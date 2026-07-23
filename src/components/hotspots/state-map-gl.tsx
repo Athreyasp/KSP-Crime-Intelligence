@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { DISTRICT_STATS } from "@/data/mock";
+
 import karnatakaGeo from "@/data/karnataka.geojson.json";
 
 const MAPTILER_KEY = "vJbuGTzYMGTLnGWttx64";
@@ -21,12 +21,14 @@ function heatColor(heat: number, low: number, high: number) {
 }
 
 export function StateMapGL({
+  districtStats,
   maxTotal,
   selectedId,
   onSelect,
   lowT,
   highT,
 }: {
+  districtStats: any[];
   maxTotal: number;
   selectedId: number | null;
   onSelect: (id: number) => void;
@@ -101,9 +103,9 @@ export function StateMapGL({
 
       // annotate features with heat + district id
       const heatByName = new Map<string, { heat: number; districtId: number; total: number; spike: number; name: string }>();
-      for (const s of DISTRICT_STATS) {
+      for (const s of districtStats) {
         heatByName.set(toGeo(s.district.name), {
-          heat: s.total / maxTotal,
+          heat: s.total / (maxTotal || 1),
           districtId: s.district.id,
           total: s.total,
           spike: s.spike,
@@ -318,6 +320,42 @@ export function StateMapGL({
       0.8,
     ]);
   }, [lowT, highT, selectedId]);
+
+  // Update map source data dynamically when districtStats or maxTotal changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loadedRef.current) return;
+    
+    const source = map.getSource("ka-districts") as maplibregl.GeoJSONSource;
+    if (!source) return;
+
+    const geo: any = JSON.parse(JSON.stringify(karnatakaGeo));
+    const heatByName = new Map<string, { heat: number; districtId: number; total: number; spike: number; name: string }>();
+    
+    for (const s of districtStats) {
+      heatByName.set(toGeo(s.district.name), {
+        heat: s.total / (maxTotal || 1),
+        districtId: s.district.id,
+        total: s.total,
+        spike: s.spike,
+        name: s.district.name,
+      });
+    }
+
+    for (const f of geo.features) {
+      const info = heatByName.get(f.properties?.district ?? f.properties?.NAME ?? f.properties?.name);
+      f.properties = {
+        ...(f.properties ?? {}),
+        heat: info?.heat ?? 0,
+        districtId: info?.districtId ?? -1,
+        total: info?.total ?? 0,
+        spike: info?.spike ?? 0,
+        districtName: info?.name ?? f.properties?.district ?? f.properties?.NAME,
+      };
+    }
+
+    source.setData(geo);
+  }, [districtStats, maxTotal]);
 
   return (
     <>

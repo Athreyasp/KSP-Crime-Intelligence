@@ -1,5 +1,5 @@
-import { Bell, Search, Calendar as CalendarIcon, Command as CmdIcon, Radio, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Bell, Search, Calendar as CalendarIcon, Command as CmdIcon, Radio } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +28,26 @@ function useNow() {
 
 export function Topbar() {
   const [open, setOpen] = useState(false);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const pathname = useRouterState({ select: s => s.location.pathname });
   const now = useNow();
   const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (open) {
+          setOpen(false);
+        } else {
+          searchButtonRef.current?.focus();
+          setOpen(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   const key = Object.keys(ROUTE_LABELS).find(
     k => (k === "/" ? pathname === "/" : pathname.startsWith(k))
@@ -57,16 +74,7 @@ export function Topbar() {
           <span className="hidden sm:inline">{dateStr}</span>
           <span className="hidden sm:inline text-paper/40">|</span>
           <span className="tabular-nums text-signal">{timeStr} IST</span>
-          <span className="ml-auto hidden md:flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px] shadow-success" />
-              FEED · OK
-            </span>
-            <span className="text-paper/40">|</span>
-            <span className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-signal" /> ANOMALIES · 6
-            </span>
-          </span>
+
         </div>
 
         {/* Main bar — editorial masthead */}
@@ -85,6 +93,7 @@ export function Topbar() {
 
           {/* Search — bold framed lozenge */}
           <button
+            ref={searchButtonRef}
             onClick={() => setOpen(true)}
             className={cn(
               "group ml-auto md:ml-4 flex flex-1 max-w-lg items-center gap-2 rounded-sm border-2 border-ink bg-paper px-3 py-2 text-sm text-muted-foreground",

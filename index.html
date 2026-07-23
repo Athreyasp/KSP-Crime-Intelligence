@@ -14,6 +14,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <script src="https://static.zohocdn.com/catalyst/web/v2/catalystWebJS.js"></script>
+    <script>
+      // Initialize Catalyst Web SDK — handles auth session automatically
+      window.__catalystReady = new Promise(function(resolve) {
+        try {
+          var app = catalyst.auth.signIn("login");
+          if (app) {
+            resolve(app);
+          } else {
+            resolve(null);
+          }
+        } catch(e) {
+          console.warn("Catalyst SDK init skipped (likely local dev):", e.message);
+          resolve(null);
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

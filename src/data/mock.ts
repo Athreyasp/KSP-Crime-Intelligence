@@ -99,53 +99,21 @@ export type Case = {
   actSections: string[];
   moTag: string;
   briefFacts: string;
-  complainant: { name: string; age: number; gender: "M" | "F"; occupation: string };
-  victims: { name: string; age: number; gender: "M" | "F" }[];
-  accused: { id: string; name: string; age: number; gender: "M" | "F"; arrestId?: number }[];
+  complainant: { name: string; age: number; gender: string; occupation: string; religion?: string; caste?: string };
+  victims: { name: string; age: number; gender: string; isPolice?: boolean }[];
+  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string }[];
   latitude: number;
   longitude: number;
+  incidentToDate?: string;
+  infoReceivedPSDate?: string;
+  registeringOfficer?: string;
+  courtName?: string;
 };
 
 const OCCUPATIONS = ["Farmer", "Shopkeeper", "IT Employee", "Student", "Homemaker", "Auto Driver", "Govt Employee", "Businessperson"];
 const ACT_SECTIONS = ["BNS 103", "BNS 109", "BNS 305", "BNS 318", "IT Act 66C", "IT Act 66D", "NDPS 20", "IPC 379", "IPC 420", "Arms Act 25"];
 
-export const CASES: Case[] = Array.from({ length: 240 }, (_, i) => {
-  const district = pick(DISTRICTS);
-  const head = pick(CRIME_HEADS);
-  const cat = pick(CASE_CATEGORY);
-  const daysAgo = Math.floor(rand() * 180);
-  const date = new Date(Date.now() - daysAgo * 86400000);
-  const incidentHour = Math.floor(rand() * 24);
-  const nVictims = 1 + Math.floor(rand() * 2);
-  const nAccused = 1 + Math.floor(rand() * 3);
-  return {
-    caseMasterId: 10000 + i,
-    crimeNo: `${1}${String(district.id).padStart(4, "0")}${String(1000 + i).padStart(4, "0")}${date.getFullYear()}${String(i).padStart(5, "0")}`,
-    registeredDate: date.toISOString(),
-    incidentDate: new Date(date.getTime() - Math.floor(rand() * 3) * 86400000).toISOString(),
-    hour: incidentHour,
-    district,
-    policeStation: `${district.name} PS-${1 + Math.floor(rand() * 6)}`,
-    category: cat,
-    gravity: rand() > 0.65 ? "Heinous" : "Non-Heinous",
-    crimeHead: head,
-    status: pick(CASE_STATUS),
-    actSections: Array.from({ length: 1 + Math.floor(rand() * 2) }, () => pick(ACT_SECTIONS)),
-    moTag: pick(MO_TAGS),
-    briefFacts: `Incident reported in ${district.name}. Complainant alleges ${head.name.toLowerCase()} involving ${nAccused} suspect(s). Investigation is ongoing under jurisdiction of the local police station.`,
-    complainant: { name: randName(), age: 22 + Math.floor(rand() * 45), gender: rand() > 0.5 ? "M" : "F", occupation: pick(OCCUPATIONS) },
-    victims: Array.from({ length: nVictims }, () => ({ name: randName(), age: 18 + Math.floor(rand() * 55), gender: (rand() > 0.5 ? "M" : "F") as "M" | "F" })),
-    accused: Array.from({ length: nAccused }, (_, ai) => ({
-      id: `A${ai + 1}`,
-      name: randName(),
-      age: 19 + Math.floor(rand() * 40),
-      gender: (rand() > 0.3 ? "M" : "F") as "M" | "F",
-      arrestId: rand() > 0.4 ? 5000 + Math.floor(rand() * 500) : undefined,
-    })),
-    latitude: 12 + district.y * 4,
-    longitude: 74 + district.x * 4,
-  };
-});
+export const CASES: Case[] = [];
 
 // Repeat offenders — cluster accused names that recur across cases
 export type Offender = {
@@ -160,7 +128,7 @@ export type Offender = {
   riskScore: number; // 0..100
 };
 
-export const OFFENDERS: Offender[] = Array.from({ length: 24 }, (_, i) => {
+export const OFFENDERS: Offender[] = CASES.length > 0 ? Array.from({ length: 24 }, (_, i) => {
   const name = randName();
   const cases = Array.from({ length: 2 + Math.floor(rand() * 6) }, () => CASES[Math.floor(rand() * CASES.length)]);
   return {
@@ -174,7 +142,7 @@ export const OFFENDERS: Offender[] = Array.from({ length: 24 }, (_, i) => {
     cases: cases.map(c => c.caseMasterId),
     riskScore: Math.min(100, Math.round(40 + cases.length * 6 + rand() * 15)),
   };
-});
+}) : [];
 
 // Associates linked to each offender (co-accused, victims, handlers)
 const RELATIONS = ["Co-Accused", "Known Associate", "Family", "Financial Link", "Same MO Cell", "Cellmate"] as const;
@@ -348,7 +316,7 @@ export const DISTRICT_STATS = DISTRICTS.map(d => {
 // KPIs
 export const KPIS = {
   totalFIRs: CASES.length,
-  heinousPct: Math.round((CASES.filter(c => c.gravity === "Heinous").length / CASES.length) * 100),
+  heinousPct: CASES.length > 0 ? Math.round((CASES.filter(c => c.gravity === "Heinous").length / CASES.length) * 100) : 0,
   arrests: CASES.reduce((s, c) => s + c.accused.filter(a => a.arrestId).length, 0),
   pending: CASES.filter(c => c.status === "Under Investigation").length,
   chargeSheeted: CASES.filter(c => c.status === "Charge Sheeted").length,
@@ -395,7 +363,7 @@ export type SubArea = {
 };
 
 // Approximate district centroids (lat, lng) — used as fallback for area coords
-const DISTRICT_COORDS: Record<string, [number, number]> = {
+export const DISTRICT_COORDS: Record<string, [number, number]> = {
   "Bengaluru City": [12.9716, 77.5946],
   "Bengaluru Rural": [13.2846, 77.6947],
   "Mysuru": [12.2958, 76.6394],
@@ -418,7 +386,7 @@ const DISTRICT_COORDS: Record<string, [number, number]> = {
   "Kolar": [13.1372, 78.1298],
 };
 
-const AREA_COORDS: Record<string, [number, number]> = {
+export const AREA_COORDS: Record<string, [number, number]> = {
   "Whitefield": [12.9698, 77.75],
   "Koramangala": [12.9352, 77.6245],
   "Indiranagar": [12.9784, 77.6408],
@@ -532,7 +500,7 @@ const AREA_COORDS: Record<string, [number, number]> = {
   "Srinivaspur": [13.3402, 78.2117],
 };
 
-const AREA_NAMES: Record<string, string[]> = {
+export const AREA_NAMES: Record<string, string[]> = {
   "Bengaluru City": ["Whitefield","Koramangala","Indiranagar","MG Road","Electronic City","Yelahanka","Jayanagar","HSR Layout","Malleshwaram","Marathahalli"],
   "Bengaluru Rural": ["Devanahalli","Doddaballapur","Hoskote","Nelamangala"],
   "Mysuru": ["Krishnaraja","Chamundipuram","Vijayanagar","Hebbal","T. Narasipur","Nanjangud","Hunsur"],
@@ -612,7 +580,7 @@ export type MicroSpot = {
   y: number;
 };
 
-const STREET_SUFFIXES = ["Main Rd", "Cross", "Circle", "Market", "Junction", "Bus Stand", "Layout", "Nagar", "Colony", "Beat"];
+export const STREET_SUFFIXES = ["Main Rd", "Cross", "Circle", "Market", "Junction", "Bus Stand", "Layout", "Nagar", "Colony", "Beat"];
 
 export const getMicroSpots = (area: SubArea): MicroSpot[] => {
   const count = 6 + ((area.name.length + area.districtId) % 4); // 6..9

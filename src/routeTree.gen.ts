@@ -18,6 +18,7 @@ import { Route as PredictiveRouteImport } from './routes/predictive'
 import { Route as SociologicalRouteImport } from './routes/sociological'
 import { Route as CasesIndexRouteImport } from './routes/cases.index'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
+import { Route as CasesNewRouteImport } from './routes/cases.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
   path: '/$caseId',
   getParentRoute: () => CasesRoute,
 } as any)
+const CasesNewRoute = CasesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => CasesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/cases/new': typeof CasesNewRoute
   '/cases/': typeof CasesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/cases/new': typeof CasesNewRoute
   '/cases': typeof CasesIndexRoute
 }
 export interface FileRoutesById {
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/cases/new': typeof CasesNewRoute
   '/cases/': typeof CasesIndexRoute
 }
 export interface FileRouteTypes {
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/predictive'
     | '/sociological'
     | '/cases/$caseId'
+    | '/cases/new'
     | '/cases/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/predictive'
     | '/sociological'
     | '/cases/$caseId'
+    | '/cases/new'
     | '/cases'
   id:
     | '__root__'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/predictive'
     | '/sociological'
     | '/cases/$caseId'
+    | '/cases/new'
     | '/cases/'
   fileRoutesById: FileRoutesById
 }
@@ -208,16 +220,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdRouteImport
       parentRoute: typeof CasesRoute
     }
+    '/cases/new': {
+      id: '/cases/new'
+      path: '/new'
+      fullPath: '/cases/new'
+      preLoaderRoute: typeof CasesNewRouteImport
+      parentRoute: typeof CasesRoute
+    }
   }
 }
 
 interface CasesRouteChildren {
   CasesCaseIdRoute: typeof CasesCaseIdRoute
+  CasesNewRoute: typeof CasesNewRoute
   CasesIndexRoute: typeof CasesIndexRoute
 }
 
 const CasesRouteChildren: CasesRouteChildren = {
   CasesCaseIdRoute: CasesCaseIdRoute,
+  CasesNewRoute: CasesNewRoute,
   CasesIndexRoute: CasesIndexRoute,
 }
 
@@ -235,13 +256,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

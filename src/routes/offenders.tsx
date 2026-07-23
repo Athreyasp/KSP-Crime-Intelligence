@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { OFFENDERS, CASES, OFFENDER_ASSOCIATES, OFFENDER_PREDICTIONS } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
 import { ChevronRight, MapPin, Fingerprint, Users, Sparkles, TriangleAlert, Clock, Target } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { PageHeader } from "@/components/page-header";
@@ -21,10 +21,18 @@ export const Route = createFileRoute("/offenders")({
 });
 
 function OffendersPage() {
+  const { offenders: OFFENDERS, cases: CASES } = useDb();
   const [q, setQ] = useState("");
-  const [openId, setOpenId] = useState<string | null>(OFFENDERS[0].id);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openId && OFFENDERS.length > 0) {
+      setOpenId(OFFENDERS[0].id);
+    }
+  }, [OFFENDERS, openId]);
+
   const filtered = OFFENDERS.filter(o => o.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => b.riskScore - a.riskScore);
-  const active = OFFENDERS.find(o => o.id === openId);
+  const active = OFFENDERS.find(o => o.id === openId) || OFFENDERS[0];
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -36,7 +44,17 @@ function OffendersPage() {
         actions={<Badge variant="outline" className="border-signal/40 text-signal">{OFFENDERS.length} on watchlist</Badge>}
       />
 
-      <div className="grid gap-4 lg:grid-cols-5 items-start">
+      {OFFENDERS.length === 0 ? (
+        <Card className="p-8 text-center bg-surface-1 border-border">
+          <p className="text-sm text-muted-foreground italic">No repeat offenders registered yet. Offender profiles and predictive next-action intelligence will be displayed here once cases with accused details are added.</p>
+          <div className="mt-4">
+            <Link to="/cases/new" className="inline-flex items-center gap-1.5 bg-ink px-4 py-2 text-xs font-semibold text-paper hover:bg-signal transition-colors">
+              Register new FIR Case
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-5 items-start">
         <Card className="lg:col-span-2 bg-surface-1 border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Watchlist</CardTitle>
@@ -155,11 +173,13 @@ function OffendersPage() {
           </Card>
         )}
       </div>
+      )}
     </div>
   );
 }
 
 function AssociatesPanel({ offenderId }: { offenderId: string }) {
+  const { offenderAssociates: OFFENDER_ASSOCIATES } = useDb();
   const associates = OFFENDER_ASSOCIATES[offenderId] ?? [];
   const roleStyle: Record<string, string> = {
     "Co-Accused": "border-alert/40 text-alert bg-alert/5",
@@ -234,6 +254,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
 }
 
 function PredictionPanel({ offenderId, offenderName }: { offenderId: string; offenderName: string }) {
+  const { offenderPredictions: OFFENDER_PREDICTIONS } = useDb();
   const pred = OFFENDER_PREDICTIONS[offenderId];
   if (!pred) return null;
   const confColor = pred.confidence === "High" ? "text-alert border-alert/40 bg-alert/10"

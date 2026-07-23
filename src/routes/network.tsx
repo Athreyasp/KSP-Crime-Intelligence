@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { NETWORK_RICH, neighborsOf, degreeMap, relationColor, type EntityType, type RichNode } from "@/data/network-rich";
+import { relationColor, type EntityType, type RichNode, type RelationType } from "@/data/network-rich";
+import { useDb } from "@/hooks/use-db";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/network")({
   head: () => ({
@@ -30,11 +32,14 @@ type SimLink = { source: SimNode; target: SimNode; relation: import("@/data/netw
 const W = 900;
 const H = 600;
 
-function useForceLayout() {
+function useForceLayout(networkRich: any) {
   return useMemo(() => {
-    const nodes: SimNode[] = NETWORK_RICH.nodes.map(n => ({ ...n, x: W / 2 + Math.random() * 40 - 20, y: H / 2 + Math.random() * 40 - 20 }));
+    if (!networkRich || !networkRich.nodes || networkRich.nodes.length === 0) {
+      return { nodes: [], links: [] };
+    }
+    const nodes: SimNode[] = networkRich.nodes.map((n: any) => ({ ...n, x: W / 2 + Math.random() * 40 - 20, y: H / 2 + Math.random() * 40 - 20 }));
     const idx = new Map(nodes.map(n => [n.id, n]));
-    const links = NETWORK_RICH.edges.map(e => ({
+    const links = networkRich.edges.map((e: any) => ({
       source: idx.get(e.source)!, target: idx.get(e.target)!, relation: e.relation, weight: e.weight,
     })) as SimLink[];
 
@@ -47,7 +52,7 @@ function useForceLayout() {
 
     for (let i = 0; i < 320; i++) sim.tick();
     return { nodes, links };
-  }, []);
+  }, [networkRich]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -65,8 +70,19 @@ const TYPE_META: Record<EntityType, { color: string; label: string; Icon: typeof
 /* ------------------------------------------------------------------ */
 
 function NetworkPage() {
-  const { nodes, links } = useForceLayout();
-  const deg = useMemo(() => degreeMap(), []);
+  const { networkRich } = useDb();
+  const { nodes, links } = useForceLayout(networkRich);
+  
+  const deg = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!networkRich || !networkRich.edges) return m;
+    for (const e of networkRich.edges) {
+      m.set(e.source, (m.get(e.source) ?? 0) + 1);
+      m.set(e.target, (m.get(e.target) ?? 0) + 1);
+    }
+    return m;
+  }, [networkRich]);
+
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | EntityType>("all");
@@ -76,7 +92,15 @@ function NetworkPage() {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   const focused = selected ?? hover;
-  const neighbors = useMemo(() => (focused ? neighborsOf(focused) : new Set<string>()), [focused]);
+  const neighbors = useMemo(() => {
+    const set = new Set<string>();
+    if (!focused || !networkRich || !networkRich.edges) return set;
+    for (const e of networkRich.edges) {
+      if (e.source === focused) set.add(e.target);
+      if (e.target === focused) set.add(e.source);
+    }
+    return set;
+  }, [focused, networkRich]);
 
   const filteredNodes = nodes.filter(n => {
     if (typeFilter !== "all" && n.type !== typeFilter) return false;
@@ -109,15 +133,14 @@ function NetworkPage() {
   }, [selectedNode, nodes]);
 
   return (
-    <div className="space-y-6">
-      {/* Masthead */}
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <header className="editorial-rule">
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-signal">§ 02 · Link Intelligence</div>
             <h1 className="font-editorial text-3xl md:text-4xl leading-none mt-1">Association Atlas</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {nodes.length} entities · {links.length} relationships · {NETWORK_RICH.clusters.length} clusters detected
+              {nodes.length} entities · {links.length} relationships · {networkRich?.clusters.length ?? 0} clusters detected
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -132,7 +155,17 @@ function NetworkPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-12 md:auto-rows-[minmax(0,auto)] items-stretch">
+      {nodes.length === 0 ? (
+        <Card className="p-8 text-center bg-surface-1 border-border">
+          <p className="text-sm text-muted-foreground italic">No relationship network maps generated yet. Entity relationship links will be visualized here once cases with accused/victim details are added.</p>
+          <div className="mt-4">
+            <Link to="/cases/new" className="inline-flex items-center gap-1.5 bg-ink px-4 py-2 text-xs font-semibold text-paper hover:bg-signal transition-colors">
+              Register new FIR Case
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-12 md:auto-rows-[minmax(0,auto)] items-stretch">
         {/* ---------------- Entity Rail ---------------- */}
         <Card className="md:col-span-4 lg:col-span-3 md:h-[600px] bg-surface-1 border-ink shadow-hard flex flex-col min-h-0">
           <CardHeader className="pb-2 shrink-0">
@@ -229,7 +262,7 @@ function NetworkPage() {
 
                 <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
                   {/* Cluster hulls */}
-                  {NETWORK_RICH.clusters.map(c => {
+                  {networkRich?.clusters?.map(c => {
                     const pts = nodes.filter(n => n.cluster === c.id);
                     if (pts.length < 3) return null;
                     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -351,7 +384,7 @@ function NetworkPage() {
                 </p>
               </div>
             ) : (
-              <DossierPanel node={selectedNode} nodes={nodes} deg={deg} onOpen={id => setSelected(id)} />
+              <DossierPanel node={selectedNode} nodes={nodes} deg={deg} edges={networkRich.edges} onOpen={id => setSelected(id)} />
             )}
           </CardContent>
         </Card>
@@ -398,7 +431,7 @@ function NetworkPage() {
             <CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-signal" /> Detected patterns</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {NETWORK_RICH.clusters.map((c, i) => {
+            {networkRich.clusters.map((c: any, i: number) => {
               const size = nodes.filter(n => n.cluster === c.id).length;
               const kindColor = c.kind === "organised" ? "signal" : c.kind === "recurring-mo" ? "warning" : "info";
               return (
@@ -425,6 +458,7 @@ function NetworkPage() {
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }
@@ -441,9 +475,9 @@ function diamondPoints(r: number) {
 }
 
 /* --- Dossier subcomponent --- */
-function DossierPanel({ node, nodes, deg, onOpen }: { node: RichNode; nodes: RichNode[]; deg: Map<string, number>; onOpen: (id: string) => void }) {
+function DossierPanel({ node, nodes, deg, edges, onOpen }: { node: RichNode; nodes: RichNode[]; deg: Map<string, number>; edges: any[]; onOpen: (id: string) => void }) {
   const t = TYPE_META[node.type as EntityType];
-  const links = NETWORK_RICH.edges
+  const links = edges
     .filter(e => e.source === node.id || e.target === node.id)
     .map(e => {
       const otherId = e.source === node.id ? e.target : e.source;

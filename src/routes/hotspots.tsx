@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, ChevronRight, Download, FileText, GitCompare, X } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { CRIME_HEADS, DISTRICT_STATS, HOURLY, getSubAreas, getMicroSpots, type SubArea, type MicroSpot } from "@/data/mock";
+import { CRIME_HEADS } from "@/data/mock";
+import { type SubArea, type MicroSpot } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
+import { computeSubAreas, computeMicroSpots } from "@/lib/db";
 import karnatakaMap from "@/data/karnataka-map.json";
 import { StateMapGL } from "@/components/hotspots/state-map-gl";
 import { SubAreaMapGL } from "@/components/hotspots/sub-area-map-gl";
@@ -198,6 +201,7 @@ async function svgToPngDataUrl(svg: SVGSVGElement, scale = 2): Promise<string> {
 }
 
 function Hotspots() {
+  const { districtStats: DISTRICT_STATS, hourly: HOURLY } = useDb();
   const [hour, setHour] = useState<number[]>([0, 23]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"state" | "district" | "area">("state");
@@ -214,8 +218,8 @@ function Hotspots() {
   const [compareBId, setCompareBId] = useState<number>(defaultB);
   const mapWrapRef = useRef<HTMLDivElement | null>(null);
 
-  const maxTotal = Math.max(...DISTRICT_STATS.map(d => d.total));
-  const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) ?? DISTRICT_STATS[0];
+  const maxTotal = Math.max(...DISTRICT_STATS.map(d => d.total), 1);
+  const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) ?? DISTRICT_STATS[0] ?? { district: { id: 1, name: "Bengaluru City" }, total: 0 };
   const lowT = thresholds[0] / 100;
   const highT = thresholds[1] / 100;
 
@@ -224,7 +228,7 @@ function Hotspots() {
     [selected]
   );
 
-  const allAreas: SubArea[] = useMemo(() => getSubAreas(selected.district.id), [selected]);
+  const allAreas: SubArea[] = useMemo(() => computeSubAreas(selected.district.id, DISTRICT_STATS), [selected, DISTRICT_STATS]);
 
   const matchesFilters = (a: SubArea) => {
     if (crimeFilter !== "all" && a.topCrime !== crimeFilter) return false;
@@ -248,7 +252,7 @@ function Hotspots() {
 
   const maxAreaFirs = Math.max(...allAreas.map(a => a.firs), 1);
   const selectedArea = allAreas.find(a => a.id === selectedAreaId) ?? null;
-  const microSpots = useMemo(() => (selectedArea ? getMicroSpots(selectedArea) : []), [selectedArea]);
+  const microSpots = useMemo(() => (selectedArea ? computeMicroSpots(selectedArea) : []), [selectedArea]);
   const maxMicroFirs = Math.max(...microSpots.map(m => m.firs), 1);
   const [selectedMicroId, setSelectedMicroId] = useState<string | null>(null);
   const selectedMicro = microSpots.find(m => m.id === selectedMicroId) ?? null;
@@ -480,6 +484,7 @@ function Hotspots() {
             <div ref={mapWrapRef} className="relative aspect-[5/4] rounded-md border border-border bg-surface-2 grid-bg overflow-hidden">
               {viewMode === "state" ? (
                 <StateMapGL
+                  districtStats={DISTRICT_STATS}
                   maxTotal={maxTotal}
                   selectedId={selectedId}
                   onSelect={openDistrict}

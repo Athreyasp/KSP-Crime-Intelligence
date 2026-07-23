@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CASES } from "@/data/mock";
+import { getStoredCases } from "@/lib/db";
 import { ArrowLeft, MapPin, Calendar, Gavel, User, Users, Shield } from "lucide-react";
 
 export const Route = createFileRoute("/cases/$caseId")({
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/cases/$caseId")({
     ],
   }),
   loader: ({ params }: { params: { caseId: string } }) => {
-    const c = CASES.find(x => x.caseMasterId === Number(params.caseId));
+    const c = getStoredCases().find(x => x.caseMasterId === Number(params.caseId));
     if (!c) throw notFound();
     return { case: c };
   },
@@ -27,7 +27,16 @@ export const Route = createFileRoute("/cases/$caseId")({
 
 function CaseDetail() {
   const { caseId } = Route.useParams();
-  const c = CASES.find(x => x.caseMasterId === Number(caseId)) || CASES[0];
+  const cases = getStoredCases();
+  const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
+  if (!c) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h2 className="font-display text-2xl">No cases registered yet</h2>
+        <Link to="/cases/new" className="mt-4 inline-block text-primary hover:underline">Register FIR Case</Link>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <Link to="/cases" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -72,18 +81,27 @@ function CaseDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Complainant</CardTitle></CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p className="font-medium">{c.complainant.name}</p>
-            <p className="text-xs text-muted-foreground">Age {c.complainant.age} · {c.complainant.gender === "M" ? "Male" : "Female"}</p>
+            <p className="text-xs text-muted-foreground">Age {c.complainant.age} · {c.complainant.gender === "M" ? "Male" : c.complainant.gender === "F" ? "Female" : "Transgender"}</p>
             <p className="text-xs text-muted-foreground">Occupation: {c.complainant.occupation}</p>
+            {/* @ts-ignore */}
+            {c.complainant.religion && <p className="text-xs text-muted-foreground">Religion: {c.complainant.religion}</p>}
+            {/* @ts-ignore */}
+            {c.complainant.caste && <p className="text-xs text-muted-foreground">Caste: {c.complainant.caste}</p>}
           </CardContent>
         </Card>
 
         <Card className="bg-surface-1 border-border">
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Victims ({c.victims.length})</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {c.victims.map((v: typeof c.victims[number], i: number) => (
-              <div key={i} className="text-sm">
-                <p className="font-medium">{v.name}</p>
-                <p className="text-xs text-muted-foreground">Age {v.age} · {v.gender === "M" ? "Male" : "Female"}</p>
+            {c.victims.map((v: any, i: number) => (
+              <div key={i} className="text-sm flex justify-between items-start border-b border-border/40 pb-1.5 last:border-0 last:pb-0">
+                <div>
+                  <p className="font-medium">{v.name}</p>
+                  <p className="text-xs text-muted-foreground">Age {v.age} · {v.gender === "M" ? "Male" : v.gender === "F" ? "Female" : "Transgender"}</p>
+                </div>
+                {v.isPolice && (
+                  <Badge variant="outline" className="border-signal/45 text-signal text-[9px] uppercase tracking-widest font-mono scale-90">Police</Badge>
+                )}
               </div>
             ))}
           </CardContent>
@@ -92,16 +110,26 @@ function CaseDetail() {
         <Card className="bg-surface-1 border-border">
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Shield className="h-4 w-4" /> Accused ({c.accused.length})</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {c.accused.map((a: typeof c.accused[number]) => (
-              <div key={a.id} className="flex items-center justify-between text-sm rounded-md border border-border bg-surface-2 p-2">
-                <div>
-                  <p className="font-medium">{a.id} · {a.name}</p>
-                  <p className="text-[11px] text-muted-foreground">Age {a.age} · {a.gender}</p>
+            {c.accused.map((a: any) => (
+              <div key={a.id} className="flex flex-col gap-1.5 text-sm rounded-md border border-border bg-surface-2 p-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{a.id} · {a.name}</p>
+                    <p className="text-[11px] text-muted-foreground">Age {a.age} · {a.gender}</p>
+                  </div>
+                  {a.arrestId ? (
+                    <Badge className="bg-success/20 text-success border border-success/40">Arrested</Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-warning/40 text-warning">At large</Badge>
+                  )}
                 </div>
-                {a.arrestId ? (
-                  <Badge className="bg-success/20 text-success border border-success/40">Arrested</Badge>
-                ) : (
-                  <Badge variant="outline" className="border-warning/40 text-warning">At large</Badge>
+                {a.arrestId && (a.arrestDate || a.arrestDistrict || a.ioName || a.courtName) && (
+                  <div className="border-t border-border/50 pt-1.5 mt-1 text-[10px] text-muted-foreground space-y-0.5">
+                    {a.arrestDate && <p>Arrested Date: {new Date(a.arrestDate).toLocaleDateString("en-IN")}</p>}
+                    {a.arrestDistrict && <p>Arrest Location: {a.arrestDistrict} District</p>}
+                    {a.ioName && <p>IO Officer: {a.ioName}</p>}
+                    {a.courtName && <p>Court: {a.courtName}</p>}
+                  </div>
                 )}
               </div>
             ))}
@@ -110,15 +138,23 @@ function CaseDetail() {
       </div>
 
       <Card className="bg-surface-1 border-border">
-        <CardHeader className="pb-2"><CardTitle className="text-base">Incident Location</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Incident & Registration Particulars</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-4 text-sm">
             <Info label="Police Station" value={c.policeStation} />
             <Info label="District" value={c.district.name} />
             <Info label="Latitude" value={c.latitude.toFixed(4)} mono />
             <Info label="Longitude" value={c.longitude.toFixed(4)} mono />
-            <Info label="Incident from" value={new Date(c.incidentDate).toLocaleString("en-IN")} />
+            <Info label="Incident From" value={new Date(c.incidentDate).toLocaleString("en-IN")} />
+            {/* @ts-ignore */}
+            <Info label="Incident To" value={c.incidentToDate ? new Date(c.incidentToDate).toLocaleString("en-IN") : "N/A"} />
+            {/* @ts-ignore */}
+            <Info label="Info Received at PS" value={c.infoReceivedPSDate ? new Date(c.infoReceivedPSDate).toLocaleString("en-IN") : "N/A"} />
             <Info label="Registered" value={new Date(c.registeredDate).toLocaleString("en-IN")} />
+            {/* @ts-ignore */}
+            <Info label="Registering Officer" value={c.registeringOfficer || "N/A"} />
+            {/* @ts-ignore */}
+            <Info label="Hearing Court" value={c.courtName || "N/A"} />
             <Info label="MO Tag" value={c.moTag} />
             <Info label="Hour of Incident" value={`${String(c.hour).padStart(2, "0")}:00`} mono />
           </div>

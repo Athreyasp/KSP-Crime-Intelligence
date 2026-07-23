@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
-import { fetchLiveCases } from "@/lib/catalyst-api";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CASES, DISTRICTS, CRIME_HEADS, CASE_STATUS } from "@/data/mock";
+import { DISTRICTS, CRIME_HEADS, CASE_STATUS } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
 import { ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
@@ -21,17 +21,11 @@ export const Route = createFileRoute("/cases/")({
 });
 
 function CasesPage() {
-  const [allCases, setAllCases] = useState<typeof CASES>(CASES);
+  const { cases: allCases } = useDb();
   const [q, setQ] = useState("");
   const [district, setDistrict] = useState<string>("all");
   const [head, setHead] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
-
-  useEffect(() => {
-    fetchLiveCases().then(data => {
-      if (data && data.length > 0) setAllCases(data);
-    });
-  }, []);
 
   const rows = useMemo(() => allCases.filter(c =>
     (district === "all" || c.district.name === district) &&
@@ -47,7 +41,7 @@ function CasesPage() {
         eyebrow="FIR Corpus"
         title="Case Explorer"
         description="Browse the state FIR corpus. Filter by district, crime head or status, then open a row for full case detail."
-        actions={<Badge variant="outline" className="border-border">{rows.length} of {CASES.length}</Badge>}
+        actions={<Badge variant="outline" className="border-border">{rows.length} of {allCases.length}</Badge>}
       />
 
       <Card className="bg-surface-1 border-border">

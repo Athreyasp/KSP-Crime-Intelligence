@@ -1,11 +1,10 @@
 {
 	"deployment": {
 		"name": "api",
-		"stack": "java25",
-		"type": "advancedio",
-		"env_variables": {}
+		"stack": "node20",
+		"type": "advancedio"
 	},
 	"execution": {
-		"main": " ApiFunction"
+		"main": "index.js"
 	}
 }

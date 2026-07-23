@@ -8,7 +8,8 @@ import {
   LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart,
   FolderSearch, FileText, Building2, Fingerprint,
 } from "lucide-react";
-import { CASES, OFFENDERS, DISTRICTS } from "@/data/mock";
+import { DISTRICTS } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
 
 const PAGES = [
   { title: "Overview", url: "/", icon: LayoutDashboard, hint: "Statewide KPIs" },
@@ -25,18 +26,7 @@ export function GlobalSearch({
 }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-
-  // ⌘K / Ctrl+K shortcut
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        onOpenChange(!open);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onOpenChange]);
+  const { cases: CASES, offenders: OFFENDERS } = useDb();
 
   const q = query.trim().toLowerCase();
 
@@ -93,7 +83,7 @@ export function GlobalSearch({
             {pages.map(p => (
               <CommandItem
                 key={p.url}
-                value={`page ${p.title} ${p.hint}`}
+                value={`page ${p.title} ${p.hint}`.toLowerCase()}
                 onSelect={() => go(p.url)}
               >
                 <p.icon className="mr-2 h-4 w-4 text-primary" />
@@ -111,7 +101,7 @@ export function GlobalSearch({
               {districts.map(d => (
                 <CommandItem
                   key={d.id}
-                  value={`district ${d.name}`}
+                  value={`district ${d.name}`.toLowerCase()}
                   onSelect={() => go("/hotspots")}
                 >
                   <Building2 className="mr-2 h-4 w-4 text-primary" />
@@ -132,7 +122,7 @@ export function GlobalSearch({
               {offenders.map(o => (
                 <CommandItem
                   key={o.id}
-                  value={`offender ${o.name} ${o.moTags.join(" ")}`}
+                  value={`offender ${o.name} ${o.moTags.join(" ")}`.toLowerCase()}
                   onSelect={() => go("/offenders")}
                 >
                   <Fingerprint className="mr-2 h-4 w-4 text-primary" />
@@ -153,7 +143,7 @@ export function GlobalSearch({
               {cases.map(c => (
                 <CommandItem
                   key={c.caseMasterId}
-                  value={`case ${c.crimeNo} ${c.complainant.name} ${c.district.name} ${c.crimeHead.name} ${c.moTag}`}
+                  value={`case ${c.crimeNo} ${c.complainant.name} ${c.district.name} ${c.crimeHead.name} ${c.moTag}`.toLowerCase()}
                   onSelect={() => go(`/cases/${c.caseMasterId}`)}
                 >
                   <FileText className="mr-2 h-4 w-4 text-primary" />

@@ -5,7 +5,8 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   RadialBarChart, RadialBar, PolarAngleAxis,
 } from "recharts";
-import { FORECAST, DISTRICT_STATS, CASES } from "@/data/mock";
+import { FORECAST } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
 import { Sparkles, TriangleAlert, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/predictive")({
 const chartAxis = { stroke: "oklch(0.68 0.02 250)", fontSize: 11 };
 
 function Predictive() {
+  const { districtStats: DISTRICT_STATS, cases: CASES } = useDb();
   const topRisk = DISTRICT_STATS.slice(0, 6);
   const anomalies = CASES.filter(c => c.gravity === "Heinous").slice(0, 4);
 
@@ -105,7 +107,7 @@ function Predictive() {
             {anomalies.map(c => (
               <div key={c.caseMasterId} className="rounded-md border border-alert/30 bg-alert/5 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs">FIR {c.caseMasterId}</span>
+                  <span className="font-mono text-xs">FIR {c.crimeNo}</span>
                   <Badge className="bg-alert text-alert-foreground">Anomaly · 0.87</Badge>
                 </div>
                 <p className="mt-2 text-sm font-medium">{c.crimeHead.name} — {c.district.name}</p>
@@ -117,6 +119,11 @@ function Predictive() {
                 </div>
               </div>
             ))}
+            {anomalies.length === 0 && (
+              <div className="col-span-full py-6 text-center text-xs text-muted-foreground italic">
+                No anomalous or heinous patterns identified in the current records database.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -1,14 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
-import { fetchLiveCases } from "@/lib/catalyst-api";
+import { useMemo, useState } from "react";
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Shield, FileText, Gavel,
-  MapPin, Network, Brain, Radar,
+  Radar,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import {
-  KPIS, DAILY_TREND, DISTRICT_STATS, ALERTS, HOURLY, HEAD_DIST, CASES,
-} from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
+import { DISTRICTS } from "@/data/mock";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,43 +52,47 @@ function heatFill(t: number) {
 function Cartogram({
   selectedId, onSelect,
 }: { selectedId: number | null; onSelect: (id: number) => void }) {
+  const { kpis: KPIS, districtStats: DISTRICT_STATS } = useDb();
   const W = 760, H = 560;
   const PAD = 60;
   const R = 34;
 
   const max = Math.max(...DISTRICT_STATS.map(d => d.total));
 
-  const positioned = DISTRICT_STATS.map(s => ({
-    ...s,
-    cx: PAD + s.district.x * (W - PAD * 2),
-    cy: PAD + s.district.y * (H - PAD * 2),
-  }));
+  const positioned = useMemo(() => {
+    const pos = DISTRICT_STATS.map(s => ({
+      ...s,
+      cx: PAD + s.district.x * (W - PAD * 2),
+      cy: PAD + s.district.y * (H - PAD * 2),
+    }));
 
-  // Relax positions so hexes never overlap (flat-top hex min-dist ≈ √3·R)
-  const MIN_DIST = Math.sqrt(3) * R + 4;
-  for (let iter = 0; iter < 120; iter++) {
-    let moved = 0;
-    for (let i = 0; i < positioned.length; i++) {
-      for (let j = i + 1; j < positioned.length; j++) {
-        const a = positioned[i], b = positioned[j];
-        const dx = b.cx - a.cx, dy = b.cy - a.cy;
-        const dist = Math.hypot(dx, dy) || 0.01;
-        if (dist < MIN_DIST) {
-          const push = (MIN_DIST - dist) / 2;
-          const ux = dx / dist, uy = dy / dist;
-          a.cx -= ux * push; a.cy -= uy * push;
-          b.cx += ux * push; b.cy += uy * push;
-          moved += push;
+    // Relax positions so hexes never overlap (flat-top hex min-dist ≈ √3·R)
+    const MIN_DIST = Math.sqrt(3) * R + 4;
+    for (let iter = 0; iter < 120; iter++) {
+      let moved = 0;
+      for (let i = 0; i < pos.length; i++) {
+        for (let j = i + 1; j < pos.length; j++) {
+          const a = pos[i], b = pos[j];
+          const dx = b.cx - a.cx, dy = b.cy - a.cy;
+          const dist = Math.hypot(dx, dy) || 0.01;
+          if (dist < MIN_DIST) {
+            const push = (MIN_DIST - dist) / 2;
+            const ux = dx / dist, uy = dy / dist;
+            a.cx -= ux * push; a.cy -= uy * push;
+            b.cx += ux * push; b.cy += uy * push;
+            moved += push;
+          }
         }
       }
+      // clamp inside frame
+      for (const p of pos) {
+        p.cx = Math.max(PAD, Math.min(W - PAD, p.cx));
+        p.cy = Math.max(PAD, Math.min(H - PAD, p.cy));
+      }
+      if (moved < 0.5) break;
     }
-    // clamp inside frame
-    for (const p of positioned) {
-      p.cx = Math.max(PAD, Math.min(W - PAD, p.cx));
-      p.cy = Math.max(PAD, Math.min(H - PAD, p.cy));
-    }
-    if (moved < 0.5) break;
-  }
+    return pos;
+  }, []);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ maxHeight: 600 }}>
@@ -216,10 +218,11 @@ function Cartogram({
    RADIAL TIMELINE — 24h ring around selected district
    ───────────────────────────────────────────────────────── */
 function DistrictRadial({ districtId }: { districtId: number }) {
+  const { cases: CASES } = useDb();
   const hours = useMemo(() => {
-    const dc = CASES.filter(c => c.district.id === districtId);
-    return Array.from({ length: 24 }, (_, h) => dc.filter(c => c.hour === h).length);
-  }, [districtId]);
+    const dc = CASES.filter((c: any) => c.district.id === districtId);
+    return Array.from({ length: 24 }, (_, h) => dc.filter((c: any) => c.hour === h).length);
+  }, [districtId, CASES]);
 
   const S = 220, cx = S / 2, cy = S / 2, rIn = 34, rOut = 90;
   const max = Math.max(...hours, 1);
@@ -303,22 +306,26 @@ function KPI({
    MAIN
    ───────────────────────────────────────────────────────── */
 function Overview() {
-  const [allCases, setAllCases] = useState<typeof CASES>(CASES);
-  const [selectedId, setSelectedId] = useState<number>(DISTRICT_STATS[0].district.id);
+  const {
+    cases: allCases,
+    kpis: KPIS,
+    dailyTrend: DAILY_TREND,
+    districtStats: DISTRICT_STATS,
+    alerts: ALERTS,
+    headDist: HEAD_DIST,
+  } = useDb();
 
-  useEffect(() => {
-    fetchLiveCases().then(data => {
-      if (data && data.length > 0) setAllCases(data);
-    });
-  }, []);
+  const [selectedId, setSelectedId] = useState<number>(() => DISTRICT_STATS[0]?.district.id ?? 1);
 
-  const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) || DISTRICT_STATS[0];
+  const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) || DISTRICT_STATS[0] || {
+    district: DISTRICTS[0], total: 0, heinous: 0, arrests: 0, riskScore: 0, spike: 0
+  };
 
   const totalLiveFIRs = allCases.length;
   const heinousCount = allCases.filter(c => c.gravity === "Heinous").length;
   const heinousSharePct = Math.round((heinousCount / (totalLiveFIRs || 1)) * 100);
 
-  const firs14 = DAILY_TREND.slice(-14).map(d => Math.round(d.firs * (totalLiveFIRs / (CASES.length || 1))));
+  const firs14 = DAILY_TREND.slice(-14).map(d => d.firs);
   const hein14 = DAILY_TREND.slice(-14).map(d => d.heinous);
   const arr14 = DAILY_TREND.slice(-14).map(d => d.arrests);
   const cs14 = DAILY_TREND.slice(-14).map((d, i) => Math.round(d.arrests * 0.6 + i * 0.4));
@@ -330,15 +337,7 @@ function Overview() {
     <div className="space-y-5">
       {/* ───────── MASTHEAD ───────── */}
       <header className="border-y-4 border-ink py-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-ink/25 pb-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-            Vol. IV · Issue 07 · {date}
-          </span>
-          <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em]">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-signal pulse-alert" />
-            Live · SCRB Feed
-          </span>
-        </div>
+
         <h1 className="mt-3 font-editorial text-[46px] md:text-[64px] leading-[0.95] tracking-tight text-ink">
           The Karnataka <em className="text-signal">Crime</em> Daily.
         </h1>
@@ -346,20 +345,7 @@ function Overview() {
           Strategic intelligence brief · {KPIS.activeDistricts} districts · {HEAD_DIST.length} crime heads ·
           rolling 30-day window · real-time anomaly channel. <span className="font-editorial italic text-ink">Read the state, then the street.</span>
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Link to="/hotspots" className="inline-flex items-center gap-1.5 bg-ink px-3 py-1.5 text-xs font-semibold text-paper hover:bg-signal transition-colors">
-            <MapPin className="h-3.5 w-3.5" /> Hotspot Map
-          </Link>
-          <Link to="/predictive" className="inline-flex items-center gap-1.5 border border-ink bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink hover:text-paper transition-colors">
-            <Brain className="h-3.5 w-3.5" /> Predictive Intel
-          </Link>
-          <Link to="/network" className="inline-flex items-center gap-1.5 border border-ink bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink hover:text-paper transition-colors">
-            <Network className="h-3.5 w-3.5" /> Network Analysis
-          </Link>
-          <span className="ml-auto hidden md:inline font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-            Ref · KSP/SCRB/OVR-01
-          </span>
-        </div>
+
       </header>
 
       {/* ───────── TICKER ───────── */}
@@ -541,13 +527,14 @@ function Overview() {
 
 /* ─── Trend line chart ─── */
 function TrendChart() {
+  const { dailyTrend: DAILY_TREND } = useDb();
   const W = 460, H = 200, PAD = { l: 30, r: 12, t: 10, b: 22 };
   const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b };
-  const max = Math.max(...DAILY_TREND.map(d => d.firs));
+  const max = Math.max(...DAILY_TREND.map((d: any) => d.firs), 1);
   const xAt = (i: number) => PAD.l + (i / (DAILY_TREND.length - 1)) * inner.w;
   const yAt = (v: number) => PAD.t + inner.h - (v / max) * inner.h;
 
-  const linePts = DAILY_TREND.map((d, i) => `${xAt(i)},${yAt(d.firs)}`).join(" L ");
+  const linePts = DAILY_TREND.map((d: any, i: number) => `${xAt(i)},${yAt(d.firs)}`).join(" L ");
   const areaPath = `M ${PAD.l},${PAD.t + inner.h} L ${linePts} L ${xAt(DAILY_TREND.length - 1)},${PAD.t + inner.h} Z`;
 
   return (
@@ -564,7 +551,7 @@ function TrendChart() {
       <path d={areaPath} fill="url(#hatch)" />
       <path d={`M ${linePts}`} fill="none" stroke={INK} strokeWidth="2" />
       {/* heinous bars */}
-      {DAILY_TREND.map((d, i) => {
+      {DAILY_TREND.map((d: any, i: number) => {
         const bh = (d.heinous / max) * inner.h * 0.4;
         return (
           <rect key={i} x={xAt(i) - 3} y={PAD.t + inner.h - bh} width="6" height={bh} fill={SIGNAL} opacity="0.85" />
@@ -594,9 +581,10 @@ function TrendChart() {
 
 /* ─── Taxonomy list ─── */
 function TaxonomyList() {
-  const total = HEAD_DIST.reduce((s, h) => s + h.value, 0) || 1;
-  const sorted = [...HEAD_DIST].sort((a, b) => b.value - a.value);
-  const max = sorted[0].value;
+  const { headDist: HEAD_DIST } = useDb();
+  const total = HEAD_DIST.reduce((s: number, h: any) => s + h.value, 0) || 1;
+  const sorted = [...HEAD_DIST].sort((a: any, b: any) => b.value - a.value);
+  const max = sorted[0]?.value ?? 1;
   return (
     <ul className="mt-3 space-y-2.5">
       {sorted.map((h, i) => {

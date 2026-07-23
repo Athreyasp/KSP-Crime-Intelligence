@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield,
+  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarHeader, SidebarFooter, useSidebar,
@@ -18,6 +18,7 @@ const ITEMS: NavItem[] = [
   { title: "Predictive",   url: "/predictive",   icon: Brain,           live: true },
   { title: "Sociological", url: "/sociological", icon: LineChart },
   { title: "Cases",        url: "/cases",        icon: FolderSearch },
+  { title: "New FIR",      url: "/cases/new",    icon: Plus },
 ];
 
 export function AppSidebar() {

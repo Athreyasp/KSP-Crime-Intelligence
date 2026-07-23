@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid,
   BarChart, Bar, LabelList,
 } from "recharts";
-import { SOCIO } from "@/data/mock";
+import { useDb } from "@/hooks/use-db";
 import { PageHeader } from "@/components/page-header";
 
 export const Route = createFileRoute("/sociological")({
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/sociological")({
 const chartAxis = { stroke: "oklch(0.68 0.02 250)", fontSize: 11 };
 
 function Sociological() {
+  const { socio: SOCIO } = useDb();
   const corr = [
     { pair: "Urbanization ↔ Crime Rate",  value: 0.62 },
     { pair: "Literacy ↔ Cyber Share",     value: 0.71 },
