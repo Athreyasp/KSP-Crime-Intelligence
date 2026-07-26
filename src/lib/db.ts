@@ -81,25 +81,27 @@ export async function addCase(c: Omit<Case, "caseMasterId">): Promise<Case> {
   }
 }
 
+let isCatalystSynced = false;
+let catalystSyncCount = 0;
+
+export function getCatalystSyncInfo() {
+  return {
+    synced: isCatalystSynced,
+    count: catalystSyncCount,
+  };
+}
+
 export async function syncWithCatalyst() {
   if (typeof window === "undefined") return;
   try {
     const liveCases = await fetchLiveCases();
     if (liveCases && Array.isArray(liveCases) && liveCases.length > 0) {
-      const current = getStoredCases();
-      const liveMap = new Map(liveCases.map(c => [c.crimeNo, c]));
-      const merged = [...liveCases];
-      
-      for (const localCase of current) {
-        if (!liveMap.has(localCase.crimeNo)) {
-          merged.push(localCase);
-        }
-      }
-      
-      saveCases(merged);
+      isCatalystSynced = true;
+      catalystSyncCount = liveCases.length;
+      saveCases(liveCases);
     }
-  } catch (err) {
-    console.warn("Catalyst sync paused or waiting for API gateway configuration:", err.message);
+  } catch (err: any) {
+    console.warn("Catalyst sync paused or waiting for API gateway configuration:", err?.message || err);
   }
 }
 
@@ -314,78 +316,150 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
   const nodes: RichNode[] = [];
   const edges: RichEdge[] = [];
   const seen = new Set<string>();
-  const add = (n: RichNode) => { if (!seen.has(n.id)) { seen.add(n.id); nodes.push(n); } };
+  const edgeSeen = new Set<string>();
+
+  const addNode = (n: RichNode) => {
+    if (!seen.has(n.id)) {
+      seen.add(n.id);
+      nodes.push(n);
+    }
+  };
+
+  const addEdge = (e: RichEdge) => {
+    const key1 = `${e.source}->${e.target}:${e.relation}`;
+    const key2 = `${e.target}->${e.source}:${e.relation}`;
+    if (!edgeSeen.has(key1) && !edgeSeen.has(key2)) {
+      edgeSeen.add(key1);
+      edges.push(e);
+    }
+  };
 
   const clusters = [
-    { id: "A-04", label: "Bengaluru Snatching Ring", kind: "organised" as const },
-    { id: "A-07", label: "Mysuru Chain-Snatch MO",   kind: "recurring-mo" as const },
-    { id: "A-11", label: "Hubballi Cyber Cell",      kind: "organised" as const },
-    { id: "A-13", label: "Ballari Vehicle Ring",     kind: "geo-ring" as const },
+    { id: "A-04", label: "Bengaluru Organized Ring", kind: "organised" as const },
+    { id: "A-07", label: "Statewide Repeat MO Cell", kind: "recurring-mo" as const },
+    { id: "A-11", label: "Cyber & Tech Crime Syndicate", kind: "organised" as const },
+    { id: "A-13", label: "Inter-District Vehicle Network", kind: "geo-ring" as const },
   ];
 
-  const VEHICLE_PLATES = ["KA-01-XX-4421", "KA-05-MJ-9013", "KA-19-BZ-7702"];
-  const PHONE_NUMBERS  = ["+91 98450 ●●●32", "+91 96632 ●●●08"];
+  const VEHICLE_PLATES = ["KA-01-XX-4421", "KA-05-MJ-9013", "KA-19-BZ-7702", "KA-09-AP-3388", "KA-51-KL-1147"];
+  const PHONE_NUMBERS  = ["+91 98450 ●●●32", "+91 96632 ●●●08", "+91 90080 ●●●17", "+91 99011 ●●●94"];
 
-  // Generate network for first 12 offenders
-  const centers = offenders.slice(0, 12);
-  centers.forEach((off, i) => {
-    const cluster = clusters[i % clusters.length].id;
-    const off_cases = off.cases.slice(0, 3);
-    const districts = new Set<string>();
-    const dates: number[] = [];
+  // 1. Process all cases from Zoho DB
+  cases.forEach((kase, cIdx) => {
+    const cluster = clusters[cIdx % clusters.length].id;
+    const caseNodeId = `C-${kase.caseMasterId}`;
 
-    // Add accused node
-    add({
-      id: off.id,
-      label: off.name,
-      type: "accused",
+    // Add Case Node
+    addNode({
+      id: caseNodeId,
+      label: `FIR ${kase.crimeNo.slice(-8)}`,
+      type: "case",
       cluster,
       meta: {
-        aliases: [`"${off.name.split(" ")[0]} bhai"`],
-        age: off.age,
-        district: off.jurisdictions[0] || "Statewide",
-        activeFIRs: off_cases.length,
-        riskScore: off.riskScore,
-        moTags: off.moTags,
-        predictedNext: {
-          crime: off.moTags[0] ?? "Theft",
-          probability: Math.min(94, off.riskScore + 5),
-          window: "7 days"
-        }
+        district: kase.district.name,
+        firstSeen: kase.registeredDate.slice(0, 10),
+        lastSeen: kase.incidentDate.slice(0, 10),
+        moTags: [kase.moTag || kase.crimeHead.name],
+        activeFIRs: 1,
+        riskScore: kase.gravity === "Heinous" ? 85 : 50,
       }
     });
 
-    off_cases.forEach(caseId => {
-      const kase = cases.find(c => c.caseMasterId === caseId);
-      if (!kase) return;
-      districts.add(kase.district.name);
-      
-      const cid = `C-${caseId}`;
-      add({
-        id: cid, label: `FIR ${kase.crimeNo.slice(-6)}`, type: "case", cluster,
-        meta: { district: kase.district.name, firstSeen: kase.registeredDate.slice(0, 10) },
+    // Add Location Node
+    const locNodeId = `L-${kase.district.id}`;
+    addNode({
+      id: locNodeId,
+      label: kase.district.name,
+      type: "location",
+      cluster,
+      meta: { district: kase.district.name }
+    });
+    addEdge({ source: caseNodeId, target: locNodeId, relation: "occurred-at", weight: 1 });
+
+    // Add Victim Nodes
+    kase.victims.forEach((v, vIdx) => {
+      const victimNodeId = `V-${kase.caseMasterId}-${vIdx}`;
+      addNode({
+        id: victimNodeId,
+        label: v.name,
+        type: "victim",
+        cluster,
+        meta: { age: v.age, district: kase.district.name }
       });
-      edges.push({ source: off.id, target: cid, relation: "co-accused", weight: 2 });
+      addEdge({ source: victimNodeId, target: caseNodeId, relation: "victim-of", weight: 1 });
+    });
 
-      const lid = `L-${kase.district.id}`;
-      add({ id: lid, label: kase.district.name, type: "location", cluster, meta: { district: kase.district.name } });
-      edges.push({ source: cid, target: lid, relation: "occurred-at", weight: 1 });
+    // Co-accused array for building direct suspect-suspect edges within the same FIR
+    const accusedNodeIdsInCase: string[] = [];
 
-      if (kase.victims.length > 0) {
-        const victim = kase.victims[0];
-        const vid = `V-${caseId}`;
-        add({
-          id: vid, label: victim.name, type: "victim", cluster,
-          meta: { age: victim.age, district: kase.district.name },
+    kase.accused.forEach((a, aIdx) => {
+      // Find matching offender profile or construct entity ID
+      const matchingOffender = offenders.find(o => o.name.trim().toLowerCase() === a.name.trim().toLowerCase());
+      const accusedNodeId = matchingOffender ? matchingOffender.id : `ACC-${a.name.replace(/\s+/g, "-")}-${aIdx}`;
+      accusedNodeIdsInCase.push(accusedNodeId);
+
+      addNode({
+        id: accusedNodeId,
+        label: a.name,
+        type: "accused",
+        cluster,
+        meta: {
+          aliases: [`"${a.name.split(" ")[0]} alias"`],
+          age: a.age,
+          district: kase.district.name,
+          activeFIRs: matchingOffender ? matchingOffender.cases.length : 1,
+          riskScore: matchingOffender ? matchingOffender.riskScore : (kase.gravity === "Heinous" ? 80 : 55),
+          moTags: matchingOffender ? matchingOffender.moTags : [kase.moTag],
+          firstSeen: kase.registeredDate.slice(0, 10),
+          predictedNext: {
+            crime: kase.moTag || "Repeat Theft",
+            probability: Math.min(95, (matchingOffender ? matchingOffender.riskScore : 60) + 10),
+            window: "7–14 days"
+          }
+        }
+      });
+
+      addEdge({ source: accusedNodeId, target: caseNodeId, relation: "co-accused", weight: 2 });
+
+      // Add vehicle connection for select suspects
+      if ((cIdx + aIdx) % 2 === 0) {
+        const plate = VEHICLE_PLATES[(cIdx + aIdx) % VEHICLE_PLATES.length];
+        const vehId = `VEH-${plate.replace(/[^A-Z0-9]/g, "")}`;
+        addNode({
+          id: vehId,
+          label: plate,
+          type: "vehicle",
+          cluster,
+          meta: { plate, district: kase.district.name }
         });
-        edges.push({ source: vid, target: cid, relation: "victim-of", weight: 1 });
+        addEdge({ source: accusedNodeId, target: vehId, relation: "drove", weight: 1.5 });
+      }
+
+      // Add phone connection for select suspects
+      if ((cIdx + aIdx) % 3 === 0) {
+        const num = PHONE_NUMBERS[(cIdx + aIdx) % PHONE_NUMBERS.length];
+        const phId = `PH-${num.replace(/[^0-9]/g, "")}`;
+        addNode({
+          id: phId,
+          label: num,
+          type: "phone",
+          cluster,
+          meta: { number: num, district: kase.district.name }
+        });
+        addEdge({ source: accusedNodeId, target: phId, relation: "called", weight: 1 });
       }
     });
 
-    if (i % 2 === 0) {
-      const veh = `VEH-${off.id}`;
-      add({ id: veh, label: VEHICLE_PLATES[i % VEHICLE_PLATES.length], type: "vehicle", cluster, meta: { plate: VEHICLE_PLATES[i % VEHICLE_PLATES.length] } });
-      edges.push({ source: off.id, target: veh, relation: "drove", weight: 1.5 });
+    // Create direct co-accused links between suspects in the same case
+    for (let i = 0; i < accusedNodeIdsInCase.length; i++) {
+      for (let j = i + 1; j < accusedNodeIdsInCase.length; j++) {
+        addEdge({
+          source: accusedNodeIdsInCase[i],
+          target: accusedNodeIdsInCase[j],
+          relation: "co-accused",
+          weight: 3
+        });
+      }
     }
   });
 

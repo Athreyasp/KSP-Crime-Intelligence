@@ -5,7 +5,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ChevronRight, Download, FileText, GitCompare, X } from "lucide-react";
+import {
+  ArrowLeft, ChevronRight, Download, FileText, GitCompare, X,
+  BarChart3, Clock, PieChart, Flame, ShieldAlert, TrendingUp, Activity
+} from "lucide-react";
 import { jsPDF } from "jspdf";
 import { CRIME_HEADS } from "@/data/mock";
 import { type SubArea, type MicroSpot } from "@/data/mock";
@@ -201,9 +204,10 @@ async function svgToPngDataUrl(svg: SVGSVGElement, scale = 2): Promise<string> {
 }
 
 function Hotspots() {
-  const { districtStats: DISTRICT_STATS, hourly: HOURLY } = useDb();
+  const { cases: allCases, districtStats: DISTRICT_STATS, hourly: HOURLY } = useDb();
   const [hour, setHour] = useState<number[]>([0, 23]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"state" | "district" | "area">("state");
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [thresholds, setThresholds] = useState<number[]>([30, 70]); // percent of max
@@ -218,8 +222,27 @@ function Hotspots() {
   const [compareBId, setCompareBId] = useState<number>(defaultB);
   const mapWrapRef = useRef<HTMLDivElement | null>(null);
 
-  const maxTotal = Math.max(...DISTRICT_STATS.map(d => d.total), 1);
-  const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) ?? DISTRICT_STATS[0] ?? { district: { id: 1, name: "Bengaluru City" }, total: 0 };
+  const filteredDistrictStats = useMemo(() => {
+    return DISTRICT_STATS.map(s => {
+      let cases = (allCases || []).filter(c => c.district.id === s.district.id || toGeoSVG(c.district.name) === toGeoSVG(s.district.name));
+      if (crimeFilter !== "all") cases = cases.filter(c => c.crimeHead.name === crimeFilter);
+      if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
+      const total = cases.length;
+      const heinous = cases.filter(c => c.gravity === "Heinous").length;
+      const arrests = cases.reduce((acc, c) => acc + (c.arrestCount || 1), 0);
+      return { ...s, total, heinous, arrests };
+    });
+  }, [DISTRICT_STATS, allCases, crimeFilter, hour]);
+
+  const filteredMaxTotal = Math.max(...filteredDistrictStats.map(d => d.total), 1);
+  const filteredMinTotal = Math.min(...filteredDistrictStats.map(d => d.total), 0);
+
+  const selected = filteredDistrictStats.find(d => d.district.id === selectedId) ?? filteredDistrictStats[0] ?? { district: { id: 1, name: "Bengaluru City" }, total: 0, heinous: 0, arrests: 0, riskScore: 50, spike: 0 };
+  const activeDistrict = useMemo(() => {
+    const targetId = hoveredId ?? selectedId;
+    return filteredDistrictStats.find(d => d.district.id === targetId) ?? selected;
+  }, [filteredDistrictStats, hoveredId, selectedId, selected]);
+
   const lowT = thresholds[0] / 100;
   const highT = thresholds[1] / 100;
 
@@ -229,6 +252,81 @@ function Hotspots() {
   );
 
   const allAreas: SubArea[] = useMemo(() => computeSubAreas(selected.district.id, DISTRICT_STATS), [selected, DISTRICT_STATS]);
+
+  const activeCases = useMemo(() => {
+    let cases = (allCases || []).filter(c => c.district.id === activeDistrict.district.id || toGeoSVG(c.district.name) === toGeoSVG(activeDistrict.district.name));
+    if (crimeFilter !== "all") cases = cases.filter(c => c.crimeHead.name === crimeFilter);
+    if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
+    return cases;
+  }, [allCases, activeDistrict, crimeFilter, hour]);
+
+  // 1. Hourly 24h profile
+  const activeHourly = useMemo(() => {
+    const counts = Array(24).fill(0);
+    activeCases.forEach(c => {
+      const h = typeof c.hour === "number" && c.hour >= 0 && c.hour < 24 ? c.hour : 10;
+      counts[h] = (counts[h] || 0) + 1;
+    });
+    return counts.map((count, h) => ({
+      hour: `${String(h).padStart(2, "0")}:00`,
+      count,
+      h
+    }));
+  }, [activeCases]);
+
+  const maxActiveHourly = Math.max(...activeHourly.map(d => d.count), 1);
+  const peakHourObj = activeHourly.reduce((max, cur) => cur.count > max.count ? cur : max, activeHourly[0] || { hour: "18:00", count: 0 });
+
+  // 2. Crime taxonomy mix
+  const activeTaxonomy = useMemo(() => {
+    const total = activeCases.length || 1;
+    return CRIME_HEADS.map(ch => {
+      const count = activeCases.filter(c => c.crimeHead.id === ch.id).length;
+      return {
+        ...ch,
+        count,
+        pct: Math.round((count / total) * 100)
+      };
+    }).sort((a, b) => b.count - a.count);
+  }, [activeCases]);
+
+  // 3. Gravity breakdown (Heinous vs Non-Heinous)
+  const activeGravity = useMemo(() => {
+    const total = activeCases.length || 1;
+    const heinousCount = activeCases.filter(c => c.gravity === "Heinous").length;
+    const nonHeinousCount = Math.max(0, total - heinousCount);
+    const heinousPct = Math.round((heinousCount / total) * 100);
+    return { heinousCount, nonHeinousCount, heinousPct };
+  }, [activeCases]);
+
+  // 4. Status disposal mix
+  const activeStatus = useMemo(() => {
+    const total = activeCases.length || 1;
+    const pending = activeCases.filter(c => c.status === "Under Investigation").length;
+    const chargeSheeted = activeCases.filter(c => c.status === "Charge Sheeted").length;
+    const closed = activeCases.filter(c => c.status === "Closed").length;
+    const trial = activeCases.filter(c => c.status === "Pending Trial").length;
+    return [
+      { name: "Under Inv.", count: pending, color: "#f59e0b", pct: Math.round((pending / total) * 100) },
+      { name: "Charge Sheeted", count: chargeSheeted, color: "#22c3e6", pct: Math.round((chargeSheeted / total) * 100) },
+      { name: "Closed", count: closed, color: "#10b981", pct: Math.round((closed / total) * 100) },
+      { name: "Pending Trial", count: trial, color: "#a855f7", pct: Math.round((trial / total) * 100) },
+    ];
+  }, [activeCases]);
+
+  // 5. Day of week incident velocity
+  const activeDayOfWeek = useMemo(() => {
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const counts: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    activeCases.forEach(c => {
+      const dt = new Date(c.registeredDate || c.incidentDate || Date.now());
+      const dayIdx = (dt.getDay() + 6) % 7; // Mon = 0
+      const dName = days[dayIdx] || "Mon";
+      counts[dName] = (counts[dName] || 0) + 1;
+    });
+    const maxVal = Math.max(...Object.values(counts), 1);
+    return days.map(d => ({ day: d, count: counts[d] || 0, maxVal }));
+  }, [activeCases]);
 
   const matchesFilters = (a: SubArea) => {
     if (crimeFilter !== "all" && a.topCrime !== crimeFilter) return false;
@@ -447,7 +545,7 @@ function Hotspots() {
             </div>
           </CardHeader>
           <CardContent>
-            {viewMode === "district" && (
+            {(viewMode === "state" || viewMode === "district") && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Filters</span>
                 <Select value={crimeFilter} onValueChange={setCrimeFilter}>
@@ -483,11 +581,14 @@ function Hotspots() {
 
             <div ref={mapWrapRef} className="relative aspect-[5/4] rounded-md border border-border bg-surface-2 grid-bg overflow-hidden">
               {viewMode === "state" ? (
-                <StateMapGL
-                  districtStats={DISTRICT_STATS}
-                  maxTotal={maxTotal}
-                  selectedId={selectedId}
-                  onSelect={openDistrict}
+                <StateMapSVG
+                  districtStats={filteredDistrictStats}
+                  minTotal={filteredMinTotal}
+                  maxTotal={filteredMaxTotal}
+                  selectedId={selected.district.id}
+                  hoveredId={hoveredId}
+                  onHover={(id) => setHoveredId(id)}
+                  onSelect={(id) => setSelectedId(id)}
                   lowT={lowT}
                   highT={highT}
                 />
@@ -537,16 +638,17 @@ function Hotspots() {
               )}
             </div>
 
-            {/* Choropleth legend */}
-            <div className="mt-4 rounded-md border border-border bg-surface-2 p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium">Choropleth scale</span>
-                <span className="text-muted-foreground text-[10px]">
-                  % of max {viewMode === "district" ? "area" : "district"} FIRs
+            {/* Choropleth legend & Dual-Thumb Range Slider */}
+            <div className="mt-4 rounded-md border border-border bg-surface-2 p-3 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span>Choropleth Class Breaks</span>
+                <span className="font-mono text-[10px] text-signal font-bold bg-signal/10 px-2 py-0.5 rounded border border-signal/30">
+                  Low: {thresholds[0]}% · High: ≥ {thresholds[1]}%
                 </span>
               </div>
+              
               <div
-                className="h-3 w-full rounded-sm border border-border"
+                className="h-3 w-full rounded-full border border-border/50 shadow-inner"
                 style={{
                   background: `linear-gradient(to right,
                     ${COLOR_LOW} 0%,
@@ -557,12 +659,7 @@ function Hotspots() {
                     ${COLOR_HIGH} 100%)`,
                 }}
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>0%</span>
-                <span className="text-foreground">low → {thresholds[0]}%</span>
-                <span className="text-foreground">high ≥ {thresholds[1]}%</span>
-                <span>100%</span>
-              </div>
+              
               <Slider
                 value={thresholds}
                 onValueChange={(v) => {
@@ -571,188 +668,388 @@ function Hotspots() {
                 min={5}
                 max={95}
                 step={5}
-                className="mt-1"
+                className="mt-2"
               />
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Drag the two handles to redraw class breaks. Below <span className="font-mono text-foreground">{thresholds[0]}%</span> = low intensity (teal), between = medium (amber), above <span className="font-mono text-foreground">{thresholds[1]}%</span> = high (red). Values normalized against the largest observed FIR count in view.
+
+              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                <span>0% (Min)</span>
+                <span className="text-primary font-bold">Class Break 1: {thresholds[0]}%</span>
+                <span className="text-alert font-bold">Class Break 2: {thresholds[1]}%</span>
+                <span>100% (Max)</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed pt-1 border-t border-border/30">
+                Drag both handles to adjust heat threshold breaks across Karnataka districts in real-time.
               </p>
             </div>
 
-            <div className="mt-3 rounded-md border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Time-of-day window</span>
-                <span className="font-mono">{String(hour[0]).padStart(2, "0")}:00 – {String(hour[1]).padStart(2, "0")}:00</span>
+            {/* Time-of-day Range Slider */}
+            <div className="mt-3 rounded-md border border-border bg-surface-2 p-3 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-signal" />
+                  Time-of-Day Active Window
+                </span>
+                <span className="font-mono text-signal font-bold bg-signal/10 px-2 py-0.5 rounded border border-signal/30">
+                  {String(hour[0]).padStart(2, "0")}:00 – {String(hour[1]).padStart(2, "0")}:00
+                </span>
               </div>
-              <Slider value={hour} onValueChange={setHour} min={0} max={23} step={1} className="mt-3" />
-              <div className="mt-2 flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
+
+              <Slider
+                value={hour}
+                onValueChange={(v) => {
+                  if (v.length === 2 && v[0] <= v[1]) setHour(v);
+                }}
+                min={0}
+                max={23}
+                step={1}
+                className="mt-2"
+              />
+
+              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>
+              </div>
+
+              {/* Time Band Quick Presets */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Button
+                  size="sm"
+                  variant={hour[0] === 0 && hour[1] === 23 ? "default" : "outline"}
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setHour([0, 23])}
+                >
+                  Full 24h
+                </Button>
+                <Button
+                  size="sm"
+                  variant={hour[0] === 0 && hour[1] === 6 ? "default" : "outline"}
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setHour([0, 6])}
+                >
+                  Night (00-06)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={hour[0] === 6 && hour[1] === 12 ? "default" : "outline"}
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setHour([6, 12])}
+                >
+                  Morning (06-12)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={hour[0] === 12 && hour[1] === 18 ? "default" : "outline"}
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setHour([12, 18])}
+                >
+                  Afternoon (12-18)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={hour[0] === 18 && hour[1] === 23 ? "default" : "outline"}
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setHour([18, 23])}
+                >
+                  Evening (18-23)
+                </Button>
               </div>
             </div>
 
-            <div className="mt-3 rounded-md border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between text-xs">
+            {/* Red-zone Spike Threshold Slider */}
+            <div className="mt-3 rounded-md border border-border bg-surface-2 p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold">
                 <span className="text-muted-foreground flex items-center gap-1.5">
                   <span className="pulse-alert h-2 w-2 rounded-full bg-alert" />
-                  Red-zone spike threshold
+                  Red-Zone Spike Alert Sensitivity
                 </span>
-                <span className="font-mono text-alert">+{spikeThreshold[0]}%</span>
+                <span className="font-mono text-alert font-bold bg-alert/10 px-2 py-0.5 rounded border border-alert/30">
+                  +{spikeThreshold[0]}%
+                </span>
               </div>
+
               <Slider
                 value={spikeThreshold}
                 onValueChange={setSpikeThreshold}
                 min={0}
                 max={50}
                 step={1}
-                className="mt-3"
+                className="mt-2"
               />
-              <div className="mt-2 flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>0%</span><span>15%</span><span>25%</span><span>50%</span>
+
+              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                <span>0% (All)</span><span>+15% (Standard)</span><span>+25% (Elevated)</span><span>+50% (Extreme)</span>
               </div>
-              <p className="mt-2 text-[10px] text-muted-foreground leading-relaxed">
-                Areas whose FIR volume rises above <span className="font-mono text-foreground">+{spikeThreshold[0]}%</span> vs baseline pulse red on the map.
+              <p className="text-[10px] text-muted-foreground leading-relaxed pt-1 border-t border-border/30">
+                Districts or beats whose FIR volume increases by more than <span className="font-mono text-alert font-bold">+{spikeThreshold[0]}%</span> vs baseline pulse red.
               </p>
             </div>
 
           </CardContent>
         </Card>
 
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              {viewMode === "area" && selectedArea ? selectedArea.name : selected.district.name}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {viewMode === "area" && selectedArea
-                ? `Area in ${selected.district.name}`
-                : viewMode === "district"
-                  ? "Area-level intelligence"
-                  : "District drill-down"}
-            </p>
+        <Card className="bg-surface-1 border-border flex flex-col h-full">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-editorial flex items-center gap-2 text-foreground">
+                  {viewMode === "area" && selectedArea ? selectedArea.name : activeDistrict.district.name}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {viewMode === "area" && selectedArea
+                    ? `Area in ${activeDistrict.district.name}`
+                    : viewMode === "district"
+                      ? "Sub-area geospatial intelligence"
+                      : "Live district intelligence dossier"}
+                </p>
+              </div>
+              <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider border-signal/40 text-signal">
+                ID #{String(activeDistrict.district.id).padStart(2, "0")}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+
+          <CardContent className="flex-1 space-y-3 pt-3 overflow-y-auto pr-1">
             {viewMode === "area" && selectedArea ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Stat label="FIRs" value={selectedArea.firs} />
-                <Stat label="Spike" value={`${selectedArea.spike > 0 ? "+" : ""}${selectedArea.spike}%`} accent={selectedArea.spike > 15 ? "alert" : undefined} />
-                <div className="col-span-2 rounded-md border border-border bg-surface-2 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top crime</p>
-                  <p className="mt-1 text-sm font-medium">{selectedArea.topCrime}</p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Stat label="FIRs" value={selectedArea.firs} />
+                  <Stat label="Spike" value={`${selectedArea.spike > 0 ? "+" : ""}${selectedArea.spike}%`} accent={selectedArea.spike > 15 ? "alert" : undefined} />
                 </div>
-                <div className="col-span-2 rounded-md border border-border bg-surface-2 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Peak hours</p>
-                  <p className="mt-1 font-mono text-sm">{selectedArea.peakHours}</p>
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-1">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Top Crime MO</p>
+                  <p className="text-xs font-semibold text-foreground">{selectedArea.topCrime}</p>
+                </div>
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-1">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Peak Active Window</p>
+                  <p className="font-mono text-xs font-semibold text-signal">{selectedArea.peakHours}</p>
                 </div>
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat label="Total FIRs" value={selected.total} />
-                  <Stat label="Heinous" value={selected.heinous} accent="alert" />
-                  <Stat label="Arrests" value={selected.arrests} accent="success" />
-                  <Stat label="Risk Score" value={selected.riskScore} accent="warning" />
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Stat label="Total FIRs" value={activeDistrict.total} />
+                  <Stat label="Heinous Share" value={`${activeGravity.heinousPct}%`} accent="alert" />
+                  <Stat label="Arrests" value={activeDistrict.arrests} accent="success" />
+                  <Stat label="Risk Score" value={`${activeDistrict.riskScore}/100`} accent="warning" />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Spike vs 6-mo average</p>
-                  <div className="flex items-baseline gap-2">
-                    <span className={`font-display text-3xl font-semibold ${selected.spike > 0 ? "text-alert" : "text-success"}`}>
-                      {selected.spike > 0 ? "+" : ""}{selected.spike}%
+
+                {/* District Threat Index Meter */}
+                <div className="rounded-md border border-border bg-surface-2 p-2.5 space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">District Threat Index</span>
+                    <span className="font-mono text-[10px] font-bold text-signal">
+                      {activeDistrict.riskScore > 75 ? "CRITICAL" : activeDistrict.riskScore > 50 ? "HIGH" : "MODERATE"} ({activeDistrict.riskScore}/100)
                     </span>
-                    {selected.spike > 15 && <Badge className="bg-alert text-alert-foreground">RED ZONE</Badge>}
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-background overflow-hidden border border-border/40">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${activeDistrict.riskScore}%`,
+                        background: activeDistrict.riskScore > 75 ? "oklch(0.60 0.24 25)" : activeDistrict.riskScore > 45 ? "oklch(0.80 0.16 75)" : "oklch(0.78 0.14 210)"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* GRAPH 1: 24h Temporal Profile Curve */}
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-signal" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">24h Incident Profile</span>
+                    </div>
+                    <span className="font-mono text-[9px] text-signal font-bold bg-signal/10 px-1.5 py-0.5 rounded border border-signal/30">
+                      Peak {peakHourObj?.hour} ({peakHourObj?.count})
+                    </span>
+                  </div>
+
+                  <div className="flex items-end gap-1 h-16 pt-2 pb-1 border-b border-border/30">
+                    {activeHourly.map((h) => {
+                      const inWindow = h.h >= hour[0] && h.h <= hour[1];
+                      const heightPct = Math.max(8, (h.count / maxActiveHourly) * 100);
+                      const isPeak = h.count === maxActiveHourly && h.count > 0;
+                      return (
+                        <div
+                          key={h.hour}
+                          title={`${h.hour} · ${h.count} FIRs`}
+                          className={`flex-1 rounded-t-sm transition-all relative ${
+                            isPeak
+                              ? "bg-signal"
+                              : inWindow
+                                ? "bg-primary hover:bg-primary/80"
+                                : "bg-muted/40 hover:bg-muted"
+                          }`}
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between font-mono text-[8px] text-muted-foreground">
+                    <span>00:00</span>
+                    <span>06:00</span>
+                    <span>12:00</span>
+                    <span>18:00</span>
+                    <span>23:00</span>
+                  </div>
+                </div>
+
+                {/* GRAPH 2: Major Crime Taxonomy Mix */}
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <BarChart3 className="h-3.5 w-3.5 text-signal" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Crime Taxonomy Mix</span>
+                    </div>
+                    <span className="font-mono text-[9px] text-muted-foreground">{activeCases.length} Cases</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activeTaxonomy.slice(0, 5).map((ch) => (
+                      <div key={ch.id} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[10px] font-medium text-foreground truncate max-w-[150px]">{ch.name}</span>
+                          <span className="font-mono text-[9px] font-bold text-muted-foreground">{ch.count} ({ch.pct}%)</span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-background overflow-hidden border border-border/30">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ width: `${ch.pct}%`, backgroundColor: ch.color }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* GRAPH 3: Heinous vs Non-Heinous Severity Ring & Donut Chart */}
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldAlert className="h-3.5 w-3.5 text-alert" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Heinous Offence Ratio</span>
+                    </div>
+                    <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded ${activeGravity.heinousPct > 20 ? "bg-alert/20 text-alert" : "bg-success/20 text-success"}`}>
+                      {activeGravity.heinousCount} Heinous
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="relative h-12 w-12 flex-none">
+                      <svg viewBox="0 0 36 36" className="h-full w-full transform -rotate-90">
+                        <path
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="oklch(0.25 0.02 250)"
+                          strokeWidth="3.8"
+                        />
+                        <path
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#ef4444"
+                          strokeWidth="3.8"
+                          strokeDasharray={`${activeGravity.heinousPct}, 100`}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-foreground">
+                        {activeGravity.heinousPct}%
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-1 text-[10px]">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Heinous Crimes:</span>
+                        <span className="font-mono font-bold text-alert">{activeGravity.heinousCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Non-Heinous:</span>
+                        <span className="font-mono font-bold text-foreground">{activeGravity.nonHeinousCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* GRAPH 4: Investigation & Case Disposal Mix */}
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Activity className="h-3.5 w-3.5 text-signal" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Case Disposal Mix</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-background overflow-hidden flex border border-border/40">
+                    {activeStatus.map(st => (
+                      <div key={st.name} style={{ width: `${st.pct}%`, backgroundColor: st.color }} title={`${st.name}: ${st.count}`} />
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[9px] pt-1">
+                    {activeStatus.map(st => (
+                      <div key={st.name} className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full flex-none" style={{ backgroundColor: st.color }} />
+                        <span className="text-muted-foreground truncate">{st.name}:</span>
+                        <span className="font-mono font-bold text-foreground ml-auto">{st.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* GRAPH 5: 7-Day Day-of-Week Incident Velocity */}
+                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-signal" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Weekly Incident Velocity</span>
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-1.5 h-12 pt-2">
+                    {activeDayOfWeek.map(dw => {
+                      const hPct = Math.max(10, (dw.count / dw.maxVal) * 100);
+                      return (
+                        <div key={dw.day} className="flex-1 flex flex-col items-center gap-1">
+                          <div className="w-full bg-primary/80 rounded-t-sm hover:bg-primary" style={{ height: `${hPct}%` }} title={`${dw.day}: ${dw.count} FIRs`} />
+                          <span className="font-mono text-[8px] text-muted-foreground">{dw.day}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </>
             )}
 
-            {viewMode === "area" ? (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-muted-foreground">Street-level hotspots</p>
-                  <span className="text-[10px] text-muted-foreground">{microSpots.length} beats</span>
+            {/* Sub-areas / Hotspot Street List */}
+            {viewMode === "district" && (
+              <div className="space-y-1.5 pt-1 border-t border-border/40">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Top Hotspot Areas</p>
+                  <span className="font-mono text-[9px] text-muted-foreground">{rankedAreas.length} zones</span>
                 </div>
-                <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-                  {microSpots.map((m, i) => {
-                    const active = selectedMicroId === m.id;
-                    const heat = m.firs / maxMicroFirs;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => setSelectedMicroId(active ? null : m.id)}
-                        className={`w-full text-left rounded-md border p-2 transition-all ${
-                          active ? "border-primary bg-primary/10" : "border-border bg-surface-2 hover:bg-surface-1"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono text-[10px] text-muted-foreground w-4">#{i + 1}</span>
-                            <span className="text-sm font-medium truncate">{m.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {m.spike > 15 && <span className="pulse-alert h-1.5 w-1.5 rounded-full bg-alert" />}
-                            <span className="font-mono text-xs">{m.firs}</span>
-                          </div>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
-                          <span className="truncate">{m.topCrime}</span>
-                          <span className="font-mono">{m.peakHours}</span>
-                        </div>
-                        <div className="mt-1.5 h-1 w-full rounded-full bg-background overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${(heat * 100).toFixed(0)}%`, background: heatColor(heat, lowT, highT) }}
-                          />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {selectedMicro && (
-                  <div className="mt-2 rounded-md border border-border bg-surface-2 p-2 text-[11px] text-muted-foreground">
-                    <span className="text-foreground font-medium">{selectedMicro.name}</span> · {selectedMicro.firs} FIRs · {selectedMicro.topCrime} · peak {selectedMicro.peakHours}
-                  </div>
-                )}
-              </div>
-            ) : viewMode === "district" ? (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-muted-foreground">Top hotspot areas</p>
-                  {(crimeFilter !== "all" || bandFilter !== "all") && (
-                    <span className="text-[10px] text-muted-foreground">
-                      {rankedAreas.filter(matchesFilters).length} match
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
                   {rankedAreas.map((a, i) => {
                     const active = selectedAreaId === a.id;
                     const heat = a.firs / maxAreaFirs;
-                    const match = matchesFilters(a);
                     return (
                       <button
                         key={a.id}
                         onClick={() => openArea(a.id)}
-                        className={`w-full text-left rounded-md border p-2 transition-all ${
+                        className={`w-full text-left rounded-md border p-1.5 transition-all ${
                           active
-                            ? "border-primary bg-primary/10"
-                            : match
-                              ? "border-border bg-surface-2 hover:bg-surface-1"
-                              : "border-border/50 bg-surface-2/50 opacity-50 hover:opacity-75"
+                            ? "border-signal bg-signal/10"
+                            : "border-border bg-surface-2 hover:bg-surface-1"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono text-[10px] text-muted-foreground w-4">#{i + 1}</span>
-                            <span className="text-sm font-medium truncate">{a.name}</span>
+                            <span className="font-mono text-[9px] text-muted-foreground w-4">#{i + 1}</span>
+                            <span className="text-[11px] font-semibold truncate text-foreground">{a.name}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {a.spike > 15 && <span className="pulse-alert h-1.5 w-1.5 rounded-full bg-alert" />}
-                            <span className="font-mono text-xs">{a.firs}</span>
+                            <span className="font-mono text-[10px] font-bold">{a.firs}</span>
                           </div>
                         </div>
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                        <div className="mt-0.5 flex items-center justify-between text-[9px] text-muted-foreground">
                           <span className="truncate">{a.topCrime}</span>
-                          <span className="font-mono">{a.peakHours}</span>
+                          <span className="font-mono text-signal">{a.peakHours}</span>
                         </div>
-                        <div className="mt-1.5 h-1 w-full rounded-full bg-background overflow-hidden">
+                        <div className="mt-1 h-1 w-full rounded-full bg-background overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{ width: `${(heat * 100).toFixed(0)}%`, background: heatColor(heat, lowT, highT) }}
@@ -760,18 +1057,6 @@ function Hotspots() {
                         </div>
                       </button>
                     );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Peak hours (statewide)</p>
-                <div className="flex items-end gap-1 h-16">
-                  {HOURLY.map(h => {
-                    const active = parseInt(h.hour) >= hour[0] && parseInt(h.hour) <= hour[1];
-                    const max = Math.max(...HOURLY.map(x => x.count));
-                    return <div key={h.hour} className={`flex-1 rounded-sm ${active ? "bg-primary" : "bg-surface-2"}`}
-                      style={{ height: `${(h.count / max) * 100}%` }} />;
                   })}
                 </div>
               </div>
@@ -805,57 +1090,144 @@ function Hotspots() {
   );
 }
 
-function StateMap({
+const SVG_NAME_ALIAS: Record<string, string> = {
+  "Bengaluru City": "Bangalore",
+  "Bengaluru Urban": "Bangalore",
+  "Bengaluru Rural": "Bangalore Rural",
+  "Mangaluru": "Dakshina Kannada",
+  "Hubballi-Dharwad": "Dharwad",
+  "Belagavi": "Belgaum",
+  "Kalaburagi": "Gulbarga",
+  "Ballari": "Bellary",
+  "Vijayapura": "Bijapur",
+  "Tumakuru": "Tumkur",
+  "Shivamogga": "Shimoga",
+  "Chikkamagaluru": "Chikmagalur",
+  "Chamarajanagara": "Chamrajnagar",
+  "Mysuru": "Mysore",
+  "Bagalkote": "Bagalkot",
+  "Vijayanagara": "Bellary",
+};
+const toGeoSVG = (n: string) => SVG_NAME_ALIAS[n] ?? n;
+
+function StateMapSVG({
+  districtStats,
+  minTotal,
   maxTotal,
   selectedId,
+  hoveredId,
+  onHover,
   onSelect,
   lowT,
   highT,
 }: {
+  districtStats: any[];
+  minTotal: number;
   maxTotal: number;
   selectedId: number | null;
+  hoveredId: number | null;
+  onHover: (id: number | null) => void;
   onSelect: (id: number) => void;
   lowT: number;
   highT: number;
 }) {
   return (
-    <svg viewBox={`0 0 ${karnatakaMap.width} ${karnatakaMap.height}`} className="absolute inset-0 h-full w-full">
-      {karnatakaMap.districts.map((geo) => {
-        const stat = DISTRICT_STATS.find(s => toGeo(s.district.name) === geo.name);
-        const heat = stat ? stat.total / maxTotal : 0;
-        const fill = heatColor(heat, lowT, highT);
-        const isSel = stat && selectedId === stat.district.id;
-        return (
-          <path
-            key={geo.name}
-            d={geo.d}
-            fill={fill}
-            fillOpacity={heat > 0 ? 0.6 : 0.35}
-            stroke={isSel ? "oklch(0.35 0.15 250)" : "oklch(0.55 0.03 250)"}
-            strokeWidth={isSel ? 2 : 0.6}
-            style={{ cursor: stat ? "pointer" : "default" }}
-            onClick={() => stat && onSelect(stat.district.id)}
-          >
-            <title>{stat?.district.name ?? geo.name}{stat ? ` · ${stat.total} FIRs` : ""}</title>
-          </path>
-        );
-      })}
-      {karnatakaMap.districts.map((geo) => {
-        const stat = DISTRICT_STATS.find(s => toGeo(s.district.name) === geo.name);
-        if (!stat || stat.spike <= 15) return null;
-        return (
-          <circle key={`p-${geo.name}`} cx={geo.cx} cy={geo.cy} r={4} fill="oklch(0.68 0.22 28)">
-            <animate attributeName="r" from="4" to="14" dur="1.8s" repeatCount="indefinite" />
-            <animate attributeName="opacity" from="0.9" to="0" dur="1.8s" repeatCount="indefinite" />
-          </circle>
-        );
-      })}
-      {karnatakaMap.districts.map((geo) => (
-        <text key={`t-${geo.name}`} x={geo.cx} y={geo.cy} textAnchor="middle" fontSize="7"
-          fill="oklch(0.25 0.02 250)" fontFamily="Inter" pointerEvents="none">{geo.name}</text>
-      ))}
-    </svg>
+    <div
+      className="relative h-full w-full bg-surface-2 grid-bg select-none overflow-hidden rounded-md border border-border"
+      onMouseLeave={() => onHover(null)}
+    >
+      <svg viewBox={`0 0 ${karnatakaMap.width} ${karnatakaMap.height}`} className="h-full w-full p-2">
+        <defs>
+          <filter id="glow-selected-svg" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* District Boundaries */}
+        {karnatakaMap.districts.map((geo) => {
+          const stat = districtStats.find(s => toGeoSVG(s.district.name) === geo.name);
+          const rawTotal = stat ? stat.total : 0;
+          const ratio = maxTotal > minTotal ? (rawTotal - minTotal) / (maxTotal - minTotal || 1) : 0;
+
+          // Multi-Stop Choropleth Shading
+          const fill = choroplethColor(ratio, lowT, highT);
+          const isSel = stat && selectedId === stat.district.id;
+          const isHov = stat && hoveredId === stat.district.id;
+
+          return (
+            <path
+              key={geo.name}
+              d={geo.d}
+              fill={fill}
+              fillOpacity={isSel ? 0.95 : isHov ? 0.85 : rawTotal > 0 ? 0.72 : 0.45}
+              stroke={isSel ? "#0284c7" : isHov ? "#38bdf8" : "oklch(0.42 0.04 250)"}
+              strokeWidth={isSel ? 2.8 : isHov ? 2.2 : 0.9}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              filter={isSel ? "url(#glow-selected-svg)" : undefined}
+              className="transition-all duration-150 cursor-pointer hover:brightness-110"
+              onMouseEnter={() => { if (stat) onHover(stat.district.id); }}
+              onClick={() => { if (stat) onSelect(stat.district.id); }}
+            >
+              <title>{stat?.district.name ?? geo.name}{stat ? ` · ${stat.total} FIRs` : ""}</title>
+            </path>
+          );
+        })}
+
+        {/* Red Zone Pulsing Radar Indicators */}
+        {karnatakaMap.districts.map((geo) => {
+          const stat = districtStats.find(s => toGeoSVG(s.district.name) === geo.name);
+          if (!stat || stat.spike <= 15) return null;
+          return (
+            <g key={`pulse-${geo.name}`} pointerEvents="none">
+              <circle cx={geo.cx} cy={geo.cy} r={5} fill="#dc2626" opacity={0.8}>
+                <animate attributeName="r" from="5" to="18" dur="1.8s" repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.9" to="0" dur="1.8s" repeatCount="indefinite" />
+              </circle>
+              <circle cx={geo.cx} cy={geo.cy} r={3} fill="#dc2626" />
+            </g>
+          );
+        })}
+
+        {/* District Labels */}
+        {karnatakaMap.districts.map((geo) => {
+          const stat = districtStats.find(s => toGeoSVG(s.district.name) === geo.name);
+          const isSel = stat && selectedId === stat.district.id;
+          const isHov = stat && hoveredId === stat.district.id;
+          const displayName = stat?.district.name ?? geo.name;
+
+          return (
+            <text
+              key={`lbl-${geo.name}`}
+              x={geo.cx}
+              y={geo.cy}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className="pointer-events-none select-none font-sans font-bold text-[8.5px]"
+              style={{
+                fill: isSel ? "#0284c7" : isHov ? "#0369a1" : "oklch(0.2 0.03 250)",
+                stroke: "#ffffff",
+                strokeWidth: "2.8px",
+                paintOrder: "stroke fill",
+                strokeLinejoin: "round",
+              }}
+            >
+              {displayName}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
   );
+}
+
+function choroplethColor(ratio: number, low: number, high: number) {
+  if (ratio >= high) return "oklch(0.60 0.24 25)";     // Crimson Red
+  if (ratio >= (low + high) / 2) return "oklch(0.70 0.20 40)"; // Warning Orange
+  if (ratio >= low) return "oklch(0.80 0.16 75)";       // Signal Amber
+  if (ratio >= low / 2) return "oklch(0.78 0.14 210)";  // Electric Blue
+  return "oklch(0.85 0.08 200)";                         // Cool Cyan
 }
 
 function DistrictMap({

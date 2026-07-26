@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus,
+  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus, Database,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarHeader, SidebarFooter, useSidebar,
@@ -19,6 +19,7 @@ const ITEMS: NavItem[] = [
   { title: "Sociological", url: "/sociological", icon: LineChart },
   { title: "Cases",        url: "/cases",        icon: FolderSearch },
   { title: "New FIR",      url: "/cases/new",    icon: Plus },
+  { title: "Zoho Console", url: "/zoho-console", icon: Database,        badge: "27 Tables" },
 ];
 
 export function AppSidebar() {

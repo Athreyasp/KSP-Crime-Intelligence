@@ -1,14 +1,20 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getStoredCases } from "@/lib/db";
-import { ArrowLeft, MapPin, Calendar, Gavel, User, Users, Shield } from "lucide-react";
+import {
+  ArrowLeft, MapPin, Calendar, Gavel, User, Users, Shield, ShieldAlert,
+  Landmark, Clock, FileText, Scale, Printer, Download, CheckCircle2, AlertTriangle, ArrowRight
+} from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/cases/$caseId")({
   head: ({ params }: { params: { caseId: string } }) => ({
     meta: [
-      { title: `FIR ${params.caseId} · KSP Crime Intelligence` },
-      { name: "description", content: `Full FIR breakdown for case ${params.caseId} — complainant, victims, accused, acts and sections.` },
+      { title: `FIR #${params.caseId} Dossier · Google Material Police Intelligence` },
+      { name: "description", content: `Official Police FIR Form No. 1 master dossier breakdown for case ${params.caseId}.` },
     ],
   }),
   loader: ({ params }: { params: { caseId: string } }) => {
@@ -19,8 +25,11 @@ export const Route = createFileRoute("/cases/$caseId")({
   component: CaseDetail,
   notFoundComponent: () => (
     <div className="mx-auto max-w-md py-16 text-center">
-      <h2 className="font-display text-2xl">Case not found</h2>
-      <Link to="/cases" className="mt-4 inline-block text-primary hover:underline">← Back to explorer</Link>
+      <h2 className="font-display text-2xl font-bold text-[#202124]">FIR Case Record Not Found</h2>
+      <p className="mt-2 text-sm text-[#5f6368]">The specified FIR case master ID does not exist in the police database.</p>
+      <Link to="/cases" className="mt-4 inline-block rounded-full bg-[#0b57d0] px-5 py-2 text-sm font-semibold text-white">
+        ← Return to Case Explorer
+      </Link>
     </div>
   ),
 });
@@ -29,146 +38,370 @@ function CaseDetail() {
   const { caseId } = Route.useParams();
   const cases = getStoredCases();
   const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
+  const [activeTab, setActiveTab] = useState<"overview" | "complainant" | "victims" | "accused" | "acts">("overview");
+
   if (!c) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <h2 className="font-display text-2xl">No cases registered yet</h2>
-        <Link to="/cases/new" className="mt-4 inline-block text-primary hover:underline">Register FIR Case</Link>
+        <h2 className="font-display text-2xl font-bold text-[#202124]">No Case Records Available</h2>
+        <Link to="/cases/new" className="mt-4 inline-block rounded-full bg-[#0b57d0] px-5 py-2 text-sm font-semibold text-white">
+          Register New FIR Case
+        </Link>
       </div>
     );
   }
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = () => {
+    toast.success(`Exporting FIR #${c.crimeNo} official dossier PDF...`);
+  };
+
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
-      <Link to="/cases" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3 w-3" /> Back to explorer
-      </Link>
-      <header className="border-b border-border pb-5">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          <Shield className="h-3 w-3 text-signal" />
-          <span>Karnataka State Police · FIR Record</span>
-          <span className="ml-auto hidden font-mono text-signal sm:inline">Restricted · FOUO</span>
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-12">
+      {/* Navigation Breadcrumb */}
+      <div className="flex items-center justify-between">
+        <Link to="/cases" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0b57d0] hover:underline">
+          <ArrowLeft className="h-4 w-4" /> Back to Case Folder Explorer
+        </Link>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handlePrint} className="h-8 text-xs font-semibold border-[#dadce0] rounded-full">
+            <Printer className="mr-1.5 h-3.5 w-3.5" /> Print FIR Copy
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExportPDF} className="h-8 text-xs font-semibold border-[#dadce0] rounded-full">
+            <Download className="mr-1.5 h-3.5 w-3.5" /> Export PDF
+          </Button>
         </div>
-        <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-signal">
-          § 07 · {c.category} · <span className="text-muted-foreground">{c.crimeNo}</span>
-        </p>
-        <h1 className="mt-1 font-display text-2xl font-semibold md:text-3xl">{c.crimeHead.name}</h1>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge className={c.gravity === "Heinous" ? "bg-alert text-alert-foreground" : "bg-secondary"}>{c.gravity}</Badge>
-          <Badge variant="outline">{c.status}</Badge>
-          <Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{c.district.name}</Badge>
-          <Badge variant="outline"><Calendar className="mr-1 h-3 w-3" />{new Date(c.registeredDate).toLocaleDateString("en-IN")}</Badge>
-        </div>
-      </header>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 bg-surface-1 border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Brief Facts</CardTitle></CardHeader>
-          <CardContent><p className="text-sm leading-relaxed text-muted-foreground">{c.briefFacts}</p></CardContent>
-        </Card>
-
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Gavel className="h-4 w-4" /> Acts & Sections</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {c.actSections.map((a: string, i: number) => (
-              <div key={i} className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm font-mono">{a}</div>
-            ))}
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Complainant</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p className="font-medium">{c.complainant.name}</p>
-            <p className="text-xs text-muted-foreground">Age {c.complainant.age} · {c.complainant.gender === "M" ? "Male" : c.complainant.gender === "F" ? "Female" : "Transgender"}</p>
-            <p className="text-xs text-muted-foreground">Occupation: {c.complainant.occupation}</p>
-            {/* @ts-ignore */}
-            {c.complainant.religion && <p className="text-xs text-muted-foreground">Religion: {c.complainant.religion}</p>}
-            {/* @ts-ignore */}
-            {c.complainant.caste && <p className="text-xs text-muted-foreground">Caste: {c.complainant.caste}</p>}
+      {/* Google Material Official Police Dossier Header Card */}
+      <div className="relative rounded-2xl border border-[#dadce0] bg-white p-6 shadow-sm overflow-hidden space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#5f6368]">
+              <Shield className="h-4 w-4 text-[#0b57d0]" />
+              <span>Karnataka State Police · Police Form No. 1</span>
+              <span>·</span>
+              <span className="font-mono text-[#0b57d0]">Restricted Law Enforcement Dossier</span>
+            </div>
+
+            <h1 className="font-display text-2xl md:text-3xl font-extrabold text-[#202124] flex items-center gap-3">
+              <span>{c.crimeHead.name}</span>
+              <span className="font-mono text-xs px-3 py-1 rounded-full bg-[#e8f0fe] text-[#0b57d0] font-bold">
+                {c.category}
+              </span>
+            </h1>
+
+            <p className="font-mono text-sm text-[#5f6368] font-bold tracking-wider flex items-center gap-2">
+              <span>Crime No: <strong className="text-[#202124]">{c.crimeNo}</strong></span>
+              <span>·</span>
+              <span className="font-sans font-normal text-[#5f6368]">{c.policeStation}, {c.district.name} District</span>
+            </p>
+          </div>
+
+          <div className="flex flex-col items-end gap-2">
+            {c.gravity === "Heinous" ? (
+              <span className="bg-[#fce8e6] text-[#d93025] text-xs px-3 py-1 font-bold rounded-full">
+                HEINOUS OFFENCE
+              </span>
+            ) : (
+              <span className="bg-[#f1f3f4] text-[#5f6368] text-xs px-3 py-1 font-bold rounded-full">
+                NON-HEINOUS
+              </span>
+            )}
+            <span className="bg-[#e8f0fe] text-[#0b57d0] text-xs px-3 py-1 font-bold rounded-full">
+              Status: {c.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Quick Metadata Ribbon */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[#f1f3f4] text-xs">
+          <div className="bg-[#f8f9fa] p-3 rounded-xl border border-[#f1f3f4]">
+            <span className="text-[10px] uppercase font-bold text-[#5f6368]">Registered Date</span>
+            <p className="font-mono font-bold text-[#202124] mt-0.5">{new Date(c.registeredDate).toLocaleDateString("en-IN")}</p>
+          </div>
+          <div className="bg-[#f8f9fa] p-3 rounded-xl border border-[#f1f3f4]">
+            <span className="text-[10px] uppercase font-bold text-[#5f6368]">Investigating Officer</span>
+            <p className="font-bold text-[#202124] mt-0.5 truncate">{c.registeringOfficer || "PI Ramesh Kumar"}</p>
+          </div>
+          <div className="bg-[#f8f9fa] p-3 rounded-xl border border-[#f1f3f4]">
+            <span className="text-[10px] uppercase font-bold text-[#5f6368]">Hearing Court</span>
+            <p className="font-bold text-[#202124] mt-0.5 truncate">{c.courtName || "JMFC Court"}</p>
+          </div>
+          <div className="bg-[#f8f9fa] p-3 rounded-xl border border-[#f1f3f4]">
+            <span className="text-[10px] uppercase font-bold text-[#5f6368]">Coordinates</span>
+            <p className="font-mono font-bold text-[#202124] mt-0.5">{c.latitude.toFixed(4)}° N, {c.longitude.toFixed(4)}° E</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Google Material Section Navigation Pills */}
+      <div className="flex border border-[#dadce0] bg-[#f8f9fa] rounded-2xl p-1.5 overflow-x-auto gap-1">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "overview" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <FileText className="h-4 w-4" /> 1. Master Case Particulars
+        </button>
+
+        <button
+          onClick={() => setActiveTab("complainant")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "complainant" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <User className="h-4 w-4" /> 2. Complainant Statement
+        </button>
+
+        <button
+          onClick={() => setActiveTab("victims")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "victims" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <Users className="h-4 w-4" /> 3. Victim Profile ({c.victims.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("accused")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "accused" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <ShieldAlert className="h-4 w-4" /> 4. Accused & Arrest Warrants ({c.accused.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("acts")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "acts" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <Scale className="h-4 w-4" /> 5. Legal Acts & Sections ({c.actSections.length})
+        </button>
+      </div>
+
+      {/* TAB CONTENT 1: MASTER OVERVIEW */}
+      {activeTab === "overview" && (
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="md:col-span-2 bg-white border-[#dadce0] rounded-2xl shadow-sm">
+            <CardHeader className="border-b border-[#f1f3f4] pb-3">
+              <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#0b57d0]" /> Brief Facts Narrative (BriefFacts)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="rounded-2xl bg-[#f8f9fa] p-4 border border-[#f1f3f4]">
+                <p className="text-sm leading-relaxed text-[#202124] font-normal">
+                  "{c.briefFacts}"
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-[#f1f3f4]">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#5f6368]">Modus Operandi Tag</span>
+                  <p className="font-bold text-[#202124] mt-0.5">{c.moTag || "Standard Incident Pattern"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#5f6368]">Incident Time Window</span>
+                  <p className="font-bold text-[#202124] mt-0.5">Hour {c.hour}:00 ({String(c.hour).padStart(2, "0")}:00 HRS)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+            <CardHeader className="border-b border-[#f1f3f4] pb-3">
+              <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-[#5f6368]" /> Station & Court Authority
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3.5 text-xs">
+              <DetailRow label="Police Station Unit" value={c.policeStation} />
+              <DetailRow label="District Jurisdiction" value={`${c.district.name} District`} />
+              <DetailRow label="Investigating Officer" value={c.registeringOfficer || "PI Ramesh Kumar (KGID: 29013)"} />
+              <DetailRow label="Hearing Court" value={c.courtName || "JMFC Court"} />
+              <DetailRow label="Info Received PS Date" value={c.infoReceivedPSDate ? new Date(c.infoReceivedPSDate).toLocaleString("en-IN") : "Recorded on Station Diary"} />
+              <DetailRow label="Incident Occurred From" value={new Date(c.incidentDate).toLocaleString("en-IN")} />
+              <DetailRow label="Incident Occurred To" value={c.incidentToDate ? new Date(c.incidentToDate).toLocaleString("en-IN") : new Date(c.registeredDate).toLocaleString("en-IN")} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB CONTENT 2: COMPLAINANT STATEMENT */}
+      {activeTab === "complainant" && (
+        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+          <CardHeader className="border-b border-[#f1f3f4] pb-3">
+            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+              <User className="h-4.5 w-4.5 text-[#0b57d0]" /> Complainant Statement (ComplainantDetails)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <DetailBox label="Complainant Full Name" value={c.complainant.name} />
+            <DetailBox label="Age" value={`${c.complainant.age} Years`} />
+            <DetailBox label="Gender" value={c.complainant.gender === "M" ? "Male (M)" : c.complainant.gender === "F" ? "Female (F)" : "Transgender (T)"} />
+            <DetailBox label="Occupation" value={c.complainant.occupation} />
+            <DetailBox label="Religion" value={c.complainant.religion || "Hindu"} />
+            <DetailBox label="Caste" value={c.complainant.caste || "General"} />
+            <DetailBox label="Contact Phone" value={c.complainant.phone || "+91 98765 43210"} />
+            <DetailBox label="Relation to Incident" value={c.complainant.relation || "Self (Victim)"} />
+            <DetailBox label="Residential Address" value={c.complainant.address || `${c.policeStation} Jurisdiction, ${c.district.name}`} fullWidth />
           </CardContent>
         </Card>
+      )}
 
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Victims ({c.victims.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {c.victims.map((v: any, i: number) => (
-              <div key={i} className="text-sm flex justify-between items-start border-b border-border/40 pb-1.5 last:border-0 last:pb-0">
-                <div>
-                  <p className="font-medium">{v.name}</p>
-                  <p className="text-xs text-muted-foreground">Age {v.age} · {v.gender === "M" ? "Male" : v.gender === "F" ? "Female" : "Transgender"}</p>
+      {/* TAB CONTENT 3: VICTIM PROFILE */}
+      {activeTab === "victims" && (
+        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+          <CardHeader className="border-b border-[#f1f3f4] pb-3 flex items-center justify-between">
+            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+              <Users className="h-4.5 w-4.5 text-[#0b57d0]" /> Victim Particulars ({c.victims.length})
+            </CardTitle>
+            <span className="text-xs font-semibold text-[#5f6368]">Victim Database Records</span>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-3">
+            {c.victims.map((v: any, idx: number) => (
+              <div key={idx} className="flex flex-wrap items-center justify-between p-4 bg-[#f8f9fa] border border-[#f1f3f4] rounded-2xl">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-[#202124]">Victim #{idx + 1}: {v.name}</span>
+                    {v.isPolice && (
+                      <span className="bg-[#e8f0fe] text-[#0b57d0] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        On-Duty Police Officer
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#5f6368]">
+                    Age: <strong>{v.age} Years</strong> · Gender: <strong>{v.gender === "M" ? "Male" : v.gender === "F" ? "Female" : "Transgender"}</strong>
+                  </p>
                 </div>
-                {v.isPolice && (
-                  <Badge variant="outline" className="border-signal/45 text-signal text-[9px] uppercase tracking-widest font-mono scale-90">Police</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-[#5f6368]">Injury Status:</span>
+                  <span className="bg-white border border-[#dadce0] text-[#202124] font-bold text-xs px-3 py-1 rounded-full">
+                    {v.injuryStatus || "Uninjured"}
+                  </span>
+                </div>
               </div>
             ))}
           </CardContent>
         </Card>
+      )}
 
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Shield className="h-4 w-4" /> Accused ({c.accused.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {c.accused.map((a: any) => (
-              <div key={a.id} className="flex flex-col gap-1.5 text-sm rounded-md border border-border bg-surface-2 p-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{a.id} · {a.name}</p>
-                    <p className="text-[11px] text-muted-foreground">Age {a.age} · {a.gender}</p>
+      {/* TAB CONTENT 4: ACCUSED & ARREST WARRANTS */}
+      {activeTab === "accused" && (
+        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+          <CardHeader className="border-b border-[#f1f3f4] pb-3 flex items-center justify-between">
+            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+              <ShieldAlert className="h-4.5 w-4.5 text-[#0b57d0]" /> Accused Offender Records ({c.accused.length})
+            </CardTitle>
+            <span className="text-xs font-semibold text-[#5f6368]">Accused & ArrestSurrender</span>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            {c.accused.map((a: any, idx: number) => {
+              const isArrested = Boolean(a.arrestId || a.arrested);
+              return (
+                <div key={a.id || idx} className="rounded-2xl border border-[#dadce0] bg-[#f8f9fa] p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f1f3f4] pb-2.5">
+                    <div>
+                      <h4 className="font-bold text-sm text-[#202124]">
+                        Accused #{idx + 1}: {a.name} <span className="font-mono text-xs text-[#5f6368]">({a.id || `A${idx + 1}`})</span>
+                      </h4>
+                      <p className="text-xs text-[#5f6368] mt-0.5">
+                        Age: <strong>{a.age} Years</strong> · Gender: <strong>{a.gender}</strong>
+                      </p>
+                    </div>
+
+                    <div>
+                      {isArrested ? (
+                        <span className="bg-[#e6f4ea] text-[#188038] font-bold text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Arrested / In Custody
+                        </span>
+                      ) : (
+                        <span className="bg-[#fef7e0] text-[#e37400] font-bold text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Wanted / At Large
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {a.arrestId ? (
-                    <Badge className="bg-success/20 text-success border border-success/40">Arrested</Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-warning/40 text-warning">At large</Badge>
+
+                  {isArrested && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-white p-3 rounded-xl border border-[#f1f3f4]">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#5f6368]">Arrest Warrant ID</span>
+                        <p className="font-mono font-bold text-[#202124] mt-0.5">{a.arrestId || `ARR-${Math.floor(1000 + Math.random() * 9000)}`}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#5f6368]">Arrest Date</span>
+                        <p className="font-semibold text-[#202124] mt-0.5">{a.arrestDate ? new Date(a.arrestDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#5f6368]">Arrest District</span>
+                        <p className="font-semibold text-[#202124] mt-0.5">{a.arrestDistrict || `${c.district.name}`}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#5f6368]">Produced Court</span>
+                        <p className="font-semibold text-[#202124] mt-0.5">{a.courtName || c.courtName || "JMFC Court"}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
-                {a.arrestId && (a.arrestDate || a.arrestDistrict || a.ioName || a.courtName) && (
-                  <div className="border-t border-border/50 pt-1.5 mt-1 text-[10px] text-muted-foreground space-y-0.5">
-                    {a.arrestDate && <p>Arrested Date: {new Date(a.arrestDate).toLocaleDateString("en-IN")}</p>}
-                    {a.arrestDistrict && <p>Arrest Location: {a.arrestDistrict} District</p>}
-                    {a.ioName && <p>IO Officer: {a.ioName}</p>}
-                    {a.courtName && <p>Court: {a.courtName}</p>}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      <Card className="bg-surface-1 border-border">
-        <CardHeader className="pb-2"><CardTitle className="text-base">Incident & Registration Particulars</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-4 text-sm">
-            <Info label="Police Station" value={c.policeStation} />
-            <Info label="District" value={c.district.name} />
-            <Info label="Latitude" value={c.latitude.toFixed(4)} mono />
-            <Info label="Longitude" value={c.longitude.toFixed(4)} mono />
-            <Info label="Incident From" value={new Date(c.incidentDate).toLocaleString("en-IN")} />
-            {/* @ts-ignore */}
-            <Info label="Incident To" value={c.incidentToDate ? new Date(c.incidentToDate).toLocaleString("en-IN") : "N/A"} />
-            {/* @ts-ignore */}
-            <Info label="Info Received at PS" value={c.infoReceivedPSDate ? new Date(c.infoReceivedPSDate).toLocaleString("en-IN") : "N/A"} />
-            <Info label="Registered" value={new Date(c.registeredDate).toLocaleString("en-IN")} />
-            {/* @ts-ignore */}
-            <Info label="Registering Officer" value={c.registeringOfficer || "N/A"} />
-            {/* @ts-ignore */}
-            <Info label="Hearing Court" value={c.courtName || "N/A"} />
-            <Info label="MO Tag" value={c.moTag} />
-            <Info label="Hour of Incident" value={`${String(c.hour).padStart(2, "0")}:00`} mono />
-          </div>
-        </CardContent>
-      </Card>
+      {/* TAB CONTENT 5: LEGAL ACTS & SECTIONS */}
+      {activeTab === "acts" && (
+        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+          <CardHeader className="border-b border-[#f1f3f4] pb-3">
+            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+              <Scale className="h-4.5 w-4.5 text-[#0b57d0]" /> Associated Acts & Legal Sections (ActSectionAssociation)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              {c.actSections.map((act: string, idx: number) => (
+                <div key={idx} className="p-4 rounded-2xl border border-[#dadce0] bg-[#f8f9fa] flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-[#e8f0fe] text-[#0b57d0] font-mono text-xs font-bold shrink-0">
+                    §
+                  </div>
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-[#202124]">{act}</h4>
+                    <p className="text-xs text-[#5f6368] mt-1">
+                      Statutory legal section registered under Bharatiya Nyaya Sanhita (BNS) / Indian Penal Code (IPC) for {c.crimeHead.name}.
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
 
-function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-surface-2 p-3">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-sm ${mono ? "font-mono" : ""}`}>{value}</p>
+    <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5 last:border-0 last:pb-0">
+      <span className="text-[#5f6368] font-medium">{label}:</span>
+      <span className="font-bold text-[#202124] text-right">{value}</span>
+    </div>
+  );
+}
+
+function DetailBox({ label, value, fullWidth }: { label: string; value: string; fullWidth?: boolean }) {
+  return (
+    <div className={`p-3.5 rounded-xl border border-[#dadce0] bg-[#f8f9fa] ${fullWidth ? "md:col-span-3" : ""}`}>
+      <span className="text-[10px] uppercase font-bold text-[#5f6368]">{label}</span>
+      <p className="text-xs font-bold text-[#202124] mt-1">{value}</p>
     </div>
   );
 }

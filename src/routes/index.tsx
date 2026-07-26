@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Shield, FileText, Gavel,
-  Radar,
+  Radar, Database, RefreshCw
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDb } from "@/hooks/use-db";
 import { DISTRICTS } from "@/data/mock";
+import { getCatalystSyncInfo, syncWithCatalyst } from "@/lib/db";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -316,6 +317,14 @@ function Overview() {
   } = useDb();
 
   const [selectedId, setSelectedId] = useState<number>(() => DISTRICT_STATS[0]?.district.id ?? 1);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncInfo = getCatalystSyncInfo();
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    await syncWithCatalyst();
+    setTimeout(() => setIsSyncing(false), 500);
+  };
 
   const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) || DISTRICT_STATS[0] || {
     district: DISTRICTS[0], total: 0, heinous: 0, arrests: 0, riskScore: 0, spike: 0
@@ -337,6 +346,30 @@ function Overview() {
     <div className="space-y-5">
       {/* ───────── MASTHEAD ───────── */}
       <header className="border-y-4 border-ink py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/20 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] font-bold text-ink flex items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 text-signal" />
+              Zoho Catalyst DataStore
+            </span>
+            <span className="rounded bg-ink px-2 py-0.5 font-mono text-[10px] font-bold text-paper">
+              {allCases.length} Live Console Records
+            </span>
+          </div>
+
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-1.5 rounded border border-ink/30 bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-colors"
+          >
+            <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
+            {isSyncing ? "Syncing Zoho Tables..." : "Sync Live Console"}
+          </button>
+        </div>
 
         <h1 className="mt-3 font-editorial text-[46px] md:text-[64px] leading-[0.95] tracking-tight text-ink">
           The Karnataka <em className="text-signal">Crime</em> Daily.

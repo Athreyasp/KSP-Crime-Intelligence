@@ -181,72 +181,205 @@ function OffendersPage() {
 function AssociatesPanel({ offenderId }: { offenderId: string }) {
   const { offenderAssociates: OFFENDER_ASSOCIATES } = useDb();
   const associates = OFFENDER_ASSOCIATES[offenderId] ?? [];
-  const roleStyle: Record<string, string> = {
-    "Co-Accused": "border-alert/40 text-alert bg-alert/5",
-    "Handler": "border-warning/40 text-warning bg-warning/5",
-    "Informant": "border-primary/40 text-primary bg-primary/5",
-    "Victim": "border-border text-muted-foreground bg-surface-2",
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const roleMeta: Record<string, { color: string; bg: string; text: string }> = {
+    "Co-Accused": { color: "#dc2626", bg: "#fef2f2", text: "#991b1b" },
+    "Handler": { color: "#7c3aed", bg: "#f3e8fd", text: "#5b21b6" },
+    "Informant": { color: "#2563eb", bg: "#eff6ff", text: "#1e40af" },
+    "Victim": { color: "#d97706", bg: "#fffbe8", text: "#92400e" },
   };
+
+  const CX = 250;
+  const CY = 220;
+  const RAD = 135;
+
   return (
-    <div>
-      <p className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-        <Users className="h-3.5 w-3.5" /> Connected Persons · Link Analysis
-      </p>
-      <div className="rounded-md border border-border bg-surface-2 p-3">
-        {/* Radial connection diagram */}
-        <div className="relative mx-auto aspect-square w-full max-w-[340px]">
-          <svg viewBox="0 0 340 340" className="h-full w-full">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-2 text-xs uppercase font-bold tracking-wider text-[#475569]">
+          <Users className="h-4 w-4 text-[#2563eb]" /> Criminal Syndicate Link Analysis
+        </p>
+        <Badge className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] font-mono text-[10px] font-bold px-2.5 py-0.5">
+          {associates.length} Connected Associates
+        </Badge>
+      </div>
+
+      <div className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-sm space-y-4">
+        {/* Cinematic Link Diagram */}
+        <div className="relative mx-auto aspect-square w-full max-w-[460px] bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-2 overflow-hidden shadow-inner flex items-center justify-center">
+          {/* Grid Dot Background */}
+          <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:18px_18px] opacity-50 pointer-events-none" />
+
+          <svg viewBox="0 0 500 500" className="h-full w-full relative z-10">
+            <defs>
+              <filter id="glow-link" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Connection Strings */}
             {associates.map((a, i) => {
               const angle = (i / associates.length) * Math.PI * 2 - Math.PI / 2;
-              const x = 170 + Math.cos(angle) * 130;
-              const y = 170 + Math.sin(angle) * 130;
+              const x = CX + Math.cos(angle) * RAD;
+              const y = CY + Math.sin(angle) * RAD;
+              const isHovered = hoveredIdx === i;
+              const meta = roleMeta[a.role] || roleMeta["Co-Accused"];
+
               return (
-                <line key={`l-${i}`} x1={170} y1={170} x2={x} y2={y}
-                  stroke="oklch(0.78 0.14 195)" strokeOpacity={a.strength / 200} strokeWidth={a.strength / 40} />
+                <g key={`link-${i}`}>
+                  <line
+                    x1={CX}
+                    y1={CY}
+                    x2={x}
+                    y2={y}
+                    stroke={isHovered ? meta.color : "#94a3b8"}
+                    strokeOpacity={isHovered ? 1 : 0.45}
+                    strokeWidth={isHovered ? 3.5 : Math.max(1.5, a.strength / 30)}
+                    strokeDasharray={a.role === "Victim" ? "4 3" : "none"}
+                    filter={isHovered ? "url(#glow-link)" : undefined}
+                  />
+                </g>
               );
             })}
-            <circle cx={170} cy={170} r={26} fill="oklch(0.68 0.22 28)" fillOpacity={0.9} stroke="oklch(0.16 0.02 250)" strokeWidth={2} />
-            <text x={170} y={174} textAnchor="middle" fontSize="10" fill="oklch(0.98 0 0)" fontFamily="Inter" fontWeight="600">
-              SUBJECT
-            </text>
+
+            {/* Center Subject Node */}
+            <g transform={`translate(${CX}, ${CY})`}>
+              <circle r={36} fill="#dc2626" opacity={0.15} className="animate-pulse" />
+              <circle r={26} fill="#0f172a" stroke="#dc2626" strokeWidth={3} />
+              <text textAnchor="middle" y={-3} fontSize="9" fill="#94a3b8" fontFamily="JetBrains Mono" fontWeight="bold">
+                TARGET
+              </text>
+              <text textAnchor="middle" y={9} fontSize="10" fill="#ffffff" fontFamily="Space Grotesk, sans-serif" fontWeight="bold">
+                SUBJECT
+              </text>
+            </g>
+
+            {/* Associate Nodes */}
             {associates.map((a, i) => {
               const angle = (i / associates.length) * Math.PI * 2 - Math.PI / 2;
-              const x = 170 + Math.cos(angle) * 130;
-              const y = 170 + Math.sin(angle) * 130;
-              const fill = a.role === "Victim" ? "oklch(0.78 0.16 70)"
-                : a.role === "Handler" ? "oklch(0.78 0.16 70)"
-                : a.role === "Informant" ? "oklch(0.78 0.14 195)"
-                : "oklch(0.68 0.22 28)";
+              const cos = Math.cos(angle);
+              const sin = Math.sin(angle);
+              const x = CX + cos * RAD;
+              const y = CY + sin * RAD;
+              const isHovered = hoveredIdx === i;
+              const meta = roleMeta[a.role] || roleMeta["Co-Accused"];
+
+              // Smart text positioning relative to angle
+              let textX = 0;
+              let textY = -22;
+              let textAnchor = "middle";
+
+              if (cos > 0.3) {
+                textX = 22;
+                textY = 4;
+                textAnchor = "start";
+              } else if (cos < -0.3) {
+                textX = -22;
+                textY = 4;
+                textAnchor = "end";
+              } else if (sin > 0.3) {
+                textX = 0;
+                textY = 28;
+                textAnchor = "middle";
+              }
+
               return (
-                <g key={`n-${i}`}>
-                  <circle cx={x} cy={y} r={14} fill={fill} fillOpacity={0.85} stroke="oklch(0.16 0.02 250)" strokeWidth={2} />
-                  <text x={x} y={y - 20} textAnchor="middle" fontSize="9" fill="oklch(0.95 0.01 250)" fontFamily="Inter">
-                    {a.name.split(" ")[0]}
+                <g
+                  key={`node-${i}`}
+                  transform={`translate(${x}, ${y})`}
+                  className="cursor-pointer transition-transform duration-200"
+                  onMouseEnter={() => setHoveredIdx(i)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                >
+                  {/* Outer ring */}
+                  <circle
+                    r={isHovered ? 18 : 14}
+                    fill={meta.bg}
+                    stroke={meta.color}
+                    strokeWidth={isHovered ? 3 : 2}
+                  />
+                  
+                  {/* Core Icon Dot */}
+                  <circle r={5} fill={meta.color} />
+
+                  {/* PERFECTLY ALIGNED READABLE LABELS */}
+                  <text
+                    x={textX}
+                    y={textY}
+                    textAnchor={textAnchor}
+                    fontSize="11"
+                    fontWeight="bold"
+                    fill="#0f172a"
+                    fontFamily="DM Sans, sans-serif"
+                    style={{ paintOrder: "stroke", stroke: "#ffffff", strokeWidth: 4 } as React.CSSProperties}
+                  >
+                    {a.name}
                   </text>
-                  <text x={x} y={y + 28} textAnchor="middle" fontSize="8" fill="oklch(0.68 0.02 250)" fontFamily="Inter">
-                    {a.role}
+
+                  <text
+                    x={textX}
+                    y={textY + (textY > 0 ? 13 : 13)}
+                    textAnchor={textAnchor}
+                    fontSize="9"
+                    fontWeight="bold"
+                    fill={meta.text}
+                    fontFamily="JetBrains Mono, monospace"
+                    style={{ paintOrder: "stroke", stroke: "#ffffff", strokeWidth: 3 } as React.CSSProperties}
+                  >
+                    {a.role} ({a.sharedCases} FIRs)
                   </text>
                 </g>
               );
             })}
           </svg>
+
+          {/* Bottom Diagram Legend */}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-3 bg-white/95 backdrop-blur border border-[#e2e8f0] rounded-xl py-1.5 px-3 text-[10px] font-semibold text-[#475569] shadow-sm">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#dc2626]" /> Co-Accused</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#7c3aed]" /> Handler</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#2563eb]" /> Informant</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#d97706]" /> Victim</span>
+          </div>
         </div>
 
-        {/* Table */}
-        <div className="mt-3 divide-y divide-border rounded-md border border-border bg-background">
-          {associates.map((a, i) => (
-            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2 text-xs">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{a.name}</p>
-                <p className="truncate text-muted-foreground">{a.relation} · {a.sharedCases} shared case(s)</p>
+        {/* Perfectly Aligned Associates Grid Table */}
+        <div className="divide-y divide-[#f1f5f9] rounded-xl border border-[#e2e8f0] bg-white overflow-hidden">
+          {associates.map((a, i) => {
+            const isHovered = hoveredIdx === i;
+            const meta = roleMeta[a.role] || roleMeta["Co-Accused"];
+            return (
+              <div
+                key={i}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                className={`grid grid-cols-[1fr_100px_90px_50px] items-center gap-3 px-3.5 py-2.5 text-xs transition-colors cursor-pointer ${
+                  isHovered ? "bg-[#eff6ff]" : "hover:bg-[#f8fafc]"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-[#0f172a]">{a.name}</p>
+                  <p className="truncate text-[11px] text-[#64748b]">{a.relation} · {a.sharedCases} shared FIR(s)</p>
+                </div>
+
+                <div className="text-center">
+                  <span className="font-semibold text-[10px] px-2 py-0.5 rounded-full inline-block" style={{ background: meta.bg, color: meta.text }}>
+                    {a.role}
+                  </span>
+                </div>
+
+                <div className="hidden sm:flex items-center h-1.5 w-full overflow-hidden rounded-full bg-[#e2e8f0]">
+                  <div className="h-full bg-[#2563eb]" style={{ width: `${a.strength}%` }} />
+                </div>
+
+                <span className="font-mono text-[11px] font-bold text-[#475569] text-right">{a.strength}%</span>
               </div>
-              <Badge variant="outline" className={`text-[10px] ${roleStyle[a.role]}`}>{a.role}</Badge>
-              <div className="hidden sm:flex h-1.5 w-20 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full bg-primary" style={{ width: `${a.strength}%` }} />
-              </div>
-              <span className="font-mono text-[10px] text-muted-foreground w-8 text-right">{a.strength}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

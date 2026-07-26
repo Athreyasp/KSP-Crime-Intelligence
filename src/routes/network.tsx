@@ -1,116 +1,142 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type SimulationNodeDatum } from "d3-force";
-import { Search, Route as RouteIcon, Radar, Focus, Users, Car, Phone, MapPin as PinIcon, Fingerprint, FileText, Sparkles, ChevronRight } from "lucide-react";
+import {
+  Search, Radar, Focus, Users, Car, Phone, MapPin as PinIcon, Fingerprint, FileText, Sparkles, ChevronRight,
+  ShieldAlert, Eye, RotateCcw, Clock, Database, X, LayoutGrid, Network as NetworkIcon, ArrowUpRight, Shield
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { relationColor, type EntityType, type RichNode, type RelationType } from "@/data/network-rich";
+import { type EntityType, type RichNode, type RelationType } from "@/data/network-rich";
 import { useDb } from "@/hooks/use-db";
-import { Link } from "@tanstack/react-router";
+import { PageHeader } from "@/components/page-header";
 
 export const Route = createFileRoute("/network")({
   head: () => ({
     meta: [
-      { title: "Association Atlas · KSP Crime Intelligence" },
-      { name: "description", content: "Investigator-grade link analysis: entities, relationships, clusters, and predicted next moves." },
-      { property: "og:title", content: "Association Atlas — Link Analysis" },
-      { property: "og:description", content: "Force-directed criminal network with cluster hulls, dossiers and predictive next-action intelligence." },
+      { title: "Network Atlas · Google Material Police Intelligence" },
+      { name: "description", content: "Ultra-clean Google Material 3 link intelligence workspace derived from Zoho database FIR records." },
     ],
   }),
   component: NetworkPage,
 });
 
 /* ------------------------------------------------------------------ */
-/* Simulation                                                          */
+/* Types & Metadata Palette                                           */
 /* ------------------------------------------------------------------ */
 type SimNode = RichNode & SimulationNodeDatum & { x: number; y: number };
-type SimLink = { source: SimNode; target: SimNode; relation: import("@/data/network-rich").RelationType; weight: number };
+type SimLink = { source: SimNode; target: SimNode; relation: RelationType; weight: number };
 
-const W = 900;
-const H = 600;
+const W = 1000;
+const H = 620;
 
+const TYPE_META: Record<EntityType, { color: string; bg: string; border: string; label: string; Icon: typeof Users }> = {
+  accused:  { color: "#d93025", bg: "#fce8e6", border: "#f8b4b0", label: "Suspect", Icon: Fingerprint },
+  victim:   { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Victim",  Icon: Users },
+  case:     { color: "#e37400", bg: "#fef7e0", border: "#fde293", label: "FIR Case", Icon: FileText },
+  location: { color: "#188038", bg: "#e6f4ea", border: "#a8dab5", label: "Location", Icon: PinIcon },
+  vehicle:  { color: "#a142f4", bg: "#f3e8fd", border: "#d7aefb", label: "Vehicle", Icon: Car },
+  phone:    { color: "#ec4899", bg: "#fce7f3", border: "#f9a8d4", label: "Phone",   Icon: Phone },
+};
+
+/* ------------------------------------------------------------------ */
+/* Force Layout Hook                                                  */
+/* ------------------------------------------------------------------ */
 function useForceLayout(networkRich: any) {
   return useMemo(() => {
     if (!networkRich || !networkRich.nodes || networkRich.nodes.length === 0) {
       return { nodes: [], links: [] };
     }
-    const nodes: SimNode[] = networkRich.nodes.map((n: any) => ({ ...n, x: W / 2 + Math.random() * 40 - 20, y: H / 2 + Math.random() * 40 - 20 }));
+    const nodes: SimNode[] = networkRich.nodes.map((n: any) => ({
+      ...n,
+      x: W / 2 + (Math.random() - 0.5) * 380,
+      y: H / 2 + (Math.random() - 0.5) * 280
+    }));
     const idx = new Map(nodes.map(n => [n.id, n]));
-    const links = networkRich.edges.map((e: any) => ({
-      source: idx.get(e.source)!, target: idx.get(e.target)!, relation: e.relation, weight: e.weight,
-    })) as SimLink[];
+    const links = networkRich.edges
+      .map((e: any) => ({
+        source: idx.get(e.source)!,
+        target: idx.get(e.target)!,
+        relation: e.relation,
+        weight: e.weight || 1,
+      }))
+      .filter((l: any) => l.source && l.target) as SimLink[];
 
     const sim = forceSimulation(nodes)
-      .force("link", forceLink<SimNode, SimLink>(links).id((d: SimNode) => d.id).distance((l: SimLink) => 90 / (l.weight || 1)).strength(0.6))
-      .force("charge", forceManyBody<SimNode>().strength(-260))
+      .force("link", forceLink<SimNode, SimLink>(links).id((d: SimNode) => d.id).distance(125).strength(0.5))
+      .force("charge", forceManyBody<SimNode>().strength(-280))
       .force("center", forceCenter(W / 2, H / 2))
-      .force("collide", forceCollide<SimNode>().radius(22).strength(0.9))
+      .force("collide", forceCollide<SimNode>().radius(30).strength(0.8))
       .stop();
 
-    for (let i = 0; i < 320; i++) sim.tick();
+    for (let i = 0; i < 350; i++) sim.tick();
     return { nodes, links };
   }, [networkRich]);
 }
 
-/* ------------------------------------------------------------------ */
-/* Icons/shapes for entity types                                       */
-/* ------------------------------------------------------------------ */
-const TYPE_META: Record<EntityType, { color: string; label: string; Icon: typeof Users }> = {
-  accused:  { color: "var(--signal)",              label: "Accused",  Icon: Fingerprint },
-  victim:   { color: "var(--amber-ink)",           label: "Victim",   Icon: Users },
-  case:     { color: "oklch(0.45 0.03 250)",       label: "Case",     Icon: FileText },
-  location: { color: "oklch(0.55 0.14 195)",       label: "Location", Icon: PinIcon },
-  vehicle:  { color: "oklch(0.55 0.14 155)",       label: "Vehicle",  Icon: Car },
-  phone:    { color: "oklch(0.55 0.15 300)",       label: "Phone",    Icon: Phone },
-};
-
-/* ------------------------------------------------------------------ */
-
-function NetworkPage() {
-  const { networkRich } = useDb();
+export function NetworkPage() {
+  const { networkRich, cases } = useDb();
   const { nodes, links } = useForceLayout(networkRich);
-  
-  const deg = useMemo(() => {
-    const m = new Map<string, number>();
-    if (!networkRich || !networkRich.edges) return m;
-    for (const e of networkRich.edges) {
-      m.set(e.source, (m.get(e.source) ?? 0) + 1);
-      m.set(e.target, (m.get(e.target) ?? 0) + 1);
-    }
-    return m;
-  }, [networkRich]);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | EntityType>("all");
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"graph" | "directory">("graph");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const svgRef = useRef<SVGSVGElement | null>(null);
 
-  const focused = selected ?? hover;
-  const neighbors = useMemo(() => {
+  // Filter nodes
+  const filteredNodes = useMemo(() => {
+    return nodes.filter(n => {
+      if (typeFilter !== "all" && n.type !== typeFilter) return false;
+      if (query && !n.label.toLowerCase().includes(query.toLowerCase())) return false;
+      return true;
+    });
+  }, [nodes, typeFilter, query]);
+
+  const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(n => n.id)), [filteredNodes]);
+
+  const filteredLinks = useMemo(() => {
+    return links.filter(l => filteredNodeIds.has(l.source.id) && filteredNodeIds.has(l.target.id));
+  }, [links, filteredNodeIds]);
+
+  const deg = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of filteredLinks) {
+      m.set(l.source.id, (m.get(l.source.id) ?? 0) + 1);
+      m.set(l.target.id, (m.get(l.target.id) ?? 0) + 1);
+    }
+    return m;
+  }, [filteredLinks]);
+
+  // Focus Highlight
+  const activeFocusId = selected || hover;
+  const connectedNeighborIds = useMemo(() => {
     const set = new Set<string>();
-    if (!focused || !networkRich || !networkRich.edges) return set;
-    for (const e of networkRich.edges) {
-      if (e.source === focused) set.add(e.target);
-      if (e.target === focused) set.add(e.source);
+    if (!activeFocusId) return set;
+    set.add(activeFocusId);
+    for (const l of filteredLinks) {
+      if (l.source.id === activeFocusId) set.add(l.target.id);
+      if (l.target.id === activeFocusId) set.add(l.source.id);
     }
     return set;
-  }, [focused, networkRich]);
+  }, [activeFocusId, filteredLinks]);
 
-  const filteredNodes = nodes.filter(n => {
-    if (typeFilter !== "all" && n.type !== typeFilter) return false;
-    if (query && !n.label.toLowerCase().includes(query.toLowerCase())) return false;
-    return true;
-  });
+  // Default select first suspect
+  useEffect(() => {
+    if (!selected && filteredNodes.length > 0) {
+      const firstAccused = filteredNodes.find(n => n.type === "accused");
+      if (firstAccused) setSelected(firstAccused.id);
+    }
+  }, [filteredNodes, selected]);
 
   const selectedNode = selected ? nodes.find(n => n.id === selected) : null;
 
-  // pan drag
+  // Pan / Drag controls
   const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
     dragRef.current = { ox: pan.x, oy: pan.y, px: e.clientX, py: e.clientY };
@@ -122,448 +148,316 @@ function NetworkPage() {
   };
   const onPointerUp = () => (dragRef.current = null);
 
-  const eventTimeline = useMemo(() => {
-    const cluster = selectedNode?.cluster;
-    if (!cluster) return [];
-    return nodes
-      .filter(n => n.cluster === cluster && (n.type === "case" || n.type === "accused"))
-      .map(n => ({ id: n.id, label: n.label, type: n.type, when: n.meta.firstSeen ?? n.meta.lastSeen ?? "" }))
-      .filter(x => x.when)
-      .sort((a, b) => a.when.localeCompare(b.when));
-  }, [selectedNode, nodes]);
-
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="editorial-rule">
-        <div className="flex items-end justify-between flex-wrap gap-3">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-signal">§ 02 · Link Intelligence</div>
-            <h1 className="font-editorial text-3xl md:text-4xl leading-none mt-1">Association Atlas</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {nodes.length} entities · {links.length} relationships · {networkRich?.clusters.length ?? 0} clusters detected
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-7xl space-y-5 pb-12">
+      {/* GOOGLE MATERIAL CLEAN HEADER */}
+      <PageHeader
+        section="§ 02"
+        eyebrow="Karnataka State Police · State Crime Records Bureau"
+        title="Network & Association Atlas"
+        description="Clean & intuitive link intelligence workspace. Powered 100% live by Zoho Catalyst FIR database."
+        actions={
           <div className="flex items-center gap-2">
-            <Badge className="bg-signal/10 text-signal border border-signal/40 font-mono uppercase tracking-widest text-[9px]">
-              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-signal pulse-alert" />
-              Live graph
+            <Badge className="bg-[#e8f0fe] text-[#0b57d0] border border-[#0b57d0]/20 font-bold px-3 py-1 flex items-center gap-1.5 shadow-sm">
+              <Database className="h-3.5 w-3.5 text-[#0b57d0]" />
+              Zoho Live Data ({filteredNodes.length} Entities)
             </Badge>
-            <Badge variant="outline" className="font-mono text-[9px] uppercase tracking-widest">
-              Model v1.4 · {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-            </Badge>
+
+            <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-full">
+              <button
+                onClick={() => setViewMode("graph")}
+                className={cn(
+                  "px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5",
+                  viewMode === "graph" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+                )}
+              >
+                <NetworkIcon className="h-3.5 w-3.5" /> Interactive Graph
+              </button>
+              <button
+                onClick={() => setViewMode("directory")}
+                className={cn(
+                  "px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5",
+                  viewMode === "directory" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Link Directory
+              </button>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setSelected(null); setPan({ x: 0, y: 0 }); setZoom(1); setQuery(""); setTypeFilter("all"); }}
+              className="h-8 border-[#dadce0] text-xs font-bold rounded-full bg-white text-[#202124] hover:bg-[#f8f9fa] shadow-sm"
+            >
+              <RotateCcw className="mr-1 h-3.5 w-3.5 text-[#0b57d0]" /> Reset
+            </Button>
+          </div>
+        }
+      />
+
+      {/* PROMINENT GOOGLE SEARCH & FILTER BAR */}
+      <Card className="bg-white border-[#dadce0] rounded-2xl p-3 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#5f6368]" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search suspect name, FIR crime number, vehicle plate, wiretap phone..."
+              className="h-10 pl-10 text-xs bg-[#f8f9fa] border-[#dadce0] focus:bg-white rounded-xl text-[#202124]"
+            />
+          </div>
+
+          {/* Type Filter Chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(["all", "accused", "victim", "case", "location", "vehicle", "phone"] as const).map(k => (
+              <button
+                key={k}
+                onClick={() => setTypeFilter(k)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-bold rounded-full border transition-all uppercase tracking-wider",
+                  typeFilter === k
+                    ? "bg-[#0b57d0] text-white border-[#0b57d0] shadow-sm"
+                    : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+                )}
+              >
+                {k}
+              </button>
+            ))}
           </div>
         </div>
-      </header>
+      </Card>
 
-      {nodes.length === 0 ? (
-        <Card className="p-8 text-center bg-surface-1 border-border">
-          <p className="text-sm text-muted-foreground italic">No relationship network maps generated yet. Entity relationship links will be visualized here once cases with accused/victim details are added.</p>
-          <div className="mt-4">
-            <Link to="/cases/new" className="inline-flex items-center gap-1.5 bg-ink px-4 py-2 text-xs font-semibold text-paper hover:bg-signal transition-colors">
-              Register new FIR Case
-            </Link>
+      {/* MAIN CONTENT AREA */}
+      {viewMode === "graph" ? (
+        /* MODE A: INTERACTIVE GRAPH CANVAS */
+        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm overflow-hidden relative flex flex-col h-[640px]">
+          
+          {/* Zoom controls */}
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white border border-[#dadce0] rounded-2xl p-1 shadow-sm">
+            <Button size="sm" variant="ghost" onClick={() => setZoom(z => Math.min(2.5, z + 0.2))} className="h-7 w-7 p-0 text-[#5f6368]">
+              +
+            </Button>
+            <span className="font-mono text-[10px] text-[#5f6368] px-1 font-bold">{zoom.toFixed(1)}x</span>
+            <Button size="sm" variant="ghost" onClick={() => setZoom(z => Math.max(0.6, z - 0.2))} className="h-7 w-7 p-0 text-[#5f6368]">
+              -
+            </Button>
           </div>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-12 md:auto-rows-[minmax(0,auto)] items-stretch">
-        {/* ---------------- Entity Rail ---------------- */}
-        <Card className="md:col-span-4 lg:col-span-3 md:h-[600px] bg-surface-1 border-ink shadow-hard flex flex-col min-h-0">
-          <CardHeader className="pb-2 shrink-0">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Zone 1</div>
-            <CardTitle className="text-sm">Entity Rail</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 flex-1 flex flex-col min-h-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search person, case, phone…"
-                className="h-8 pl-7 text-xs bg-paper border-ink/30" />
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {(["all", "accused", "victim", "case", "location", "vehicle", "phone"] as const).map(k => (
-                <button key={k} onClick={() => setTypeFilter(k)}
-                  className={cn("rounded-sm border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors",
-                    typeFilter === k ? "border-ink bg-ink text-paper" : "border-ink/25 text-muted-foreground hover:text-ink hover:border-ink/60")}>
-                  {k}
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto -mx-2 px-2 space-y-1">
-              {filteredNodes
-                .sort((a, b) => (deg.get(b.id) ?? 0) - (deg.get(a.id) ?? 0))
-                .slice(0, 40)
-                .map(n => {
-                  const t = TYPE_META[n.type as EntityType];
-                  const d = deg.get(n.id) ?? 0;
-                  const risk = n.meta.riskScore ?? 0;
-                  const active = selected === n.id;
+
+          <div className="flex-1 relative bg-[#ffffff] overflow-hidden">
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
+            >
+              <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
+                
+                {/* LINKS */}
+                {filteredLinks.map((l, i) => {
+                  const isFocused = activeFocusId && (l.source.id === activeFocusId || l.target.id === activeFocusId);
+                  const isDimmed = activeFocusId && !isFocused;
+                  const isCoAccused = l.relation === "co-accused";
+
                   return (
-                    <button key={n.id} onClick={() => setSelected(n.id)}
-                      className={cn("w-full text-left rounded-sm border px-2 py-1.5 transition-all group",
-                        active ? "border-ink bg-paper shadow-hard" : "border-transparent hover:border-ink/30 hover:bg-paper")}>
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-sm border border-ink/40" style={{ background: t.color, color: "var(--paper)" }}>
-                          <t.Icon className="h-3 w-3" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12px] font-medium">{n.label}</div>
-                          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                            {t.label} · {d} link{d === 1 ? "" : "s"}
-                          </div>
-                        </div>
-                        <ChevronRight className={cn("h-3 w-3 text-muted-foreground shrink-0", active && "text-signal")} />
-                      </div>
-                      {n.type === "accused" && (
-                        <div className="mt-1.5 h-1 rounded-full bg-ink/10 overflow-hidden">
-                          <div className="h-full bg-signal" style={{ width: `${risk}%` }} />
-                        </div>
-                      )}
-                    </button>
+                    <g key={i}>
+                      <line
+                        x1={l.source.x}
+                        y1={l.source.y}
+                        x2={l.target.x}
+                        y2={l.target.y}
+                        stroke={isFocused ? (isCoAccused ? "#d93025" : "#0b57d0") : isCoAccused ? "#d93025" : "#94a3b8"}
+                        strokeOpacity={isDimmed ? 0.08 : isFocused ? 0.95 : 0.35}
+                        strokeWidth={isFocused ? 2.5 : isCoAccused ? 1.6 : 1.2}
+                        strokeDasharray={l.relation === "drove" || l.relation === "called" ? "4 3" : "none"}
+                      />
+                    </g>
                   );
                 })}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* ---------------- Graph Canvas ---------------- */}
-        <Card className="md:col-span-8 lg:col-span-6 md:h-[600px] bg-surface-1 border-ink shadow-hard overflow-hidden flex flex-col min-h-0">
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0 shrink-0">
-            <div className="min-w-0">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Zone 2 · Canvas</div>
-              <CardTitle className="text-sm truncate">Force-directed graph {selected && <span className="ml-2 font-mono text-[10px] text-signal">FOCUS: {selectedNode?.label}</span>}</CardTitle>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-mono" onClick={() => setZoom(z => Math.min(2.5, z + 0.2))}>+</Button>
-              <span className="font-mono text-[10px] tabular-nums w-8 text-center">{zoom.toFixed(1)}×</span>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-mono" onClick={() => setZoom(z => Math.max(0.6, z - 0.2))}>−</Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-mono ml-2" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); setSelected(null); }}>
-                <Focus className="h-3 w-3 mr-1" /> Reset
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 min-h-0">
-            <div className="relative h-full min-h-[420px] bg-paper grid-bg border-t border-ink/20">
-              <svg
-                ref={svgRef}
-                viewBox={`0 0 ${W} ${H}`}
-                className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
-              >
-                <defs>
-                  <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="6" />
-                  </filter>
-                  <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="0.7" fill="oklch(0.28 0.02 260 / 0.15)" />
-                  </pattern>
-                </defs>
+                {/* NODES */}
+                {filteredNodes.map(n => {
+                  const t = TYPE_META[n.type as EntityType];
+                  const r = n.type === "accused" ? 15 : n.type === "case" ? 11 : 9;
+                  const isSelected = selected === n.id;
+                  const isConnected = connectedNeighborIds.has(n.id);
+                  const isDimmed = activeFocusId && !isConnected;
 
-                <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
-                  {/* Cluster hulls */}
-                  {networkRich?.clusters?.map(c => {
-                    const pts = nodes.filter(n => n.cluster === c.id);
-                    if (pts.length < 3) return null;
-                    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-                    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-                    const r = Math.max(...pts.map(p => Math.hypot(p.x - cx, p.y - cy))) + 30;
-                    const isFocus = selectedNode?.cluster === c.id;
-                    return (
-                      <g key={c.id}>
-                        <circle cx={cx} cy={cy} r={r}
-                          fill={isFocus ? "var(--signal)" : "var(--ink)"}
-                          fillOpacity={isFocus ? 0.06 : 0.03}
-                          stroke={isFocus ? "var(--signal)" : "var(--ink)"}
-                          strokeOpacity={isFocus ? 0.6 : 0.25}
-                          strokeWidth={1}
-                          strokeDasharray="4 4" />
-                        <text x={cx - r * 0.7} y={cy - r + 14} fontFamily="JetBrains Mono" fontSize={10}
-                          fill={isFocus ? "var(--signal)" : "var(--muted-foreground)"}
-                          className="uppercase tracking-widest">
-                          Cluster {c.id}
-                        </text>
-                      </g>
-                    );
-                  })}
+                  return (
+                    <g
+                      key={n.id}
+                      transform={`translate(${n.x} ${n.y})`}
+                      className="cursor-pointer transition-opacity duration-200"
+                      opacity={isDimmed ? 0.2 : 1}
+                      onMouseEnter={() => setHover(n.id)}
+                      onMouseLeave={() => setHover(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected(n.id);
+                      }}
+                    >
+                      {/* Node Halo */}
+                      {isSelected && (
+                        <circle r={r + 8} fill={t.color} opacity={0.2} />
+                      )}
 
-                  {/* Edges */}
-                  {links.map((l, i) => {
-                    const dim = focused && !(neighbors.has(l.source.id) && (l.source.id === focused || l.target.id === focused) || (l.source.id === focused || l.target.id === focused));
-                    const active = focused && (l.source.id === focused || l.target.id === focused);
-                    return (
-                      <line key={i} x1={l.source.x} y1={l.source.y} x2={l.target.x} y2={l.target.y}
-                        stroke={active ? relationColor(l.relation) : "var(--ink)"}
-                        strokeOpacity={active ? 0.85 : dim ? 0.08 : 0.28}
-                        strokeWidth={active ? 1.6 : 0.7}
-                      />
-                    );
-                  })}
+                      {/* Node Shape */}
+                      {n.type === "accused" ? (
+                        <g>
+                          <circle r={r + 2} fill="#ffffff" stroke={t.color} strokeWidth={isSelected ? 3 : 2} />
+                          <circle r={r - 3} fill={t.color} />
+                        </g>
+                      ) : (
+                        <circle r={r} fill={t.color} stroke="#ffffff" strokeWidth={2} />
+                      )}
 
-                  {/* Nodes */}
-                  {nodes.map(n => {
-                    const t = TYPE_META[n.type as EntityType];
-                    const d = deg.get(n.id) ?? 1;
-                    const r = n.type === "accused" ? 10 + Math.min(6, d) : n.type === "case" ? 6 : n.type === "location" ? 8 : 6;
-                    const isFocus = focused === n.id;
-                    const isNeighbor = focused && neighbors.has(n.id);
-                    const isDim = focused && !isFocus && !isNeighbor;
-
-                    return (
-                      <g key={n.id}
-                        transform={`translate(${n.x} ${n.y})`}
-                        style={{ cursor: "pointer", opacity: isDim ? 0.15 : 1, transition: "opacity 0.2s" }}
-                        onMouseEnter={() => setHover(n.id)}
-                        onMouseLeave={() => setHover(null)}
-                        onClick={(e) => { e.stopPropagation(); setSelected(n.id); }}>
-                        {isFocus && <circle r={r + 14} fill={t.color} opacity={0.35} filter="url(#halo)" />}
-                        {n.type === "accused" ? (
-                          <polygon points={hexPoints(r + 2)} fill={t.color} stroke="var(--ink)" strokeWidth={1.5} />
-                        ) : n.type === "case" ? (
-                          <rect x={-r} y={-r} width={r * 2} height={r * 2} fill="var(--paper)" stroke="var(--ink)" strokeWidth={1.2} />
-                        ) : n.type === "location" ? (
-                          <polygon points={diamondPoints(r + 1)} fill={t.color} stroke="var(--ink)" strokeWidth={1.2} />
-                        ) : (
-                          <circle r={r} fill={t.color} stroke="var(--ink)" strokeWidth={1.2} />
-                        )}
-                        {(isFocus || isNeighbor || n.type === "accused") && (
-                          <text y={r + 12} textAnchor="middle" fontSize={9} fontFamily="DM Sans"
-                            fill="var(--ink)"
-                            style={{ paintOrder: "stroke", stroke: "var(--paper)", strokeWidth: 3 } as React.CSSProperties}>
-                            {n.label}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </g>
-              </svg>
-
-              {/* Legend overlay */}
-              <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5 rounded-sm border border-ink/25 bg-paper/90 backdrop-blur px-2 py-1.5">
-                {(Object.entries(TYPE_META) as [EntityType, typeof TYPE_META.accused][]).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider">
-                    <span className="h-2 w-2 rounded-sm" style={{ background: v.color }} />
-                    {v.label}
-                  </div>
-                ))}
-              </div>
-
-              {/* Mini legend for relations */}
-              <div className="absolute top-2 right-2 rounded-sm border border-ink/25 bg-paper/90 backdrop-blur px-2 py-1.5 space-y-0.5">
-                {(["co-accused", "victim-of", "occurred-at", "called", "drove"] as const).map(r => (
-                  <div key={r} className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider">
-                    <span className="h-[2px] w-4" style={{ background: relationColor(r) }} />
-                    {r}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ---------------- Dossier ---------------- */}
-        <Card className="md:col-span-12 lg:col-span-3 lg:h-[600px] bg-surface-1 border-ink shadow-hard flex flex-col min-h-0">
-          <CardHeader className="pb-2 shrink-0">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Zone 3</div>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Fingerprint className="h-4 w-4 text-signal" /> Dossier
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 min-h-0 overflow-y-auto">
-            {!selectedNode ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="mx-auto h-10 w-10 flex items-center justify-center rounded-md border border-ink/25 bg-paper">
-                  <Radar className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="font-editorial italic text-sm text-muted-foreground leading-snug">
-                  "Every connection is a lead. Every lead is a case waiting to be closed."
-                </p>
-                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Select an entity to open its file
-                </p>
-              </div>
-            ) : (
-              <DossierPanel node={selectedNode} nodes={nodes} deg={deg} edges={networkRich.edges} onOpen={id => setSelected(id)} />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ---------------- Timeline ---------------- */}
-        <Card className="md:col-span-12 lg:col-span-8 bg-surface-1 border-ink shadow-hard flex flex-col">
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Zone 4</div>
-              <CardTitle className="text-sm">Cluster timeline {selectedNode && <span className="ml-2 font-mono text-[10px] text-signal">{selectedNode.cluster}</span>}</CardTitle>
-            </div>
-            <span className="font-mono text-[10px] text-muted-foreground">{eventTimeline.length} events</span>
-          </CardHeader>
-          <CardContent>
-            {eventTimeline.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">Select a node to see its cluster's timeline.</p>
-            ) : (
-              <div className="relative py-4">
-                <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-ink" />
-                <div className="relative flex justify-between">
-                  {eventTimeline.map((ev) => (
-                    <button key={ev.id} onClick={() => setSelected(ev.id)}
-                      className="group flex flex-col items-center gap-1">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground group-hover:text-ink">
-                        {ev.when.slice(5)}
-                      </span>
-                      <span className={cn(
-                        "h-3 w-3 rounded-full border-2 border-ink transition-all",
-                        ev.type === "accused" ? "bg-signal" : "bg-paper group-hover:bg-signal"
-                      )} />
-                      <span className="max-w-[80px] truncate text-[10px] group-hover:text-signal">{ev.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ---------------- Patterns ---------------- */}
-        <Card className="md:col-span-12 lg:col-span-4 bg-surface-1 border-ink shadow-hard flex flex-col">
-          <CardHeader className="pb-2">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Zone 5</div>
-            <CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-signal" /> Detected patterns</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {networkRich.clusters.map((c: any, i: number) => {
-              const size = nodes.filter(n => n.cluster === c.id).length;
-              const kindColor = c.kind === "organised" ? "signal" : c.kind === "recurring-mo" ? "warning" : "info";
-              return (
-                <button key={c.id}
-                  onClick={() => {
-                    const first = nodes.find(n => n.cluster === c.id && n.type === "accused");
-                    if (first) setSelected(first.id);
-                  }}
-                  className={cn("w-full text-left rounded-sm border p-2.5 transition-all",
-                    `border-${kindColor}/40 bg-${kindColor}/5 hover:bg-${kindColor}/10 hover:shadow-hard`)}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-[10px] uppercase tracking-widest">Cluster {c.id}</span>
-                    <Badge className={cn("border font-mono text-[9px] uppercase",
-                      `bg-${kindColor}/15 text-${kindColor} border-${kindColor}/40`)}>{c.kind.replace("-", " ")}</Badge>
-                  </div>
-                  <div className="text-[12px] font-medium">{c.label}</div>
-                  <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>{size} entities · confidence {60 + i * 8}%</span>
-                    <span className="flex items-center gap-1 text-ink"><RouteIcon className="h-3 w-3" /> View</span>
-                  </div>
-                </button>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
-      )}
-    </div>
-  );
-}
-
-/* --- helpers --- */
-function hexPoints(r: number) {
-  return Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2;
-    return `${Math.cos(a) * r},${Math.sin(a) * r}`;
-  }).join(" ");
-}
-function diamondPoints(r: number) {
-  return `0,${-r} ${r},0 0,${r} ${-r},0`;
-}
-
-/* --- Dossier subcomponent --- */
-function DossierPanel({ node, nodes, deg, edges, onOpen }: { node: RichNode; nodes: RichNode[]; deg: Map<string, number>; edges: any[]; onOpen: (id: string) => void }) {
-  const t = TYPE_META[node.type as EntityType];
-  const links = edges
-    .filter(e => e.source === node.id || e.target === node.id)
-    .map(e => {
-      const otherId = e.source === node.id ? e.target : e.source;
-      return { other: nodes.find(n => n.id === otherId)!, relation: e.relation, weight: e.weight };
-    })
-    .filter(x => x.other)
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 6);
-
-  const pred = node.meta.predictedNext;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="flex h-10 w-10 items-center justify-center border border-ink shadow-hard" style={{ background: t.color, color: "var(--paper)" }}>
-          <t.Icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{t.label} · {node.cluster}</div>
-          <div className="font-semibold text-sm truncate">{node.label}</div>
-          {node.meta.aliases?.[0] && <div className="font-editorial italic text-[11px] text-muted-foreground">a.k.a. {node.meta.aliases[0]}</div>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-[11px]">
-        {node.meta.age && <StatBox k="Age" v={String(node.meta.age)} />}
-        {node.meta.district && <StatBox k="District" v={node.meta.district} />}
-        {node.meta.activeFIRs != null && <StatBox k="Active FIRs" v={String(node.meta.activeFIRs)} />}
-        <StatBox k="Links" v={String(deg.get(node.id) ?? 0)} />
-        {node.meta.firstSeen && <StatBox k="First seen" v={node.meta.firstSeen} />}
-        {node.meta.lastSeen && <StatBox k="Last seen" v={node.meta.lastSeen} />}
-      </div>
-
-      {node.meta.riskScore != null && (
-        <div>
-          <div className="flex justify-between font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1">
-            <span>Risk score</span><span className="text-signal">{node.meta.riskScore}/100</span>
+                      {/* Clean Label */}
+                      <text
+                        y={r + 14}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fontWeight="bold"
+                        fontFamily="DM Sans, sans-serif"
+                        fill="#202124"
+                        className="select-none"
+                      >
+                        {n.label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            </svg>
           </div>
-          <div className="h-1.5 rounded-full bg-ink/10 overflow-hidden">
-            <div className="h-full bg-signal" style={{ width: `${node.meta.riskScore}%` }} />
-          </div>
-        </div>
-      )}
 
-      {pred && (
-        <div className="rounded-sm border border-signal/40 bg-signal/5 p-2">
-          <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-signal mb-1">
-            <Sparkles className="h-3 w-3" /> Predicted next
-          </div>
-          <div className="text-[12px] font-medium">{pred.crime}</div>
-          <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-            <span>{pred.window}</span><span className="text-signal">{pred.probability}% likely</span>
-          </div>
-          <div className="mt-1 h-1 rounded-full bg-ink/10 overflow-hidden">
-            <div className="h-full bg-signal" style={{ width: `${pred.probability}%` }} />
-          </div>
-        </div>
-      )}
-
-      <div>
-        <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">Connected to</div>
-        <div className="space-y-1">
-          {links.map((l, i) => {
-            const ot = TYPE_META[l.other.type as EntityType];
-            return (
-              <button key={i} onClick={() => onOpen(l.other.id)}
-                className="w-full text-left flex items-center gap-2 rounded-sm border border-transparent hover:border-ink/30 hover:bg-paper px-1.5 py-1">
-                <span className="h-4 w-4 rounded-sm flex items-center justify-center" style={{ background: ot.color }}>
-                  <ot.Icon className="h-2.5 w-2.5 text-paper" />
+          {/* FLOATING DOSSIER DRAWER ON CLICK */}
+          {selectedNode && (
+            <div className="absolute top-3 right-3 bottom-3 z-20 w-80 bg-white border border-[#dadce0] rounded-2xl p-4 shadow-xl flex flex-col overflow-y-auto space-y-4 text-xs">
+              
+              <div className="flex items-center justify-between border-b pb-2">
+                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: TYPE_META[selectedNode.type].bg, color: TYPE_META[selectedNode.type].color }}>
+                  {TYPE_META[selectedNode.type].label}
                 </span>
-                <span className="flex-1 truncate text-[11px]">{l.other.label}</span>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">{l.relation}</span>
-              </button>
+                <X className="h-4 w-4 cursor-pointer text-[#5f6368] hover:text-[#202124]" onClick={() => setSelected(null)} />
+              </div>
+
+              <div>
+                <h3 className="font-display text-base font-bold text-[#202124]">{selectedNode.label}</h3>
+                {selectedNode.meta.aliases?.[0] && (
+                  <p className="text-xs text-[#0b57d0] font-medium italic">a.k.a. {selectedNode.meta.aliases[0]}</p>
+                )}
+              </div>
+
+              {selectedNode.type === "accused" && (
+                <div className="p-3 rounded-xl bg-[#fce8e6] border border-[#f8b4b0] text-[#d93025] font-bold flex items-center justify-between">
+                  <span>STATUS: WANTED SUSPECT</span>
+                  <Badge className="bg-[#d93025] text-white text-[10px]">RISK {selectedNode.meta.riskScore || 80}/100</Badge>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 text-[#202124]">
+                <div className="p-2.5 rounded-xl bg-[#f8f9fa] border border-[#dadce0]">
+                  <span className="text-[9px] uppercase font-bold text-[#5f6368] block">District</span>
+                  <span className="font-bold text-xs">{selectedNode.meta.district || "Karnataka"}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f8f9fa] border border-[#dadce0]">
+                  <span className="text-[9px] uppercase font-bold text-[#5f6368] block">Links</span>
+                  <span className="font-bold text-xs text-[#0b57d0]">{deg.get(selectedNode.id) ?? 0} Connected</span>
+                </div>
+              </div>
+
+              {/* AI Prediction */}
+              {selectedNode.meta.predictedNext && (
+                <div className="p-3 rounded-xl bg-[#fef7e0] border border-[#f9ab00]/40 text-[#202124] space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-bold text-[#e37400]">
+                    <Sparkles className="h-3.5 w-3.5 text-[#e37400]" /> Predicted Next Move
+                  </div>
+                  <p className="font-bold text-xs">{selectedNode.meta.predictedNext.crime} in {selectedNode.meta.district || "Bengaluru"}</p>
+                  <p className="text-[10px] text-[#5f6368] font-mono">{selectedNode.meta.predictedNext.probability}% Probability · {selectedNode.meta.predictedNext.window}</p>
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <Button
+                  size="sm"
+                  className="w-full bg-[#0b57d0] text-white rounded-xl font-bold text-xs"
+                  onClick={() => {
+                    if (selectedNode.type === "case") {
+                      const cid = selectedNode.id.replace("C-", "");
+                      window.location.href = `/cases/${cid}`;
+                    }
+                  }}
+                >
+                  Inspect Details <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      ) : (
+        /* MODE B: STRUCTURED LINK DIRECTORY MATRIX */
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredNodes.map(n => {
+            const t = TYPE_META[n.type as EntityType];
+            const d = deg.get(n.id) ?? 0;
+            const isSelected = selected === n.id;
+
+            return (
+              <Card
+                key={n.id}
+                onClick={() => setSelected(n.id)}
+                className={cn(
+                  "p-4 rounded-2xl border transition-all cursor-pointer space-y-3 relative overflow-hidden",
+                  isSelected ? "border-[#0b57d0] bg-[#e8f0fe]/40 shadow-sm ring-1 ring-[#0b57d0]" : "border-[#dadce0] bg-white hover:bg-[#f8f9fa]"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1" style={{ background: t.bg, color: t.color }}>
+                    <t.Icon className="h-3 w-3" /> {t.label}
+                  </span>
+                  <span className="font-mono text-[10px] font-bold text-[#5f6368]">{d} Link(s)</span>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-sm text-[#202124]">{n.label}</h4>
+                  <p className="text-xs text-[#5f6368]">District: {n.meta.district || "Karnataka"}</p>
+                </div>
+
+                {n.type === "accused" && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-bold">
+                      <span className="text-[#5f6368]">Criminal Risk Score</span>
+                      <span className="text-[#d93025]">{n.meta.riskScore || 75}/100</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-[#f1f3f4] overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-[#f9ab00] to-[#d93025]" style={{ width: `${n.meta.riskScore || 75}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-[#dadce0] flex items-center justify-between text-xs">
+                  <span className="font-mono text-[10px] text-[#5f6368]">ID: {n.id}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelected(n.id);
+                      setViewMode("graph");
+                    }}
+                    className="h-6 px-2 text-[11px] font-bold text-[#0b57d0]"
+                  >
+                    Focus Graph <ArrowUpRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </div>
+              </Card>
             );
           })}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function StatBox({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="rounded-sm border border-ink/20 bg-paper px-2 py-1">
-      <div className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground">{k}</div>
-      <div className="text-[12px] font-medium truncate">{v}</div>
+      )}
     </div>
   );
 }
