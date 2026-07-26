@@ -663,7 +663,24 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
   };
 
   return (
-    <div className="hidden print:block w-full max-w-[210mm] mx-auto bg-white text-black p-8 font-serif text-[11px] leading-relaxed select-text">
+    <div className="hidden print:block w-full max-w-[210mm] mx-auto bg-white text-black p-8 font-serif text-[11px] leading-relaxed select-text relative overflow-hidden">
+      {/* Closed File Diagonal Cross Watermark */}
+      {caseData.status === "Closed" && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-50 select-none">
+          {/* Diagonal Line 1 (Top-Left to Bottom-Right) */}
+          <div className="absolute w-[150%] h-[4px] bg-red-600/15 top-0 left-0" style={{ transform: 'rotate(43deg)', transformOrigin: 'top left' }}></div>
+          {/* Diagonal Line 2 (Top-Right to Bottom-Left) */}
+          <div className="absolute w-[150%] h-[4px] bg-red-600/15 top-0 right-0" style={{ transform: 'rotate(-43deg)', transformOrigin: 'top right' }}></div>
+          
+          {/* Central Bold Banner */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="border-[8px] border-red-600/30 rounded-2xl px-10 py-5 bg-white/90 shadow-2xl flex flex-col items-center justify-center" style={{ transform: 'rotate(-25deg)' }}>
+              <span className="text-7xl font-black tracking-widest text-red-600/45 uppercase font-sans">CLOSED FILE</span>
+              <span className="text-lg font-bold tracking-wider text-red-600/45 uppercase font-sans mt-1">CASE RESOLVED & COMPLETED</span>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Print Page Styles Override */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {

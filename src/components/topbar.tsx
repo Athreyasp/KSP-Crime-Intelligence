@@ -202,10 +202,8 @@ export function Topbar() {
 
         {/* Main bar — editorial masthead */}
         <div className="flex h-14 items-center gap-3 px-3">
-          <SidebarTrigger className="rounded-sm border border-ink/20 hover:bg-surface-2" />
-
           {/* Route crumb — big serif kicker */}
-          <div className="hidden md:flex items-baseline gap-2.5 border-l border-ink/15 pl-3">
+          <div className="hidden md:flex items-baseline gap-2.5">
             <span className="font-editorial text-xl italic leading-none text-ink">
               {label.crumb}
             </span>
