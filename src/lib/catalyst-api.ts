@@ -1,5 +1,12 @@
 import { CASES, DISTRICTS, CRIME_HEADS, type Case, type District } from "@/data/mock";
 
+// In development, Vite proxies /server → Catalyst (see vite.config.ts).
+// In production (any external host), set VITE_API_BASE to your full
+// Catalyst serverless URL, e.g.:
+//   https://ksp-60078060929.development.catalystserverless.in
+// Leave empty string if deploying directly on Zoho Catalyst Hosting.
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+
 const COURTS = [
   "JMFC Court",
   "District and Sessions Court",
@@ -9,7 +16,7 @@ const COURTS = [
 
 export async function fetchLiveCases(): Promise<Case[]> {
   try {
-    const res = await fetch("/server/api/cases");
+    const res = await fetch(`${API_BASE}/server/api/cases`);
     if (!res.ok) {
       throw new Error(`Server returned HTTP ${res.status}`);
     }
@@ -244,7 +251,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
 
 export async function fetchLiveTables(): Promise<{ tables: any[]; data: Record<string, any[]> }> {
   try {
-    const res = await fetch("/server/api/tables");
+    const res = await fetch(`${API_BASE}/server/api/tables`);
     if (!res.ok) {
       throw new Error(`Server returned HTTP ${res.status}`);
     }
@@ -264,7 +271,7 @@ export async function fetchLiveDistricts(): Promise<District[]> {
 }
 
 export async function insertLiveCase(newCase: Omit<Case, "caseMasterId">): Promise<Case> {
-  const res = await fetch("/server/api/cases", {
+  const res = await fetch(`${API_BASE}/server/api/cases`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(newCase)
@@ -288,7 +295,7 @@ export async function insertLiveCase(newCase: Omit<Case, "caseMasterId">): Promi
 }
 
 export async function updateLiveCase(caseMasterId: number, status: string, briefFacts: string): Promise<void> {
-  const res = await fetch("/server/api/cases", {
+  const res = await fetch(`${API_BASE}/server/api/cases`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ caseMasterId, status, briefFacts })
@@ -307,7 +314,7 @@ export async function updateLiveCase(caseMasterId: number, status: string, brief
 }
 
 export async function clearLiveCases() {
-  const res = await fetch("/server/api/cases", {
+  const res = await fetch(`${API_BASE}/server/api/cases`, {
     method: "DELETE"
   });
   if (!res.ok) {
