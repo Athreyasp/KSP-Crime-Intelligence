@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type SimulationNodeDatum } from "d3-force";
 import {
@@ -78,6 +78,7 @@ function useForceLayout(networkRich: any) {
 }
 
 export function NetworkPage() {
+  const navigate = useNavigate();
   const { networkRich, cases } = useDb();
   const { nodes, links } = useForceLayout(networkRich);
 
@@ -88,6 +89,15 @@ export function NetworkPage() {
   const [viewMode, setViewMode] = useState<"graph" | "directory">("graph");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  // Proactively clear any legacy local storage data as requested by the user
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.clear();
+      } catch (e) {}
+    }
+  }, []);
 
   // Filter nodes
   const filteredNodes = useMemo(() => {
@@ -113,6 +123,23 @@ export function NetworkPage() {
     return m;
   }, [filteredLinks]);
 
+  // Nodes and links to render on the SVG canvas: when selected, only show target sub-network
+  const svgLinks = useMemo(() => {
+    if (!selected) return filteredLinks;
+    return filteredLinks.filter(l => l.source.id === selected || l.target.id === selected);
+  }, [filteredLinks, selected]);
+
+  const svgNodes = useMemo(() => {
+    if (!selected) return filteredNodes;
+    const neighbors = new Set<string>();
+    neighbors.add(selected);
+    for (const l of filteredLinks) {
+      if (l.source.id === selected) neighbors.add(l.target.id);
+      if (l.target.id === selected) neighbors.add(l.source.id);
+    }
+    return filteredNodes.filter(n => neighbors.has(n.id));
+  }, [filteredNodes, filteredLinks, selected]);
+
   // Focus Highlight
   const activeFocusId = selected || hover;
   const connectedNeighborIds = useMemo(() => {
@@ -126,15 +153,49 @@ export function NetworkPage() {
     return set;
   }, [activeFocusId, filteredLinks]);
 
-  // Default select first suspect
-  useEffect(() => {
-    if (!selected && filteredNodes.length > 0) {
-      const firstAccused = filteredNodes.find(n => n.type === "accused");
-      if (firstAccused) setSelected(firstAccused.id);
-    }
-  }, [filteredNodes, selected]);
+
 
   const selectedNode = selected ? nodes.find(n => n.id === selected) : null;
+
+  const getSuspectRelations = () => {
+    if (!selectedNode) return [];
+    const directLinks = links.filter(l => l.source.id === selectedNode.id || l.target.id === selectedNode.id);
+    const relations: { name: string; id: string; type: string; relation: string }[] = [];
+    
+    // Find all cases this suspect is in
+    const myCaseIds = new Set<string>();
+    directLinks.forEach(l => {
+      const peer = l.source.id === selectedNode.id ? l.target : l.source;
+      if (peer.type === "case") {
+        myCaseIds.add(peer.id);
+        relations.push({ name: peer.label, id: peer.id, type: peer.type, relation: "Suspect In" });
+      } else if (peer.type === "vehicle") {
+        relations.push({ name: peer.label, id: peer.id, type: peer.type, relation: "Shared Vehicle" });
+      } else if (peer.type === "phone") {
+        relations.push({ name: peer.label, id: peer.id, type: peer.type, relation: "Burner Phone" });
+      }
+    });
+
+    // Find other suspects who are co-accused in the same cases
+    const seenCoAccused = new Set<string>();
+    links.forEach(l => {
+      const isCaseSource = l.source.type === "case";
+      const isCaseTarget = l.target.type === "case";
+      if (!isCaseSource && !isCaseTarget) return;
+
+      const caseId = isCaseSource ? l.source.id : l.target.id;
+      const suspect = isCaseSource ? l.target : l.source;
+
+      if (suspect.type === "accused" && suspect.id !== selectedNode.id && myCaseIds.has(caseId)) {
+        if (!seenCoAccused.has(suspect.id)) {
+          seenCoAccused.add(suspect.id);
+          relations.push({ name: suspect.label, id: suspect.id, type: suspect.type, relation: "Co-Accused" });
+        }
+      }
+    });
+
+    return relations;
+  };
 
   // Pan / Drag controls
   const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
@@ -155,12 +216,12 @@ export function NetworkPage() {
         section="§ 02"
         eyebrow="Karnataka State Police · State Crime Records Bureau"
         title="Network & Association Atlas"
-        description="Clean & intuitive link intelligence workspace. Powered 100% live by Zoho Catalyst FIR database."
+        description="Clean & intuitive link intelligence workspace."
         actions={
           <div className="flex items-center gap-2">
             <Badge className="bg-[#e8f0fe] text-[#0b57d0] border border-[#0b57d0]/20 font-bold px-3 py-1 flex items-center gap-1.5 shadow-sm">
               <Database className="h-3.5 w-3.5 text-[#0b57d0]" />
-              Zoho Live Data ({filteredNodes.length} Entities)
+              Live Association Map ({filteredNodes.length} Entities)
             </Badge>
 
             <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-full">
@@ -257,7 +318,7 @@ export function NetworkPage() {
               <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
                 
                 {/* LINKS */}
-                {filteredLinks.map((l, i) => {
+                {svgLinks.map((l, i) => {
                   const isFocused = activeFocusId && (l.source.id === activeFocusId || l.target.id === activeFocusId);
                   const isDimmed = activeFocusId && !isFocused;
                   const isCoAccused = l.relation === "co-accused";
@@ -279,7 +340,7 @@ export function NetworkPage() {
                 })}
 
                 {/* NODES */}
-                {filteredNodes.map(n => {
+                {svgNodes.map(n => {
                   const t = TYPE_META[n.type as EntityType];
                   const r = n.type === "accused" ? 15 : n.type === "case" ? 11 : 9;
                   const isSelected = selected === n.id;
@@ -352,9 +413,21 @@ export function NetworkPage() {
               </div>
 
               {selectedNode.type === "accused" && (
-                <div className="p-3 rounded-xl bg-[#fce8e6] border border-[#f8b4b0] text-[#d93025] font-bold flex items-center justify-between">
-                  <span>STATUS: WANTED SUSPECT</span>
-                  <Badge className="bg-[#d93025] text-white text-[10px]">RISK {selectedNode.meta.riskScore || 80}/100</Badge>
+                <div className="p-3 rounded-xl bg-[#fce8e6] border border-[#f8b4b0] text-[#d93025] font-bold flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span>STATUS: WANTED SUSPECT</span>
+                    <Badge className="bg-[#d93025] text-white text-[10px]">RISK {selectedNode.meta.riskScore || 80}/100</Badge>
+                  </div>
+                  <div className="text-[10px] text-[#c5221f] font-mono border-t border-[#f8b4b0]/40 pt-1 flex items-center gap-1 font-bold">
+                    <span>ROLE:</span>
+                    <span>
+                      {(deg.get(selectedNode.id) || 0) >= 5
+                        ? "🔴 SYNDICATE LEADER"
+                        : (deg.get(selectedNode.id) || 0) >= 2
+                        ? "🟡 GANG ASSOCIATE"
+                        : "🟢 FIELD RUNNER"}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -366,6 +439,28 @@ export function NetworkPage() {
                 <div className="p-2.5 rounded-xl bg-[#f8f9fa] border border-[#dadce0]">
                   <span className="text-[9px] uppercase font-bold text-[#5f6368] block">Links</span>
                   <span className="font-bold text-xs text-[#0b57d0]">{deg.get(selectedNode.id) ?? 0} Connected</span>
+                </div>
+              </div>
+
+              {/* Intelligence Linkages */}
+              <div className="space-y-1.5">
+                <span className="text-[9px] uppercase font-bold text-[#5f6368] block">Intelligence Linkages</span>
+                <div className="space-y-1 max-h-28 overflow-y-auto">
+                  {getSuspectRelations().map((rel, rIdx) => (
+                    <button
+                      key={rIdx}
+                      onClick={() => setSelected(rel.id)}
+                      className="flex items-center justify-between w-full p-2 bg-[#f8f9fa] border border-[#dadce0] hover:bg-[#e8f0fe] hover:border-[#0b57d0] rounded-xl text-left transition-colors text-[10px]"
+                    >
+                      <span className="font-bold truncate text-[#202124] max-w-[130px]">{rel.name}</span>
+                      <Badge className="bg-[#e8f0fe] text-[#0b57d0] text-[8px] hover:bg-[#e8f0fe] border border-[#0b57d0]/20 font-bold px-1.5 py-0">
+                        {rel.relation}
+                      </Badge>
+                    </button>
+                  ))}
+                  {getSuspectRelations().length === 0 && (
+                    <p className="text-[10px] text-[#5f6368] italic">No direct linked associates recorded.</p>
+                  )}
                 </div>
               </div>
 
@@ -387,7 +482,11 @@ export function NetworkPage() {
                   onClick={() => {
                     if (selectedNode.type === "case") {
                       const cid = selectedNode.id.replace("C-", "");
-                      window.location.href = `/cases/${cid}`;
+                      navigate({ to: `/cases/${cid}` });
+                    } else if (selectedNode.type === "accused") {
+                      navigate({ to: "/offenders" });
+                    } else if (selectedNode.type === "location") {
+                      navigate({ to: "/hotspots" });
                     }
                   }}
                 >

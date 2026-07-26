@@ -10,7 +10,7 @@
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
   </head>
   <body>
     <div id="root"></div>
@@ -19,12 +19,9 @@
       // Initialize Catalyst Web SDK — handles auth session automatically
       window.__catalystReady = new Promise(function(resolve) {
         try {
-          var app = catalyst.auth.signIn("login");
-          if (app) {
-            resolve(app);
-          } else {
-            resolve(null);
-          }
+          // Initialize catalyst app without forcing authentication redirect
+          var app = catalyst.init();
+          resolve(app);
         } catch(e) {
           console.warn("Catalyst SDK init skipped (likely local dev):", e.message);
           resolve(null);

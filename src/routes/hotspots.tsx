@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
@@ -215,12 +215,31 @@ function Hotspots() {
 
   const [crimeFilter, setCrimeFilter] = useState<string>("all");
   const [bandFilter, setBandFilter] = useState<string>("all");
-  const [compareMode, setCompareMode] = useState(false);
-  const defaultA = DISTRICT_STATS[0]?.district.id ?? 1;
-  const defaultB = DISTRICT_STATS[1]?.district.id ?? defaultA;
-  const [compareAId, setCompareAId] = useState<number>(defaultA);
-  const [compareBId, setCompareBId] = useState<number>(defaultB);
   const mapWrapRef = useRef<HTMLDivElement | null>(null);
+
+  const [hasProcessedParam, setHasProcessedParam] = useState(false);
+
+  useEffect(() => {
+    if (hasProcessedParam) return;
+    const params = new URLSearchParams(window.location.search);
+    const districtQuery = params.get("district");
+    if (districtQuery && DISTRICT_STATS.length > 0) {
+      const queryLower = districtQuery.toLowerCase();
+      const match = DISTRICT_STATS.find(s => 
+        s.district.name.toLowerCase() === queryLower ||
+        toGeo(s.district.name).toLowerCase() === queryLower ||
+        toGeo(s.district.name).toLowerCase().includes(queryLower) ||
+        s.district.name.toLowerCase().includes(queryLower)
+      );
+      if (match) {
+        setSelectedId(match.district.id);
+        setViewMode("district");
+        setHasProcessedParam(true);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [DISTRICT_STATS, hasProcessedParam]);
 
   const filteredDistrictStats = useMemo(() => {
     return DISTRICT_STATS.map(s => {
@@ -229,7 +248,7 @@ function Hotspots() {
       if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
       const total = cases.length;
       const heinous = cases.filter(c => c.gravity === "Heinous").length;
-      const arrests = cases.reduce((acc, c) => acc + (c.arrestCount || 1), 0);
+      const arrests = cases.reduce((acc, c) => acc + (c.accused?.filter(a => a.arrestId || a.arrested).length || 0), 0);
       return { ...s, total, heinous, arrests };
     });
   }, [DISTRICT_STATS, allCases, crimeFilter, hour]);
@@ -475,31 +494,11 @@ function Hotspots() {
           <Button variant="outline" size="sm" onClick={handleExportCsv}>
             <FileText className="mr-1.5 h-4 w-4" /> CSV
           </Button>
-          <Button variant={compareMode ? "default" : "outline"} size="sm" onClick={() => setCompareMode(v => !v)}>
-            <GitCompare className="mr-1.5 h-4 w-4" /> Compare
-          </Button>
           <Button variant="outline" size="sm" onClick={handleExportPdf}>
             <Download className="mr-1.5 h-4 w-4" /> PDF
           </Button>
         </div>
       </div>
-
-      {compareMode && (
-        <ComparePanel
-          aId={compareAId}
-          bId={compareBId}
-          onChangeA={setCompareAId}
-          onChangeB={setCompareBId}
-          onClose={() => setCompareMode(false)}
-          crimeFilter={crimeFilter}
-          bandFilter={bandFilter}
-          onCrimeFilter={setCrimeFilter}
-          onBandFilter={setBandFilter}
-          lowT={lowT}
-          highT={highT}
-          matchesFilters={matchesFilters}
-        />
-      )}
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
@@ -1419,231 +1418,6 @@ function AreaMap({
     </svg>
   );
 }
-
-function ComparePanel({
-  aId, bId, onChangeA, onChangeB, onClose,
-  crimeFilter, bandFilter, onCrimeFilter, onBandFilter,
-  lowT, highT, matchesFilters,
-}: {
-  aId: number;
-  bId: number;
-  onChangeA: (id: number) => void;
-  onChangeB: (id: number) => void;
-  onClose: () => void;
-  crimeFilter: string;
-  bandFilter: string;
-  onCrimeFilter: (v: string) => void;
-  onBandFilter: (v: string) => void;
-  lowT: number;
-  highT: number;
-  matchesFilters: (a: SubArea) => boolean;
-}) {
-  const statA = DISTRICT_STATS.find(s => s.district.id === aId)!;
-  const statB = DISTRICT_STATS.find(s => s.district.id === bId)!;
-  const geoA = karnatakaMap.districts.find(g => g.name === toGeo(statA.district.name));
-  const geoB = karnatakaMap.districts.find(g => g.name === toGeo(statB.district.name));
-  const areasA = getSubAreas(aId);
-  const areasB = getSubAreas(bId);
-  const sharedMax = Math.max(...areasA.map(a => a.firs), ...areasB.map(a => a.firs), 1);
-
-  const rank = (arr: SubArea[]) => [...arr].sort((a, b) => {
-    const am = matchesFilters(a) ? 1 : 0;
-    const bm = matchesFilters(b) ? 1 : 0;
-    if (am !== bm) return bm - am;
-    return b.firs - a.firs;
-  });
-  const rankedA = rank(areasA);
-  const rankedB = rank(areasB);
-  const matchA = areasA.filter(matchesFilters);
-  const matchB = areasB.filter(matchesFilters);
-  const totalA = matchA.reduce((s, a) => s + a.firs, 0);
-  const totalB = matchB.reduce((s, a) => s + a.firs, 0);
-
-  return (
-    <Card className="bg-surface-1 border-border">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <GitCompare className="h-4 w-4" /> District Comparison
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Side-by-side hotspot rankings · shared crime type &amp; time band
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Shared filters</span>
-          <Select value={crimeFilter} onValueChange={onCrimeFilter}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
-              <SelectValue placeholder="All crime types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All crime types</SelectItem>
-              {CRIME_HEADS.map(c => (
-                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={bandFilter} onValueChange={onBandFilter}>
-            <SelectTrigger className="h-8 w-[160px] text-xs">
-              <SelectValue placeholder="All time bands" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All time bands</SelectItem>
-              {PEAK_BANDS.map(b => (
-                <SelectItem key={b} value={b}>{b}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(crimeFilter !== "all" || bandFilter !== "all") && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs"
-              onClick={() => { onCrimeFilter("all"); onBandFilter("all"); }}>Clear</Button>
-          )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <ComparePane
-            side="A"
-            statId={aId}
-            onChange={onChangeA}
-            excludeId={bId}
-            geo={geoA}
-            ranked={rankedA}
-            sharedMax={sharedMax}
-            matchesFilters={matchesFilters}
-            lowT={lowT}
-            highT={highT}
-            totalFirs={totalA}
-            matchCount={matchA.length}
-          />
-          <ComparePane
-            side="B"
-            statId={bId}
-            onChange={onChangeB}
-            excludeId={aId}
-            geo={geoB}
-            ranked={rankedB}
-            sharedMax={sharedMax}
-            matchesFilters={matchesFilters}
-            lowT={lowT}
-            highT={highT}
-            totalFirs={totalB}
-            matchCount={matchB.length}
-          />
-        </div>
-
-        {/* Summary bar */}
-        <div className="rounded-md border border-border bg-surface-2 p-3">
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-muted-foreground">Filtered FIR volume</span>
-            <span className="font-mono">
-              <span className="text-primary">{statA.district.name}: {totalA}</span>
-              {"  ·  "}
-              <span className="text-warning">{statB.district.name}: {totalB}</span>
-            </span>
-          </div>
-          <div className="flex h-2 rounded-full overflow-hidden bg-background">
-            <div className="bg-primary" style={{ width: `${(totalA / Math.max(totalA + totalB, 1)) * 100}%` }} />
-            <div className="bg-warning" style={{ width: `${(totalB / Math.max(totalA + totalB, 1)) * 100}%` }} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ComparePane({
-  side, statId, onChange, excludeId, geo, ranked, sharedMax,
-  matchesFilters, lowT, highT, totalFirs, matchCount,
-}: {
-  side: "A" | "B";
-  statId: number;
-  onChange: (id: number) => void;
-  excludeId: number;
-  geo: GeoDistrict | undefined;
-  ranked: SubArea[];
-  sharedMax: number;
-  matchesFilters: (a: SubArea) => boolean;
-  lowT: number;
-  highT: number;
-  totalFirs: number;
-  matchCount: number;
-}) {
-  const stat = DISTRICT_STATS.find(s => s.district.id === statId)!;
-  return (
-    <div className="rounded-md border border-border bg-surface-2 overflow-hidden">
-      <div className="flex items-center justify-between p-2 border-b border-border bg-surface-1">
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold ${side === "A" ? "bg-primary text-primary-foreground" : "bg-warning text-warning-foreground"}`}>{side}</span>
-          <Select value={String(statId)} onValueChange={(v) => onChange(parseInt(v))}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DISTRICT_STATS.filter(s => s.district.id !== excludeId).map(s => (
-                <SelectItem key={s.district.id} value={String(s.district.id)}>{s.district.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="text-right text-[10px] text-muted-foreground">
-          <div className="font-mono text-foreground">{totalFirs} FIRs</div>
-          <div>{matchCount} areas match</div>
-        </div>
-      </div>
-
-      <div className="relative aspect-[5/4] bg-surface-2 grid-bg">
-        {geo ? (
-          <DistrictMap
-            geo={geo}
-            areas={ranked}
-            maxAreaFirs={sharedMax}
-            selectedAreaId={null}
-            onSelectArea={() => {}}
-            matchesFilters={matchesFilters}
-            filtersActive={ranked.some(a => !matchesFilters(a)) && ranked.some(a => matchesFilters(a))}
-            lowT={lowT}
-            highT={highT}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No geometry</div>
-        )}
-      </div>
-
-      <div className="p-2">
-        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-          <span>Top areas</span>
-          <span>{stat.spike > 0 ? "+" : ""}{stat.spike}% spike</span>
-        </div>
-        <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-          {ranked.slice(0, 8).map((a, i) => {
-            const match = matchesFilters(a);
-            const heat = a.firs / sharedMax;
-            return (
-              <div key={a.id}
-                className={`flex items-center gap-2 rounded p-1.5 text-xs ${match ? "bg-background" : "bg-background/40 opacity-60"}`}
-              >
-                <span className="font-mono text-[10px] text-muted-foreground w-4 text-right">{i + 1}</span>
-                <span className="flex-1 truncate">{a.name}</span>
-                <div className="w-16 h-1 rounded-full bg-surface-2 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${heat * 100}%`, background: heatColor(heat, lowT, highT) }} />
-                </div>
-                <span className="font-mono w-8 text-right">{a.firs}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: "alert" | "success" | "warning" }) {
   const cls = accent === "alert" ? "text-alert" : accent === "success" ? "text-success" : accent === "warning" ? "text-warning" : "text-foreground";

@@ -1,32 +1,35 @@
-import { CASES as SEED_CASES, DISTRICTS, CRIME_HEADS, CASE_STATUS, type Case, type District, type CrimeHead, type SubArea, type MicroSpot, AREA_NAMES, AREA_COORDS, DISTRICT_COORDS, STREET_SUFFIXES } from "../data/mock";
-import { type Offender, type Associate, type Prediction, type RichNode, type RichEdge, type EntityType, type RelationType } from "../data/network-rich";
-import { fetchLiveCases, insertLiveCase, clearLiveCases, seedLiveCases } from "./catalyst-api";
+import { CASES as SEED_CASES, DISTRICTS, CRIME_HEADS, CASE_STATUS, type Case, type District, type SubArea, type MicroSpot, AREA_NAMES, AREA_COORDS, DISTRICT_COORDS, STREET_SUFFIXES, type Offender, type Associate, type Prediction } from "../data/mock";
+import { type RichNode, type RichEdge, type EntityType, type RelationType } from "../data/network-rich";
+export type CrimeHead = (typeof CRIME_HEADS)[number];
+import { fetchLiveCases, insertLiveCase, clearLiveCases, seedLiveCases, updateLiveCase } from "./catalyst-api";
 
 
 function initCases(): Case[] {
-  if (typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem("ksp_cases_store");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error("Error reading localStorage:", e);
-    }
-  }
   return [...SEED_CASES];
 }
 
-let loadedCases: Case[] = initCases();
+const STORAGE_KEY = "ksp_cases_db_v2";
 
-// Load cases from memory
+let loadedCases: Case[] = [];
+
+// Load cases from memory or browser local storage
 export function getStoredCases(): Case[] {
-  if (loadedCases.length === 0) {
-    loadedCases = initCases();
+  if (loadedCases.length > 0) return loadedCases;
+
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedCases = parsed;
+          return loadedCases;
+        }
+      }
+    } catch (e) {}
   }
+
+  loadedCases = initCases();
   return loadedCases;
 }
 
@@ -34,19 +37,21 @@ export function saveCases(cases: Case[]) {
   loadedCases = cases;
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem("ksp_cases_store", JSON.stringify(cases));
-    } catch (e) {
-      console.error("Failed to save cases to localStorage:", e);
-    }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+    } catch (e) {}
     window.dispatchEvent(new Event("db-update"));
   }
 }
 
 export async function clearDb(): Promise<void> {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+  }
   saveCases([]);
   if (typeof window !== "undefined") {
     try {
-      localStorage.removeItem("ksp_cases_store");
       await clearLiveCases();
     } catch (err) {
       console.error("Failed to clear Zoho Catalyst cloud Data Store:", err);
@@ -55,6 +60,11 @@ export async function clearDb(): Promise<void> {
 }
 
 export async function seedDb(): Promise<void> {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+  }
   saveCases([...SEED_CASES]);
   return Promise.resolve();
 }
@@ -72,12 +82,92 @@ export async function addCase(c: Omit<Case, "caseMasterId">): Promise<Case> {
   // Sync to remote Catalyst Data Store
   try {
     const liveCreated = await insertLiveCase(c);
-    const updatedCases = getStoredCases().map(x => x.crimeNo === c.crimeNo ? liveCreated : x);
+    const updatedCases = getStoredCases().map(x => {
+      if (x.crimeNo === c.crimeNo) {
+        const mergedAccused = liveCreated.accused.map(liveAcc => {
+          const localAcc = x.accused.find(la => la.name === liveAcc.name);
+          return {
+            ...liveAcc,
+            photo: liveAcc.photo || (localAcc ? localAcc.photo : "")
+          };
+        });
+        const mergedVictims = liveCreated.victims.map(liveVic => {
+          const localVic = x.victims.find(lv => lv.name === liveVic.name);
+          return {
+            ...liveVic,
+            photo: liveVic.photo || (localVic ? localVic.photo : "")
+          };
+        });
+        return {
+          ...liveCreated,
+          officerPhoto: liveCreated.officerPhoto || x.officerPhoto,
+          accused: mergedAccused,
+          victims: mergedVictims
+        };
+      }
+      return x;
+    });
     saveCases(updatedCases);
     return liveCreated;
   } catch (err) {
     console.error("Failed to sync new case to Zoho Catalyst Data Store:", err);
     return newCase;
+  }
+}
+
+export async function updateCaseDetails(caseMasterId: number, status: string, briefFacts: string): Promise<void> {
+  const cases = getStoredCases();
+  const updated = cases.map(c => (c.caseMasterId === caseMasterId || String(c.caseMasterId) === String(caseMasterId)) ? {
+    ...c,
+    status,
+    briefFacts,
+    chargesheetNo: status === "Charge Sheeted" ? (c.chargesheetNo || `CS-${Math.abs(caseMasterId) % 10000}`) : c.chargesheetNo,
+    chargesheetDate: status === "Charge Sheeted" ? (c.chargesheetDate || new Date().toISOString().slice(0, 10)) : c.chargesheetDate,
+    chargesheetType: status === "Charge Sheeted" ? (c.chargesheetType || "Original Chargesheet") : c.chargesheetType,
+  } : c);
+  saveCases(updated);
+
+  // Sync to remote Zoho Catalyst datastore
+  await updateLiveCase(caseMasterId, status, briefFacts);
+}
+
+export async function recordAccusedArrest(caseMasterId: number, accusedName: string, arrestDate: string, districtId: number, districtName: string): Promise<void> {
+  const cases = getStoredCases();
+  const updated = cases.map(c => {
+    if (c.caseMasterId === caseMasterId || String(c.caseMasterId) === String(caseMasterId)) {
+      const updatedAccused = c.accused.map(a => {
+        if (a.name === accusedName) {
+          return {
+            ...a,
+            arrested: true,
+            arrestId: Math.floor(6000 + Math.random() * 1000),
+            arrestDate,
+            arrestDistrict: districtName,
+            ioName: "Officer in Charge",
+            courtName: "JMFC Court"
+          };
+        }
+        return a;
+      });
+      return { ...c, accused: updatedAccused };
+    }
+    return c;
+  });
+  saveCases(updated);
+
+  // Sync to remote Zoho Catalyst datastore
+  const res = await fetch("/server/api/cases", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ caseMasterId, accusedName, arrestDate, districtId })
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to record arrest: ${res.statusText}`);
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("zoho-table-update"));
   }
 }
 
@@ -98,7 +188,50 @@ export async function syncWithCatalyst() {
     if (liveCases && Array.isArray(liveCases) && liveCases.length > 0) {
       isCatalystSynced = true;
       catalystSyncCount = liveCases.length;
-      saveCases(liveCases);
+      
+      const localCases = loadedCases;
+      const mergedCases = liveCases.map(liveCase => {
+        const localCase = localCases.find(lc => lc.caseMasterId === liveCase.caseMasterId || lc.crimeNo === liveCase.crimeNo || String(lc.caseMasterId) === String(liveCase.caseMasterId));
+        if (!localCase) return liveCase;
+
+        const effectiveStatus = (localCase.status !== "Under Investigation" && liveCase.status === "Under Investigation")
+          ? localCase.status
+          : liveCase.status;
+
+        const effectiveBriefFacts = (localCase.briefFacts && localCase.briefFacts !== liveCase.briefFacts)
+          ? localCase.briefFacts
+          : liveCase.briefFacts;
+
+        const mergedAccused = liveCase.accused.map(liveAcc => {
+          const localAcc = localCase.accused.find(la => la.name === liveAcc.name);
+          return {
+            ...liveAcc,
+            photo: liveAcc.photo || (localAcc ? localAcc.photo : "")
+          };
+        });
+
+        const mergedVictims = liveCase.victims.map(liveVic => {
+          const localVic = localCase.victims.find(lv => lv.name === liveVic.name);
+          return {
+            ...liveVic,
+            photo: liveVic.photo || (localVic ? localVic.photo : "")
+          };
+        });
+
+        return {
+          ...liveCase,
+          status: effectiveStatus,
+          briefFacts: effectiveBriefFacts,
+          chargesheetNo: liveCase.chargesheetNo || localCase.chargesheetNo,
+          chargesheetDate: liveCase.chargesheetDate || localCase.chargesheetDate,
+          chargesheetType: liveCase.chargesheetType || localCase.chargesheetType,
+          officerPhoto: liveCase.officerPhoto || localCase.officerPhoto,
+          accused: mergedAccused,
+          victims: mergedVictims
+        };
+      });
+
+      saveCases(mergedCases);
     }
   } catch (err: any) {
     console.warn("Catalyst sync paused or waiting for API gateway configuration:", err?.message || err);
@@ -264,7 +397,7 @@ export function computeOffenderAssociates(offenders: Offender[], cases: Case[]):
       });
 
       // Add victims from cases
-      o.cases.forEach((cid, idx) => {
+      o.cases.forEach((cid: number, idx: number) => {
         const c = cases.find(x => x.caseMasterId === cid);
         if (c && c.victims.length > 0) {
           associates.push({
@@ -450,17 +583,7 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       }
     });
 
-    // Create direct co-accused links between suspects in the same case
-    for (let i = 0; i < accusedNodeIdsInCase.length; i++) {
-      for (let j = i + 1; j < accusedNodeIdsInCase.length; j++) {
-        addEdge({
-          source: accusedNodeIdsInCase[i],
-          target: accusedNodeIdsInCase[j],
-          relation: "co-accused",
-          weight: 3
-        });
-      }
-    }
+    // Suspects are linked to the Case node directly, which coordinates co-accused relationships cleanly without clutter.
   });
 
   return { nodes, edges, clusters };

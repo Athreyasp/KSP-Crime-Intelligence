@@ -99,15 +99,29 @@ export type Case = {
   actSections: string[];
   moTag: string;
   briefFacts: string;
-  complainant: { name: string; age: number; gender: string; occupation: string; religion?: string; caste?: string };
-  victims: { name: string; age: number; gender: string; isPolice?: boolean }[];
-  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string }[];
+  complainant: {
+    name: string;
+    age: number;
+    gender: string;
+    occupation: string;
+    religion?: string;
+    caste?: string;
+    phone?: string;
+    relation?: string;
+    address?: string;
+  };
+  victims: { name: string; age: number; gender: string; isPolice?: boolean; photo?: string }[];
+  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string; photo?: string }[];
   latitude: number;
   longitude: number;
   incidentToDate?: string;
   infoReceivedPSDate?: string;
   registeringOfficer?: string;
   courtName?: string;
+  officerPhoto?: string;
+  chargesheetNo?: string;
+  chargesheetDate?: string;
+  chargesheetType?: string;
 };
 
 const OCCUPATIONS = ["Farmer", "Shopkeeper", "IT Employee", "Student", "Homemaker", "Auto Driver", "Govt Employee", "Businessperson"];

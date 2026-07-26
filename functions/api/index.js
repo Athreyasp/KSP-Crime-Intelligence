@@ -2,13 +2,164 @@ const express = require('express');
 const catalyst = require('zcatalyst-sdk-node');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 const router = express.Router();
 
 function getDatastore(req) {
   const catalystApp = catalyst.initialize(req);
   return catalystApp.datastore();
+}
+
+let photoMapping = {};
+let photoMappingFileId = null;
+
+// Download mapping from Zoho Datastore table
+async function loadPhotoMapping(catalystApp) {
+  try {
+    const zcql = catalystApp.zcql();
+    const queryRes = await zcql.executeZCQLQuery('SELECT * FROM PhotoAttachment');
+    const rows = (queryRes || []).map(r => r.PhotoAttachment || r);
+    
+    photoMapping = {};
+    rows.forEach(r => {
+      const keyName = `${r.EntityType}_${r.EntityID}`;
+      photoMapping[keyName] = r.FileID;
+    });
+  } catch (err) {
+    console.log('Failed to load photo mappings from PhotoAttachment datastore table, falling back:', err.message);
+  }
+  return photoMapping;
+}
+
+// Save photo mapping mapping is now inline during upload
+async function savePhotoMapping(catalystApp) {
+  console.log('Photo mappings are stored transactionally in PhotoAttachment datastore table.');
+}
+
+// Upload a file to Zoho Catalyst cloud storage (Stratus or File Store)
+async function uploadToCloud(catalystApp, tempFilePath, fileName) {
+  const fs = require('fs');
+
+  // Try Stratus first
+  try {
+    if (typeof catalystApp.stratus === 'function') {
+      const bucket = catalystApp.stratus().bucket('photos');
+      const fileStream = fs.createReadStream(tempFilePath);
+      const res = await bucket.putObject(fileName, fileStream);
+      if (res && res.object_name) {
+        return res.object_name;
+      }
+    }
+  } catch (err) {
+    console.log('Stratus upload failed, trying legacy File Store folder:', err.message);
+  }
+
+  // Fallback: Try File Store folder
+  try {
+    if (typeof catalystApp.filestore === 'function') {
+      const filestore = catalystApp.filestore();
+      const folder = filestore.folder('photos');
+      const fileObj = await folder.uploadFile({
+        code: fs.createReadStream(tempFilePath),
+        name: fileName
+      });
+      if (fileObj) {
+        return fileObj.id || fileObj.file_id;
+      }
+    }
+  } catch (err) {
+    console.error('File Store upload failed:', err.message);
+    throw err;
+  }
+
+  throw new Error('No compatible Zoho storage service (Stratus or File Store) available');
+}
+
+// Download a file from Zoho Catalyst cloud storage
+async function downloadFromCloud(catalystApp, fileId) {
+  // Try Stratus first
+  try {
+    if (typeof catalystApp.stratus === 'function') {
+      const bucket = catalystApp.stratus().bucket('photos');
+      const fileStream = await bucket.getObject(fileId);
+      if (fileStream) return fileStream;
+    }
+  } catch (err) {
+    console.log('Stratus download failed, trying legacy File Store:', err.message);
+  }
+
+  // Fallback: Try File Store folder
+  try {
+    if (typeof catalystApp.filestore === 'function') {
+      const filestore = catalystApp.filestore();
+      const folder = filestore.folder('photos');
+      const fileStream = await folder.downloadFile(fileId);
+      if (fileStream) return fileStream;
+    }
+  } catch (err) {
+    console.error('File Store download failed:', err.message);
+    throw err;
+  }
+
+  throw new Error('Download failed from both Stratus and File Store');
+}
+
+// Upload photo to Zoho File Store and insert reference in PhotoAttachment
+async function uploadPhoto(catalystApp, base64Str, keyName, caseMasterId) {
+  if (!base64Str) return null;
+  // If it doesn't look like base64, return it directly
+  if (!base64Str.startsWith('data:image') && !base64Str.includes('base64')) {
+    return base64Str;
+  }
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const fileName = `${keyName}_${Date.now()}.jpg`;
+    const tempFilePath = path.join(os.tmpdir(), fileName);
+
+    const buffer = Buffer.from(base64Str.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+    fs.writeFileSync(tempFilePath, buffer);
+
+    const fileId = await uploadToCloud(catalystApp, tempFilePath, fileName);
+    
+    try { fs.unlinkSync(tempFilePath); } catch (e) {}
+
+    // Parse keyName to get entityType and entityID
+    const parts = keyName.split('_');
+    const entityType = parts[0];
+    const entityID = parts[1] || "";
+    
+    // Write reference entry to PhotoAttachment datastore table
+    const attachmentPayload = {
+      CaseMasterID: Number(caseMasterId),
+      EntityType: String(entityType),
+      EntityID: String(entityID),
+      FileID: String(fileId),
+      AccessURL: `/server/api/photos/${fileId}`
+    };
+    
+    const datastore = catalystApp.datastore();
+    await datastore.table('PhotoAttachment').insertRow(attachmentPayload).catch((e) => {
+      console.error('Failed to insert PhotoAttachment row:', e.message);
+    });
+    if (!memoryTableStore['PhotoAttachment']) {
+      memoryTableStore['PhotoAttachment'] = [];
+    }
+    memoryTableStore['PhotoAttachment'].push(attachmentPayload);
+    
+    // Update local registry mapping
+    photoMapping[keyName] = fileId;
+    
+    return `/server/api/photos/${fileId}`;
+  } catch (err) {
+    console.error(`Zoho upload failed for ${keyName}, saving base64 inline:`, err);
+    // Save base64 in in-memory mapping as fallback
+    photoMapping[keyName] = base64Str;
+    return base64Str;
+  }
 }
 
 function formatDateOnly(val) {
@@ -54,7 +205,8 @@ const TABLE_METADATA = [
   { id: '50989000000047731', name: 'CrimeSubHead', columns: [ { id: '50989000000047732', name: 'ROWID', type: 'bigint' }, { id: '50989000000050090', name: 'CrimeSubHeadID', type: 'int' }, { id: '50989000000050092', name: 'CrimeHeadID', type: 'int' }, { id: '50989000000050094', name: 'CrimeHeadName', type: 'varchar' }, { id: '50989000000050096', name: 'SeqID', type: 'int' } ] },
   { id: '50989000000046810', name: 'UnitType', columns: [ { id: '50989000000046811', name: 'ROWID', type: 'bigint' }, { id: '50989000000049169', name: 'UnitTypeID', type: 'int' }, { id: '50989000000049171', name: 'UnitTypeName', type: 'varchar' }, { id: '50989000000049173', name: 'CityDistState', type: 'varchar' }, { id: '50989000000049175', name: 'Hierarchy', type: 'int' }, { id: '50989000000049177', name: 'Active', type: 'int' } ] },
   { id: '50989000000047360', name: 'CrimeHeadActSection', columns: [ { id: '50989000000047361', name: 'ROWID', type: 'bigint' }, { id: '50989000000047719', name: 'CrimeHeadID', type: 'int' }, { id: '50989000000047721', name: 'ActCode', type: 'varchar' }, { id: '50989000000047723', name: 'SectionCode', type: 'varchar' } ] },
-  { id: '50989000000042203', name: 'ComplainantDetails', columns: [ { id: '50989000000042204', name: 'ROWID', type: 'bigint' }, { id: '50989000000042562', name: 'ComplainantID', type: 'int' }, { id: '50989000000042564', name: 'CaseMasterID', type: 'int' }, { id: '50989000000042566', name: 'ComplainantName', type: 'varchar' }, { id: '50989000000042568', name: 'AgeYear', type: 'int' }, { id: '50989000000042570', name: 'OccupationID', type: 'int' }, { id: '50989000000042572', name: 'ReligionID', type: 'int' }, { id: '50989000000042574', name: 'CasteID', type: 'int' }, { id: '50989000000042576', name: 'GenderID', type: 'int' } ] }
+  { id: '50989000000042203', name: 'ComplainantDetails', columns: [ { id: '50989000000042204', name: 'ROWID', type: 'bigint' }, { id: '50989000000042562', name: 'ComplainantID', type: 'int' }, { id: '50989000000042564', name: 'CaseMasterID', type: 'int' }, { id: '50989000000042566', name: 'ComplainantName', type: 'varchar' }, { id: '50989000000042568', name: 'AgeYear', type: 'int' }, { id: '50989000000042570', name: 'OccupationID', type: 'int' }, { id: '50989000000042572', name: 'ReligionID', type: 'int' }, { id: '50989000000042574', name: 'CasteID', type: 'int' }, { id: '50989000000042576', name: 'GenderID', type: 'int' } ] },
+  { id: '50989000000057062', name: 'PhotoAttachment', columns: [ { id: '50989000000057063', name: 'ROWID', type: 'bigint' }, { id: '50989000000057421', name: 'CaseMasterID', type: 'int' }, { id: '50989000000057423', name: 'EntityType', type: 'varchar' }, { id: '50989000000057425', name: 'EntityID', type: 'varchar' }, { id: '50989000000057427', name: 'FileID', type: 'varchar' }, { id: '50989000000057429', name: 'AccessURL', type: 'varchar' } ] }
 ];
 
 // In-memory data store cache to ensure instant reflection across all 27 tables
@@ -68,6 +220,46 @@ router.get('/health', (req, res) => {
     message: 'KSP Crime Intelligence Catalyst Serverless API is online and active.',
     tablesCount: TABLE_METADATA.length
   });
+});
+
+// GET Handler - Serve photos from Zoho Catalyst File Store
+router.get('/photos/:fileId', async (req, res) => {
+  try {
+    const fileId = req.params.fileId;
+    
+    // If it is a base64 string, parse and send directly
+    if (fileId.startsWith('data:image') || fileId.length > 500) {
+      const matches = fileId.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const type = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', `image/${type}`);
+        return res.send(buffer);
+      }
+      return res.status(404).send('Invalid image data');
+    }
+    
+    // Otherwise fetch from Zoho Catalyst File Store
+    const catalystApp = catalyst.initialize(req);
+    const fileStream = await downloadFromCloud(catalystApp, fileId);
+    
+    res.setHeader('Content-Type', 'image/jpeg');
+    fileStream.pipe(res);
+  } catch (err) {
+    // Check fallback
+    const fallbackData = photoMapping[req.params.fileId];
+    if (fallbackData && fallbackData.startsWith('data:image')) {
+      const matches = fallbackData.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const type = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', `image/${type}`);
+        return res.send(buffer);
+      }
+    }
+    console.error('Failed to download photo:', err.message);
+    res.status(404).send('Not Found');
+  }
 });
 
 // GET Handler - Fetch all 27 tables schema & data
@@ -119,6 +311,9 @@ const getCasesHandler = async (req, res) => {
     const zcql = catalystApp.zcql();
     const datastore = catalystApp.datastore();
 
+    // Load photo mapping
+    await loadPhotoMapping(catalystApp).catch(() => {});
+
     const fetchTableData = async (tableName) => {
       try {
         const pagedRes = await datastore.table(tableName).getPagedRows();
@@ -132,24 +327,53 @@ const getCasesHandler = async (req, res) => {
       return memoryTableStore[tableName] || [];
     };
 
-    const [normalizedCases, accusedRows, victimRows, complainantRows, arrestRows, actRows] = await Promise.all([
+    const [normalizedCases, accusedRows, victimRows, complainantRows, arrestRows, actRows, chargesheetRows] = await Promise.all([
       fetchTableData('CaseMaster'),
       fetchTableData('Accused'),
       fetchTableData('Victim'),
       fetchTableData('ComplainantDetails'),
       fetchTableData('ArrestSurrender'),
-      fetchTableData('ActSectionAssociation')
+      fetchTableData('ActSectionAssociation'),
+      fetchTableData('ChargesheetDetails')
     ]);
+
+    // Format the cases and map photo assets from dynamic mapping registry
+    const casesWithPhotos = normalizedCases.map(c => {
+      const caseId = c.CaseMasterID || c.ROWID;
+      
+      const officerKey = `officer_${c.PolicePersonID}`;
+      const officerPhoto = photoMapping[officerKey]
+        ? (photoMapping[officerKey].startsWith('data:image') ? photoMapping[officerKey] : `/server/api/photos/${photoMapping[officerKey]}`)
+        : undefined;
+
+      return {
+        ...c,
+        officerPhoto
+      };
+    });
 
     res.status(200).json({
       status: 'success',
       data: {
-        cases: normalizedCases,
-        accused: accusedRows,
-        victims: victimRows,
+        cases: casesWithPhotos,
+        accused: accusedRows.map(a => {
+          const key = `accused_${a.AccusedMasterID}`;
+          const photo = photoMapping[key]
+            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/photos/${photoMapping[key]}`)
+            : undefined;
+          return { ...a, photo };
+        }),
+        victims: victimRows.map(v => {
+          const key = `victim_${v.VictimMasterID}`;
+          const photo = photoMapping[key]
+            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/photos/${photoMapping[key]}`)
+            : undefined;
+          return { ...v, photo };
+        }),
         complainants: complainantRows,
         arrests: arrestRows,
-        actSections: actRows
+        actSections: actRows,
+        chargesheet: chargesheetRows
       }
     });
   } catch (err) {
@@ -162,7 +386,8 @@ const getCasesHandler = async (req, res) => {
         victims: memoryTableStore['Victim'] || [],
         complainants: memoryTableStore['ComplainantDetails'] || [],
         arrests: memoryTableStore['ArrestSurrender'] || [],
-        actSections: memoryTableStore['ActSectionAssociation'] || []
+        actSections: memoryTableStore['ActSectionAssociation'] || [],
+        chargesheet: memoryTableStore['ChargesheetDetails'] || []
       }
     });
   }
@@ -202,7 +427,7 @@ const postCasesHandler = async (req, res) => {
     const crimeHeadId = newCase.crimeHead?.id || 1;
     const crimeHeadName = newCase.crimeHead?.name || "Homicide / Murder";
 
-    // 1. Insert into CaseMaster
+    // 1. Insert into CaseMaster (ROWID omitted so Zoho auto-generates it)
     const caseMasterPayload = {
       CaseMasterID: caseMasterIdVal,
       CrimeNo: String(newCase.crimeNo),
@@ -230,15 +455,24 @@ const postCasesHandler = async (req, res) => {
       insertedCaseRow = { CaseMaster: caseMasterPayload };
     }
     const insertedCaseObj = insertedCaseRow?.CaseMaster || insertedCaseRow || caseMasterPayload;
-    const numericRowId = Number(insertedCaseObj?.ROWID || insertedCaseObj?.CaseMasterID || caseMasterIdVal);
-    caseMasterPayload.ROWID = numericRowId;
+    
+    // In memory store we push caseMasterPayload
     memoryTableStore['CaseMaster'].push(caseMasterPayload);
 
-    // 2. ComplainantDetails
+    // Initialize photo mappings
+    const catalystApp = catalyst.initialize(req);
+    await loadPhotoMapping(catalystApp).catch(() => {});
+
+    // Upload Officer photo if present
+    let officerPhotoUrl = "";
+    if (newCase.officerPhoto) {
+      officerPhotoUrl = await uploadPhoto(catalystApp, newCase.officerPhoto, `officer_${policePersonId}`, caseMasterIdVal);
+    }
+
+    // 2. ComplainantDetails (ROWID omitted so Zoho auto-generates it)
     const complainantPayload = {
-      ROWID: Date.now() + 1,
       ComplainantID: Math.floor(Math.random() * 10000),
-      CaseMasterID: numericRowId,
+      CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
       ComplainantName: String(newCase.complainant?.name || "Unknown Complainant"),
       AgeYear: Number(newCase.complainant?.age) || 30,
       GenderID: genderMap[newCase.complainant?.gender] || 1,
@@ -249,12 +483,11 @@ const postCasesHandler = async (req, res) => {
     await datastore.table('ComplainantDetails').insertRow(complainantPayload).catch(() => {});
     memoryTableStore['ComplainantDetails'].push(complainantPayload);
 
-    // 3. Victim
+    // 3. Victim (ROWID omitted)
     const victimList = (newCase.victims && newCase.victims.length > 0) ? newCase.victims : [{ name: "Victim 1", age: 30, gender: "M", isPolice: false }];
-    const victimPayloads = victimList.map((v, idx) => ({
-      ROWID: Date.now() + 10 + idx,
+    const victimPayloads = victimList.map((v) => ({
       VictimMasterID: Math.floor(Math.random() * 10000),
-      CaseMasterID: numericRowId,
+      CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
       VictimName: String(v.name),
       AgeYear: Number(v.age) || 25,
       GenderID: genderMap[v.gender] || 1,
@@ -263,12 +496,22 @@ const postCasesHandler = async (req, res) => {
     await datastore.table('Victim').insertRows(victimPayloads).catch(() => {});
     victimPayloads.forEach(vp => memoryTableStore['Victim'].push(vp));
 
-    // 4. Accused & ArrestSurrender
+    // Upload Victim photos if present
+    if (newCase.victims && newCase.victims.length > 0) {
+      for (let i = 0; i < newCase.victims.length; i++) {
+        const v = newCase.victims[i];
+        const vPayload = victimPayloads[i];
+        if (v.photo) {
+          await uploadPhoto(catalystApp, v.photo, `victim_${vPayload.VictimMasterID}`, caseMasterIdVal);
+        }
+      }
+    }
+
+    // 4. Accused & ArrestSurrender (ROWID omitted)
     const accusedList = (newCase.accused && newCase.accused.length > 0) ? newCase.accused : [{ name: "Unknown Suspect", age: 28, gender: "M", arrested: false }];
     const accusedPayloads = accusedList.map((a, idx) => ({
-      ROWID: Date.now() + 50 + idx,
       AccusedMasterID: Math.floor(Math.random() * 10000),
-      CaseMasterID: numericRowId,
+      CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
       AccusedName: String(a.name),
       AgeYear: Number(a.age) || 30,
       GenderID: genderMap[a.gender] || 1,
@@ -277,23 +520,41 @@ const postCasesHandler = async (req, res) => {
     await datastore.table('Accused').insertRows(accusedPayloads).catch(() => {});
     accusedPayloads.forEach(ap => memoryTableStore['Accused'].push(ap));
 
-    const arrestPayloads = accusedList.filter(a => a.arrested || a.arrestDate).map((a, idx) => ({
-      ROWID: Date.now() + 100 + idx,
-      ArrestSurrenderID: Math.floor(Math.random() * 10000),
-      CaseMasterID: numericRowId,
-      ArrestSurrenderTypeID: 1,
-      ArrestSurrenderDate: formatDateOnly(a.arrestDate),
-      ArrestSurrenderStateId: 1,
-      ArrestSurrenderDistrictId: districtId
-    }));
+    // Upload Accused photos if present
+    if (newCase.accused && newCase.accused.length > 0) {
+      for (let i = 0; i < newCase.accused.length; i++) {
+        const a = newCase.accused[i];
+        const aPayload = accusedPayloads[i];
+        if (a.photo) {
+          await uploadPhoto(catalystApp, a.photo, `accused_${aPayload.AccusedMasterID}`, caseMasterIdVal);
+        }
+      }
+    }
+
+    const arrestPayloads = [];
+    accusedList.forEach((a, idx) => {
+      if (a.arrested || a.arrestDate) {
+        const aPayload = accusedPayloads[idx];
+        arrestPayloads.push({
+          ArrestSurrenderID: Math.floor(Math.random() * 10000),
+          CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
+          AccusedMasterID: aPayload ? aPayload.AccusedMasterID : Math.floor(Math.random() * 10000), // Linked FK
+          ArrestSurrenderTypeID: 1,
+          ArrestSurrenderDate: formatDateOnly(a.arrestDate),
+          ArrestSurrenderStateId: 1,
+          ArrestSurrenderDistrictId: districtId
+        });
+      }
+    });
+
     if (arrestPayloads.length > 0) {
       await datastore.table('ArrestSurrender').insertRows(arrestPayloads).catch(() => {});
       arrestPayloads.forEach(ap => memoryTableStore['ArrestSurrender'].push(ap));
     } else {
       const defaultArrest = {
-        ROWID: Date.now() + 100,
         ArrestSurrenderID: Math.floor(Math.random() * 10000),
-        CaseMasterID: numericRowId,
+        CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
+        AccusedMasterID: accusedPayloads[0] ? accusedPayloads[0].AccusedMasterID : Math.floor(Math.random() * 10000), // Associated to first accused
         ArrestSurrenderTypeID: 1,
         ArrestSurrenderDate: formatDateOnly(newCase.registeredDate),
         ArrestSurrenderStateId: 1,
@@ -303,15 +564,14 @@ const postCasesHandler = async (req, res) => {
       memoryTableStore['ArrestSurrender'].push(defaultArrest);
     }
 
-    // 5. ActSectionAssociation & CrimeHeadActSection & Section & Act
+    // 5. ActSectionAssociation & CrimeHeadActSection & Section & Act (ROWID omitted)
     const actSections = (newCase.actSections && newCase.actSections.length > 0) ? newCase.actSections : ["BNS 103"];
     const actPayloads = actSections.map((sec, idx) => {
       const parts = String(sec).split(/\s+/);
       const actCode = parts[0] || "BNS";
       const secCode = parts[1] || "103";
       return {
-        ROWID: Date.now() + 200 + idx,
-        CaseMasterID: numericRowId,
+        CaseMasterID: caseMasterIdVal, // Fixed to 32-bit int FK
         ActID: actCode === "BNS" ? 1 : actCode === "IPC" ? 2 : 3,
         SectionID: Number(secCode.replace(/\D/g, "")) || 103,
         ActOrderID: idx + 1,
@@ -321,9 +581,11 @@ const postCasesHandler = async (req, res) => {
     await datastore.table('ActSectionAssociation').insertRows(actPayloads).catch(() => {});
     actPayloads.forEach(ap => memoryTableStore['ActSectionAssociation'].push(ap));
 
-    // Populate all remaining 21 Master/Lookup tables with linked entries
+    // Upload finalized mapping
+    await savePhotoMapping(catalystApp).catch(() => {});
+
+    // Populate all remaining 21 Master/Lookup tables with linked entries (ROWID omitted)
     const writeMasterEntry = async (tableName, payload) => {
-      payload.ROWID = payload.ROWID || Date.now() + Math.floor(Math.random() * 10000);
       await datastore.table(tableName).insertRow(payload).catch(() => {});
       memoryTableStore[tableName].push(payload);
     };
@@ -334,7 +596,7 @@ const postCasesHandler = async (req, res) => {
       writeMasterEntry('Act', { ActCode: 'BNS', ActDescription: 'Bharatiya Nyaya Sanhita', ShortName: 'BNS 2023', Active: 1 }),
       writeMasterEntry('ReligionMaster', { ReligionID: relMap[newCase.complainant?.religion || ""] || 1, ReligionName: newCase.complainant?.religion || "Hindu" }),
       writeMasterEntry('CasteMaster', { caste_master_id: casteMap[newCase.complainant?.caste || ""] || 1, caste_master_name: newCase.complainant?.caste || "General" }),
-      writeMasterEntry('Unit_PoliceStation', { ROWID: Date.now() + 301 }),
+      writeMasterEntry('Unit_PoliceStation', {}),
       writeMasterEntry('State', { StateID: 1, StateName: 'Karnataka', NationalityID: 91, Active: 1 }),
       writeMasterEntry('District', { DistrictID: districtId, DistrictName: districtName, StateID: 1, Active: 1 }),
       writeMasterEntry('Court', { CourtID: courtId, CourtName: newCase.courtName || 'JMFC Court', DistrictID: districtId, StateID: 1, Active: 1 }),
@@ -343,7 +605,7 @@ const postCasesHandler = async (req, res) => {
       writeMasterEntry('CaseStatusMaster', { CaseStatusID: caseStatusId, CaseStatusName: newCase.status || "Under Investigation" }),
       writeMasterEntry('GenderMaster', { GenderID: 1, GenderName: 'Male' }),
       writeMasterEntry('OccupationMaster', { OccupationID: occMap[newCase.complainant?.occupation || ""] || 1, OccupationName: newCase.complainant?.occupation || "Business" }),
-      writeMasterEntry('ChargesheetDetails', { CSID: Math.floor(Math.random() * 10000), CaseMasterID: numericRowId, csdate: formatDateTime(newCase.registeredDate), cstype: 'Original Chargesheet', PolicePersonID: policePersonId }),
+      writeMasterEntry('ChargesheetDetails', { CSID: Math.floor(Math.random() * 10000), CaseMasterID: caseMasterIdVal, csdate: formatDateTime(newCase.registeredDate), cstype: 'Original Chargesheet', PolicePersonID: policePersonId }),
       writeMasterEntry('Employee', { EmployeeID: policePersonId, DistrictID: districtId, UnitID: 1, RankID: 1, DesignationID: 1, KGID: String(policePersonId), FirstName: newCase.registeringOfficer || 'Inspector Ramesh', EmployeeDOB: '1985-06-15', GenderID: 1, BloodGroupID: 1, PhysicallyChallenged: 0, AppointmentDate: '2010-08-01' }),
       writeMasterEntry('Designation', { DesignationID: 1, DesignationName: newCase.officerRank || 'Police Inspector (PI)', Active: 1, SortOrder: 1 }),
       writeMasterEntry('Rank', { RankID: 1, RankName: 'Police Inspector', Hierarchy: 3, Active: 1 }),
@@ -356,7 +618,8 @@ const postCasesHandler = async (req, res) => {
       status: 'success',
       data: {
         ...newCase,
-        caseMasterId: numericRowId
+        caseMasterId: caseMasterIdVal,
+        officerPhoto: officerPhotoUrl
       },
       tableUpdates: {
         totalTablesUpdated: TABLE_METADATA.length,
@@ -376,6 +639,346 @@ router.get('/cases', getCasesHandler);
 router.post('/', postCasesHandler);
 router.post('/cases', postCasesHandler);
 
+// POST/PUT Handler - Update case details in CaseMaster
+const updateCaseHandler = async (req, res) => {
+  try {
+    const datastore = getDatastore(req);
+    const { caseMasterId, status, briefFacts } = req.body;
+
+    if (!caseMasterId) {
+      return res.status(400).json({ status: 'failure', message: 'Missing caseMasterId parameter' });
+    }
+
+    const statusMapInv = {
+      "Under Investigation": 1,
+      "Charge Sheeted": 2,
+      "Closed": 3,
+      "Pending Trial": 4
+    };
+    const caseStatusId = statusMapInv[status || "Under Investigation"] || 1;
+
+    // Fetch the CaseMaster row to get its ROWID or update directly by CaseMasterID
+    let rowId = null;
+    const isRowId = String(caseMasterId).length >= 15;
+    if (isRowId) {
+      rowId = String(caseMasterId);
+    } else {
+      const zcql = catalyst.initialize(req).zcql();
+      const queryRes = await zcql.executeZCQLQuery(`SELECT ROWID FROM CaseMaster WHERE CaseMasterID = ${caseMasterId}`).catch(() => []);
+      const row = queryRes?.[0]?.CaseMaster || queryRes?.[0];
+      rowId = row?.ROWID;
+    }
+
+    if (!rowId) {
+      // Fallback - update the memory cache
+      const memRow = memoryTableStore['CaseMaster'].find(c => String(c.ROWID || c.CaseMasterID) === String(caseMasterId) || c.CaseMasterID === Number(caseMasterId));
+      if (memRow) {
+        memRow.CaseStatusID = caseStatusId;
+        memRow.BriefFacts = briefFacts;
+      }
+      return res.status(200).json({
+        status: 'success',
+        message: 'Case updated in-memory fallback (record ROWID not found in Catalyst)'
+      });
+    }
+
+    // Update CaseMaster table row via Datastore SDK updateRow
+    const payloads = [
+      { ROWID: String(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") },
+      { ROWID: Number(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") }
+    ];
+
+    let updateSuccess = false;
+    let lastError = null;
+    for (const payload of payloads) {
+      try {
+        await datastore.table('CaseMaster').updateRow(payload);
+        updateSuccess = true;
+        break;
+      } catch (e) {
+        lastError = e;
+        console.warn("Datastore updateRow attempt failed:", e.message);
+      }
+    }
+
+    if (!updateSuccess) {
+      throw new Error(`Failed to update CaseMaster table in Zoho Catalyst datastore. Error: ${lastError ? lastError.message : 'Unknown Datastore Error'}`);
+    }
+
+    // Resolve case master integer ID for child table references
+    let datastoreCaseId = Number(caseMasterId);
+    if (isRowId) {
+      const zcql = catalyst.initialize(req).zcql();
+      const caseQuery = await zcql.executeZCQLQuery(`SELECT CaseMasterID FROM CaseMaster WHERE ROWID = ${rowId}`).catch(() => []);
+      const caseRow = caseQuery?.[0]?.CaseMaster || caseQuery?.[0];
+      if (caseRow && caseRow.CaseMasterID) {
+        datastoreCaseId = Number(caseRow.CaseMasterID);
+      }
+    }
+
+    // Safety constraint: Prevent bigint values from overflowing child table 32-bit integer FK column
+    if (datastoreCaseId > 2147483647) {
+      datastoreCaseId = datastoreCaseId % 100000;
+    }
+
+    // Generate chargesheet record if status is transitioned to Charge Sheeted
+    if (caseStatusId === 2) {
+      const zcql = catalyst.initialize(req).zcql();
+      const csQuery = await zcql.executeZCQLQuery(`SELECT ROWID FROM ChargesheetDetails WHERE CaseMasterID = ${datastoreCaseId}`).catch(() => []);
+      if (!csQuery || csQuery.length === 0) {
+        const policePersonId = 29013;
+        const csdate = new Date().toISOString().slice(0, 10);
+        const csPayload = {
+          CSID: Math.floor(1000 + Math.random() * 9000),
+          CaseMasterID: datastoreCaseId,
+          csdate: csdate,
+          cstype: 'Original Chargesheet',
+          PolicePersonID: policePersonId
+        };
+        await datastore.table('ChargesheetDetails').insertRow(csPayload).catch((e) => {
+          console.error("Failed to insert ChargesheetDetails:", e.message);
+        });
+        if (!memoryTableStore['ChargesheetDetails']) {
+          memoryTableStore['ChargesheetDetails'] = [];
+        }
+        memoryTableStore['ChargesheetDetails'].push(csPayload);
+      }
+    }
+
+    // Also update in memory store cache
+    const memRow = memoryTableStore['CaseMaster'].find(c => String(c.ROWID || c.CaseMasterID) === String(caseMasterId) || c.CaseMasterID === Number(caseMasterId));
+    if (memRow) {
+      memRow.CaseStatusID = caseStatusId;
+      memRow.BriefFacts = briefFacts;
+    }
+
+    res.status(200).json({ status: 'success', message: 'Case updated successfully in Zoho Catalyst Datastore' });
+  } catch (err) {
+    console.error('Error updating case in Catalyst Datastore:', err);
+    res.status(500).json({ status: 'failure', message: err.message });
+  }
+};
+
+const recordArrestHandler = async (req, res) => {
+  try {
+    const catalystApp = catalyst.initialize(req);
+    const datastore = catalystApp.datastore();
+    const { caseMasterId, accusedName, arrestDate, districtId } = req.body;
+
+    const zcql = catalystApp.zcql();
+
+    let datastoreCaseId = Number(caseMasterId);
+    if (String(caseMasterId).length >= 15) {
+      const caseQuery = await zcql.executeZCQLQuery(`SELECT CaseMasterID FROM CaseMaster WHERE ROWID = ${caseMasterId}`).catch(() => []);
+      const row = caseQuery?.[0]?.CaseMaster || caseQuery?.[0];
+      if (row && row.CaseMasterID) {
+        datastoreCaseId = Number(row.CaseMasterID);
+      }
+    }
+
+    const accusedQuery = await zcql.executeZCQLQuery(`SELECT ROWID, AccusedMasterID FROM Accused WHERE CaseMasterID = ${datastoreCaseId} AND AccusedName = '${accusedName.replace(/'/g, "\\'")}'`).catch(() => []);
+    
+    let accusedMasterId = Math.floor(Math.random() * 10000);
+    const accusedRow = accusedQuery?.[0]?.Accused || accusedQuery?.[0];
+    if (accusedRow && accusedRow.AccusedMasterID) {
+      accusedMasterId = Number(accusedRow.AccusedMasterID);
+    }
+
+    const arrestPayload = {
+      ArrestSurrenderID: Math.floor(Math.random() * 10000),
+      CaseMasterID: datastoreCaseId,
+      AccusedMasterID: accusedMasterId,
+      ArrestSurrenderTypeID: 1,
+      ArrestSurrenderDate: String(arrestDate || new Date().toISOString().slice(0, 10)),
+      ArrestSurrenderStateId: 1,
+      ArrestSurrenderDistrictId: Number(districtId) || 1
+    };
+
+    // Insert into Datastore table ArrestSurrender
+    await datastore.table('ArrestSurrender').insertRow(arrestPayload).catch((e) => {
+      console.warn("Failed to insert arrest row in catalyst datastore:", e);
+    });
+
+    // Also update memoryTableStore
+    if (!memoryTableStore['ArrestSurrender']) {
+      memoryTableStore['ArrestSurrender'] = [];
+    }
+    memoryTableStore['ArrestSurrender'].push(arrestPayload);
+
+    res.status(200).json({ status: 'success', message: 'Arrest record saved successfully' });
+  } catch (err) {
+    console.error('Error saving arrest record:', err);
+    res.status(500).json({ status: 'failure', message: err.message });
+  }
+};
+
+// Dynamic Seeder Handler
+const seedCasesHandler = async (req, res) => {
+  try {
+    const catalystApp = catalyst.initialize(req);
+    const datastore = catalystApp.datastore();
+    const targetDistrict = req.query.district;
+
+    const districts = [
+      "Bagalkot", "Ballari", "Belagavi", "Bengaluru City", "Bengaluru Rural", 
+      "Bidar", "Chamarajanagar", "Chikkaballapur", "Chikkamagaluru", "Chitradurga", 
+      "Dakshina Kannada", "Davanagere", "Dharwad", "Gadag", "Hassan", 
+      "Haveri", "Kalaburagi", "Kodagu", "Kolar", "Koppal", "Mandya", 
+      "Mysuru", "Raichur", "Ramanagara", "Shivamogga", "Tumakuru", "Udupi", 
+      "Uttara Kannada", "Vijayapura", "Yadgir"
+    ];
+
+    const districtIdMap = {
+      "Bagalkot": 21, "Bagalkote": 21, "Ballari": 8, "Belagavi": 6,
+      "Bengaluru City": 1, "Bengaluru Rural": 2, "Bidar": 19,
+      "Chamarajanagar": 22, "Chamarajanagara": 22, "Chikkaballapur": 23, "Chikkaballapura": 23,
+      "Chikkamagaluru": 17, "Chitradurga": 24, "Dakshina Kannada": 4,
+      "Davanagere": 13, "Dharwad": 5, "Gadag": 25, "Hassan": 15,
+      "Haveri": 26, "Kalaburagi": 7, "Kodagu": 18, "Kolar": 20,
+      "Koppal": 27, "Mandya": 16, "Mysuru": 3, "Raichur": 14,
+      "Ramanagara": 28, "Shivamogga": 11, "Tumakuru": 10, "Udupi": 12,
+      "Uttara Kannada": 29, "Vijayapura": 9, "Yadgir": 30
+    };
+
+    const majorHeads = [
+      { id: 1, name: "Property Crime", majorHead: "PROPERTY CLASS" },
+      { id: 2, name: "Violent Crime", majorHead: "HEINOUS CLASS" },
+      { id: 3, name: "Cyber Crime", majorHead: "CYBER CLASS" },
+      { id: 4, name: "Narcotics", majorHead: "NDPS CLASS" }
+    ];
+
+    const sampleBriefs = [
+      "House breaking and theft of gold ornaments by breaking padlock.",
+      "Mobile phone and purse snatched by two suspects riding a motorcycle.",
+      "Vishing scam where victim was tricked into sharing OTP credentials.",
+      "Possession and attempt to distribute prohibited narcotic substances near college.",
+      "Shop shutter pried open during late night hours and cash stolen."
+    ];
+
+    const seedCount = targetDistrict ? 100 : 10;
+    const districtsToSeed = targetDistrict ? [targetDistrict] : districts;
+
+    let totalInserted = 0;
+
+    for (const dist of districtsToSeed) {
+      const distId = districtIdMap[dist] || 1;
+      const caseBatches = [];
+      const accusedBatches = [];
+      const victimBatches = [];
+      const complainantBatches = [];
+
+      for (let i = 0; i < seedCount; i++) {
+        const caseMasterIdVal = Math.floor(Math.random() * 1000000) + 20000;
+        const crimeNo = `FIR-${dist.toUpperCase().slice(0, 3)}-${2026}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+        
+        // Grid center coordinates
+        const baseLat = 12.9 + (distId * 0.05);
+        const baseLng = 75.5 + (distId * 0.05);
+        const lat = baseLat + (Math.random() - 0.5) * 0.1;
+        const lng = baseLng + (Math.random() - 0.5) * 0.1;
+
+        const major = majorHeads[Math.floor(Math.random() * majorHeads.length)];
+        const brief = sampleBriefs[Math.floor(Math.random() * sampleBriefs.length)];
+
+        // CaseMaster Record
+        const caseMasterPayload = {
+          CaseMasterID: caseMasterIdVal,
+          CrimeNo: crimeNo,
+          CrimeRegisteredDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          PolicePersonID: Math.floor(Math.random() * 1000) + 100,
+          PoliceStationID: 100 + distId,
+          CaseCategoryID: Math.floor(Math.random() * 4) + 1,
+          GravityOffenceID: Math.random() > 0.8 ? 1 : 2, // 1 = Heinous, 2 = Non-Heinous
+          CrimeMajorHeadID: major.id,
+          CrimeMinorHeadID: Math.floor(Math.random() * 10) + 1,
+          CaseStatusID: Math.floor(Math.random() * 4) + 1,
+          CourtID: distId * 2 + 1,
+          IncidentFromDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+          IncidentToDate: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          InfoReceivedPSDate: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          latitude: lat,
+          longitude: lng,
+          BriefFacts: brief
+        };
+        caseBatches.push(caseMasterPayload);
+
+        // Complainant Details Record
+        const complainantPayload = {
+          ComplainantID: Math.floor(Math.random() * 100000),
+          CaseMasterID: caseMasterIdVal,
+          ComplainantName: `Complainant ${Math.floor(Math.random() * 1000)}`,
+          AgeYear: 20 + Math.floor(Math.random() * 50),
+          OccupationID: 1,
+          ReligionID: 1,
+          CasteID: 1,
+          GenderID: Math.random() > 0.5 ? 1 : 2
+        };
+        complainantBatches.push(complainantPayload);
+
+        // Victim Record
+        const victimPayload = {
+          VictimMasterID: Math.floor(Math.random() * 100000),
+          CaseMasterID: caseMasterIdVal,
+          VictimName: `Victim ${Math.floor(Math.random() * 1000)}`,
+          AgeYear: 18 + Math.floor(Math.random() * 60),
+          GenderID: Math.random() > 0.5 ? 1 : 2,
+          VictimPolice: Math.random() > 0.95 ? "1" : "0"
+        };
+        victimBatches.push(victimPayload);
+
+        // Accused Record
+        const accusedPayload = {
+          AccusedMasterID: Math.floor(Math.random() * 100000),
+          CaseMasterID: caseMasterIdVal,
+          AccusedName: `Accused ${Math.floor(Math.random() * 1000)}`,
+          AgeYear: 19 + Math.floor(Math.random() * 40),
+          GenderID: Math.random() > 0.5 ? 1 : 2,
+          PersonID: `ACC-${Math.floor(Math.random() * 10000)}`
+        };
+        accusedBatches.push(accusedPayload);
+      }
+
+      // Batch insert inside the loop (within 100 row limitations)
+      await datastore.table('CaseMaster').insertRows(caseBatches).catch((e) => console.log('Seed error CaseMaster:', e.message));
+      await datastore.table('ComplainantDetails').insertRows(complainantBatches).catch((e) => console.log('Seed error Complainant:', e.message));
+      await datastore.table('Victim').insertRows(victimBatches).catch((e) => console.log('Seed error Victim:', e.message));
+      await datastore.table('Accused').insertRows(accusedBatches).catch((e) => console.log('Seed error Accused:', e.message));
+
+      // Append to local memory store
+      if (!memoryTableStore['CaseMaster']) memoryTableStore['CaseMaster'] = [];
+      if (!memoryTableStore['ComplainantDetails']) memoryTableStore['ComplainantDetails'] = [];
+      if (!memoryTableStore['Victim']) memoryTableStore['Victim'] = [];
+      if (!memoryTableStore['Accused']) memoryTableStore['Accused'] = [];
+
+      caseBatches.forEach(cb => memoryTableStore['CaseMaster'].push(cb));
+      complainantBatches.forEach(cb => memoryTableStore['ComplainantDetails'].push(cb));
+      victimBatches.forEach(cb => memoryTableStore['Victim'].push(cb));
+      accusedBatches.forEach(cb => memoryTableStore['Accused'].push(cb));
+
+      totalInserted += seedCount;
+    }
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: `Seeded ${totalInserted} cases successfully into Zoho Catalyst Datastore.` 
+    });
+  } catch (err) {
+    console.error('Seeding failed:', err);
+    res.status(500).json({ status: 'failure', message: err.message });
+  }
+};
+
+router.post('/cases/update', updateCaseHandler);
+router.put('/cases/update', updateCaseHandler);
+router.put('/cases', updateCaseHandler);
+router.put('/', updateCaseHandler);
+
+router.post('/cases/arrest', recordArrestHandler);
+router.patch('/cases', recordArrestHandler);
+router.patch('/', recordArrestHandler);
+router.get('/seed', seedCasesHandler);
+router.post('/seed', seedCasesHandler);
+
 // DELETE Handler - Clear all 27 tables
 const deleteCasesHandler = async (req, res) => {
   try {
@@ -392,6 +995,15 @@ const deleteCasesHandler = async (req, res) => {
           await datastore.table(t.name).deleteRows(rowIds).catch(e => {});
         }
       } catch (e) {}
+    }
+
+    // Reset photo mapping
+    photoMapping = {};
+    if (photoMappingFileId) {
+      const filestore = catalystApp.filestore();
+      const bucket = filestore.bucket('photos');
+      await bucket.deleteFile(photoMappingFileId).catch(() => {});
+      photoMappingFileId = null;
     }
 
     res.status(200).json({ status: 'success', message: 'All 27 tables cleared successfully across Zoho Catalyst Datastore' });

@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Shield, FileText, Gavel,
-  Radar, Database, RefreshCw
+  Radar, Database, RefreshCw, ArrowRight
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDb } from "@/hooks/use-db";
 import { DISTRICTS } from "@/data/mock";
 import { getCatalystSyncInfo, syncWithCatalyst } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -354,10 +356,7 @@ function Overview() {
             </span>
             <span className="font-mono text-[11px] uppercase tracking-[0.2em] font-bold text-ink flex items-center gap-1.5">
               <Database className="h-3.5 w-3.5 text-signal" />
-              Zoho Catalyst DataStore
-            </span>
-            <span className="rounded bg-ink px-2 py-0.5 font-mono text-[10px] font-bold text-paper">
-              {allCases.length} Live Console Records
+              Crime Intelligence Database
             </span>
           </div>
 
@@ -399,10 +398,18 @@ function Overview() {
 
       {/* ───────── KPI ROW ───────── */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KPI code="A1" label="Total FIRs" value={KPIS.totalFIRs} delta="+6.4%" up series={firs14} />
-        <KPI code="A2" label="Heinous Share" value={`${KPIS.heinousPct}%`} delta="-2.1%" up={false} series={hein14} tone="signal" />
-        <KPI code="A3" label="Arrests" value={KPIS.arrests} delta="+11.8%" up={false} series={arr14} />
-        <KPI code="A4" label="Charge-sheeted" value={KPIS.chargeSheeted} delta="+4.2%" up={false} series={cs14} />
+        <Link to="/cases" className="block text-inherit hover:no-underline">
+          <KPI code="A1" label="Total FIRs" value={KPIS.totalFIRs} delta="+6.4%" up series={firs14} />
+        </Link>
+        <Link to="/cases" search={{ gravity: "Heinous" } as any} className="block text-inherit hover:no-underline">
+          <KPI code="A2" label="Heinous Share" value={`${KPIS.heinousPct}%`} delta="-2.1%" up={false} series={hein14} tone="signal" />
+        </Link>
+        <Link to="/cases" className="block text-inherit hover:no-underline">
+          <KPI code="A3" label="Arrests" value={KPIS.arrests} delta="+11.8%" up={false} series={arr14} />
+        </Link>
+        <Link to="/cases" search={{ status: "Charge Sheeted" } as any} className="block text-inherit hover:no-underline">
+          <KPI code="A4" label="Charge-sheeted" value={KPIS.chargeSheeted} delta="+4.2%" up={false} series={cs14} />
+        </Link>
       </div>
 
       {/* ───────── SPATIAL CARTOGRAM CANVAS ───────── */}
@@ -425,6 +432,37 @@ function Overview() {
             </div>
           </div>
           <Cartogram selectedId={selectedId} onSelect={setSelectedId} />
+
+          {/* Spatial intelligence ribbon to utilize card bottom space */}
+          <div className="mt-4 pt-4 border-t border-ink/15 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">CRITICAL THREAT ZONE</p>
+              <p className="font-display text-base font-bold text-signal truncate">
+                {[...DISTRICT_STATS].sort((a,b) => b.riskScore - a.riskScore)[0]?.district.name || "None"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Threat index at <span className="font-mono text-signal font-bold">{[...DISTRICT_STATS].sort((a,b) => b.riskScore - a.riskScore)[0]?.riskScore || 0}/100</span>
+              </p>
+            </div>
+            <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">MAX RATE ACCELERATION</p>
+              <p className="font-display text-base font-bold text-ink truncate">
+                {[...DISTRICT_STATS].sort((a,b) => b.spike - a.spike)[0]?.district.name || "None"}
+              </p>
+              <p className="text-[10px] text-muted-foreground font-mono">
+                Volume delta: <span className="text-emerald-600 font-bold">+{[...DISTRICT_STATS].sort((a,b) => b.spike - a.spike)[0]?.spike || 0}%</span> vs baseline
+              </p>
+            </div>
+            <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">SPIKE DENSITY MONITOR</p>
+              <p className="font-display text-base font-bold text-ink truncate">
+                {DISTRICT_STATS.filter(d => d.spike > 15).length} Districts Spiking
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Exceeding standard <span className="font-mono font-semibold text-signal">+15%</span> threshold alert
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* DETAIL CARD */}
@@ -543,6 +581,87 @@ function Overview() {
               <p className="font-editorial italic text-xs text-ink">charge-sheeted</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ───────── THIRD ROW: LIVE RECENT REGISTRY LOG ───────── */}
+      <div className="bento-card p-5">
+        <div className="border-b-2 border-ink pb-2 mb-4 flex items-center justify-between">
+          <div>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">§C1 · Live Registry Feed</span>
+            <h3 className="mt-1 font-editorial text-2xl leading-none">Recent FIR Filings & Profile Registry</h3>
+          </div>
+          <span className="font-mono text-xs text-muted-foreground">Showing last 4 cases</span>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {allCases.slice(-4).reverse().map((c) => {
+            const primaryVictim = c.victims?.[0];
+            const primaryAccused = c.accused?.[0];
+            return (
+              <div key={c.caseMasterId} className="flex flex-col border border-ink/15 p-4 rounded-xl bg-paper/50 hover:bg-paper transition-all space-y-3.5 shadow-sm justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline" className="font-mono text-[9px] border-signal text-signal px-2 py-0.5">{c.crimeNo}</Badge>
+                    <span className="text-[10px] font-mono text-muted-foreground">{new Date(c.registeredDate).toLocaleDateString("en-IN")}</span>
+                  </div>
+                  <h4 className="font-bold text-sm text-ink mt-2.5 truncate">{c.crimeHead.name}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.policeStation}, {c.district.name}</p>
+                </div>
+                
+                <div className="space-y-2 pt-2.5 border-t border-ink/10 text-xs">
+                  {/* Police Officer */}
+                  <div className="flex items-center gap-2">
+                    {c.officerPhoto ? (
+                      <img src={c.officerPhoto} alt="Officer" className="h-6 w-6 rounded-full object-cover border border-signal/20" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">IO</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Investigating Officer</span>
+                      <p className="font-medium text-ink truncate">{c.registeringOfficer || "Officer"}</p>
+                    </div>
+                  </div>
+
+                  {/* Victim */}
+                  <div className="flex items-center gap-2">
+                    {primaryVictim?.photo ? (
+                      <img src={primaryVictim.photo} alt="Victim" className="h-6 w-6 rounded-full object-cover border border-emerald-500/20" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-[8px] font-bold text-emerald-600 shrink-0">VIC</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Primary Victim</span>
+                      <p className="font-medium text-ink truncate">{primaryVictim?.name || "Unknown"}</p>
+                    </div>
+                  </div>
+
+                  {/* Accused */}
+                  <div className="flex items-center gap-2">
+                    {primaryAccused?.photo ? (
+                      <img src={primaryAccused.photo} alt="Accused" className="h-6 w-6 rounded-full object-cover border border-red-500/20" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-[8px] font-bold text-red-600 shrink-0">MUG</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Primary Accused</span>
+                      <p className="font-medium text-ink truncate">{primaryAccused?.name || "Unknown"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Link to={`/cases/${c.caseMasterId}`} className="pt-2 text-center">
+                  <Button variant="ghost" size="sm" className="w-full text-xs font-bold hover:text-signal transition-colors h-7 gap-1">
+                    Open File <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+            );
+          })}
+          {allCases.length === 0 && (
+            <div className="col-span-full py-8 text-center text-xs text-muted-foreground font-mono">
+              No live case files registered in datastore.
+            </div>
+          )}
         </div>
       </div>
 

@@ -18,7 +18,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
       throw new Error(result.message || "Failed to fetch from serverless function");
     }
 
-    const { cases = [], accused = [], victims = [], complainants = [], arrests = [], actSections = [] } = result.data || {};
+    const { cases = [], accused = [], victims = [], complainants = [], arrests = [], actSections = [], chargesheet = [] } = result.data || {};
 
     // Map ArrestSurrender by AccusedMasterID and ROWID
     const arrestMap = new Map<string, any>();
@@ -27,7 +27,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
       if (row.ROWID) arrestMap.set(String(row.ROWID), row);
     });
 
-    // Map cases by string ROWID / CaseMasterID
+    // Map cases by both string ROWID and string CaseMasterID
     const caseMasterMap = new Map<string, {
       raw: any;
       accused: any[];
@@ -35,50 +35,59 @@ export async function fetchLiveCases(): Promise<Case[]> {
       complainants: any[];
       arrests: any[];
       actSections: any[];
+      chargesheet: any[];
     }>();
 
     (cases || []).forEach((c: any) => {
-      const key = String(c.ROWID || c.CaseMasterID);
-      caseMasterMap.set(key, {
+      const entry = {
         raw: c,
         accused: [],
         victims: [],
         complainants: [],
         arrests: [],
-        actSections: []
-      });
+        actSections: [],
+        chargesheet: []
+      };
+      if (c.ROWID) caseMasterMap.set(String(c.ROWID), entry);
+      if (c.CaseMasterID) caseMasterMap.set(String(c.CaseMasterID), entry);
     });
 
-    // Sequential ROWID grouping (handles cases where child tables store truncated CaseMasterID in Catalyst)
-    const allItems: { type: string; rowId: bigint; raw: any }[] = [];
-    (cases || []).forEach((c: any) => c.ROWID && allItems.push({ type: 'case', rowId: BigInt(c.ROWID), raw: c }));
-    (accused || []).forEach((a: any) => a.ROWID && allItems.push({ type: 'accused', rowId: BigInt(a.ROWID), raw: a }));
-    (victims || []).forEach((v: any) => v.ROWID && allItems.push({ type: 'victim', rowId: BigInt(v.ROWID), raw: v }));
-    (complainants || []).forEach((cm: any) => cm.ROWID && allItems.push({ type: 'complainant', rowId: BigInt(cm.ROWID), raw: cm }));
-    (arrests || []).forEach((ar: any) => ar.ROWID && allItems.push({ type: 'arrest', rowId: BigInt(ar.ROWID), raw: ar }));
-    (actSections || []).forEach((ac: any) => ac.ROWID && allItems.push({ type: 'act', rowId: BigInt(ac.ROWID), raw: ac }));
+    // Group child records cleanly by matching CaseMasterID foreign key
+    (accused || []).forEach((a: any) => {
+      const parent = caseMasterMap.get(String(a.CaseMasterID));
+      if (parent) parent.accused.push(a);
+    });
 
-    allItems.sort((a, b) => (a.rowId < b.rowId ? -1 : a.rowId > b.rowId ? 1 : 0));
+    (victims || []).forEach((v: any) => {
+      const parent = caseMasterMap.get(String(v.CaseMasterID));
+      if (parent) parent.victims.push(v);
+    });
 
-    let activeCaseKey: string | null = null;
-    allItems.forEach(item => {
-      if (item.type === 'case') {
-        activeCaseKey = String(item.raw.ROWID || item.raw.CaseMasterID);
-      } else if (activeCaseKey && caseMasterMap.has(activeCaseKey)) {
-        const target = caseMasterMap.get(activeCaseKey)!;
-        if (item.type === 'accused') target.accused.push(item.raw);
-        else if (item.type === 'victim') target.victims.push(item.raw);
-        else if (item.type === 'complainant') target.complainants.push(item.raw);
-        else if (item.type === 'arrest') target.arrests.push(item.raw);
-        else if (item.type === 'act') target.actSections.push(item.raw);
-      }
+    (complainants || []).forEach((cm: any) => {
+      const parent = caseMasterMap.get(String(cm.CaseMasterID));
+      if (parent) parent.complainants.push(cm);
+    });
+
+    (arrests || []).forEach((ar: any) => {
+      const parent = caseMasterMap.get(String(ar.CaseMasterID));
+      if (parent) parent.arrests.push(ar);
+    });
+
+    (actSections || []).forEach((ac: any) => {
+      const parent = caseMasterMap.get(String(ac.CaseMasterID));
+      if (parent) parent.actSections.push(ac);
+    });
+
+    (chargesheet || []).forEach((cs: any) => {
+      const parent = caseMasterMap.get(String(cs.CaseMasterID));
+      if (parent) parent.chargesheet.push(cs);
     });
 
     return (cases || []).map((row: any, index: number) => {
       const caseMasterId = Number(row.ROWID || row.CaseMasterID || index + 1000);
       const crimeNo = String(row.CrimeNo || `KA-${String(index + 1).padStart(4, "0")}-2026`);
       const key = String(row.ROWID || row.CaseMasterID);
-      const mappedChildData = caseMasterMap.get(key) || { accused: [], victims: [], complainants: [], arrests: [], actSections: [] };
+      const mappedChildData = caseMasterMap.get(key) || { accused: [], victims: [], complainants: [], arrests: [], actSections: [], chargesheet: [] };
 
       // District resolution
       let distId = 0;
@@ -126,12 +135,13 @@ export async function fetchLiveCases(): Promise<Case[]> {
         name: v.VictimName || `Victim ${vIdx + 1}`,
         age: Number(v.AgeYear) || 30,
         gender: v.GenderID === 2 || v.GenderID === "2" ? "F" : "M",
-        isPolice: v.VictimPolice === true || v.VictimPolice === 1 || v.VictimPolice === "1" || v.VictimPolice === "true"
+        isPolice: v.VictimPolice === true || v.VictimPolice === 1 || v.VictimPolice === "1" || v.VictimPolice === "true",
+        photo: v.photo || ""
       }));
 
       const accused = mappedChildData.accused.map((a, aIdx) => {
-        const accusedMasterId = String(a.ROWID || a.AccusedMasterID || aIdx);
-        const arrestRecord = arrestMap.get(accusedMasterId);
+        const accusedMasterId = String(a.AccusedMasterID || a.ROWID || aIdx);
+        const arrestRecord = arrestMap.get(accusedMasterId) || arrestMap.get(String(a.ROWID));
         const isArrested = !!arrestRecord;
 
         return {
@@ -139,11 +149,13 @@ export async function fetchLiveCases(): Promise<Case[]> {
           name: a.AccusedName || `Accused ${aIdx + 1}`,
           age: Number(a.AgeYear) || 25,
           gender: a.GenderID === 2 || a.GenderID === "2" ? "F" : "M",
+          arrested: isArrested,
           arrestId: isArrested ? Number(accusedMasterId) || (aIdx + 1) : undefined,
           arrestDate: isArrested ? String(arrestRecord.ArrestSurrenderDate || "").slice(0, 10) : undefined,
           arrestDistrict: isArrested ? (DISTRICTS.find(d => d.id === Number(arrestRecord.ArrestSurrenderDistrictId))?.name || "Bengaluru City") : undefined,
           ioName: isArrested ? `Officer ID ${arrestRecord.IOID}` : undefined,
-          courtName: isArrested ? (COURTS[Number(arrestRecord.CourtID) - 1] || "JMFC Court") : undefined
+          courtName: isArrested ? (COURTS[Number(arrestRecord.CourtID) - 1] || "JMFC Court") : undefined,
+          photo: a.photo || ""
         };
       });
 
@@ -184,6 +196,20 @@ export async function fetchLiveCases(): Promise<Case[]> {
       const regDate = String(row.CrimeRegisteredDate || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
       const incDate = String(row.IncidentFromDate || row.CrimeRegisteredDate || "").slice(0, 10) || regDate;
 
+      const statusId = Number(row.CaseStatusID || 1);
+      const statusMap: { [key: number]: string } = {
+        1: "Under Investigation",
+        2: "Charge Sheeted",
+        3: "Closed",
+        4: "Pending Trial"
+      };
+      const status = statusMap[statusId] || "Under Investigation";
+
+      const primaryChargesheet = mappedChildData.chargesheet?.[0];
+      const chargesheetNo = primaryChargesheet ? `CS-${primaryChargesheet.CSID}` : (status === "Charge Sheeted" ? `CS-${Number(row.CaseMasterID || row.ROWID || index + 1000) % 10000}` : undefined);
+      const chargesheetDate = primaryChargesheet ? String(primaryChargesheet.csdate || "").slice(0, 10) : (status === "Charge Sheeted" ? regDate : undefined);
+      const chargesheetType = primaryChargesheet ? primaryChargesheet.cstype : (status === "Charge Sheeted" ? "Original Chargesheet" : undefined);
+
       return {
         caseMasterId,
         crimeNo,
@@ -204,6 +230,10 @@ export async function fetchLiveCases(): Promise<Case[]> {
         accused,
         latitude: Number(row.latitude || row.Latitude || 12.9716),
         longitude: Number(row.longitude || row.Longitude || 77.5946),
+        officerPhoto: row.officerPhoto || "",
+        chargesheetNo,
+        chargesheetDate,
+        chargesheetType
       };
     });
   } catch (err) {
@@ -255,6 +285,25 @@ export async function insertLiveCase(newCase: Omit<Case, "caseMasterId">): Promi
   }
 
   return result.data;
+}
+
+export async function updateLiveCase(caseMasterId: number, status: string, briefFacts: string): Promise<void> {
+  const res = await fetch("/server/api/cases", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ caseMasterId, status, briefFacts })
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to update case: ${errorText}`);
+  }
+  const result = await res.json();
+  if (result.status !== "success") {
+    throw new Error(result.message || "Server returned failure");
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("zoho-table-update"));
+  }
 }
 
 export async function clearLiveCases() {

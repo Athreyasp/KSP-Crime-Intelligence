@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus, Database,
+  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarHeader, SidebarFooter, useSidebar,
@@ -12,21 +12,24 @@ type NavItem = { title: string; url: string; icon: typeof MapPin; live?: boolean
 
 const ITEMS: NavItem[] = [
   { title: "Overview",     url: "/",             icon: LayoutDashboard, live: true },
-  { title: "Hotspots",     url: "/hotspots",     icon: MapPin,          badge: "6" },
+  { title: "Hotspots",     url: "/hotspots",     icon: MapPin },
   { title: "Network",      url: "/network",      icon: Network },
   { title: "Offenders",    url: "/offenders",    icon: UserSearch },
   { title: "Predictive",   url: "/predictive",   icon: Brain,           live: true },
   { title: "Sociological", url: "/sociological", icon: LineChart },
   { title: "Cases",        url: "/cases",        icon: FolderSearch },
   { title: "New FIR",      url: "/cases/new",    icon: Plus },
-  { title: "Zoho Console", url: "/zoho-console", icon: Database,        badge: "27 Tables" },
 ];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: s => s.location.pathname });
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
+  const isActive = (url: string) => {
+    if (url === "/") return pathname === "/";
+    if (url === "/cases") return pathname.startsWith("/cases") && !pathname.startsWith("/cases/new");
+    return pathname.startsWith(url);
+  };
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -38,39 +41,43 @@ export function AppSidebar() {
   const stamp = mounted ? now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false }) : "--:--";
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/60">
+    <Sidebar collapsible="icon" className="border-r-2 border-ink bg-paper text-ink">
       {/* Masthead */}
-      <SidebarHeader className="p-0 bg-sidebar">
+      <SidebarHeader className="p-0 bg-paper border-b border-ink/15">
         <div className={cn(
           "flex items-center gap-3 px-4 pt-5 pb-4",
           collapsed && "flex-col gap-2 px-0 pt-4"
         )}>
           <div className="relative">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-paper border border-ink shadow-hard">
-              <Shield className="h-4 w-4 text-signal" strokeWidth={2.5} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper border-2 border-ink shadow-sm">
+              <Shield className="h-4 w-4 text-signal animate-pulse" strokeWidth={2.5} />
             </div>
+            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
           </div>
           {!collapsed && (
             <div className="min-w-0 leading-tight">
-              <div className="font-editorial italic text-[15px] text-sidebar-foreground -mb-0.5">Karnataka</div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-sidebar-foreground/60">
+              <div className="font-editorial italic text-[16px] text-ink tracking-wide">Karnataka</div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink/60">
                 Crime Intelligence · SCRB
               </div>
             </div>
           )}
         </div>
         {!collapsed && (
-          <div className="mx-4 mb-1 flex items-center gap-2">
-            <div className="h-[3px] flex-1 bg-ink" />
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">
-              § Nav
+          <div className="mx-4 mb-2 flex items-center gap-2">
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-ink/20 to-transparent" />
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink/50">
+              Navigation Registry
             </span>
-            <div className="h-[3px] w-4 bg-signal" />
+            <div className="h-[1px] w-8 bg-signal" />
           </div>
         )}
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar px-2 py-2">
+      <SidebarContent className="bg-paper px-2 py-2">
         <nav className="flex flex-col gap-1">
           {ITEMS.map((item, idx) => {
             const active = isActive(item.url);
@@ -82,47 +89,55 @@ export function AppSidebar() {
                 to={item.url}
                 title={collapsed ? item.title : undefined}
                 className={cn(
-                  "group relative flex items-center gap-2 rounded-md text-[13px] transition-all",
-                  collapsed ? "justify-center px-0 py-2" : "px-2 py-2",
+                  "group relative flex items-center gap-3 rounded-lg text-[13px] transition-all duration-300 font-medium",
+                  collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
                   active
-                    ? "bg-paper text-ink border border-ink shadow-hard"
-                    : "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
+                    ? "bg-[#f1f3f4] text-ink border-2 border-ink font-bold"
+                    : "text-ink/75 hover:text-ink hover:bg-ink/5 hover:translate-x-1"
                 )}
               >
+                {/* Left accent slide-in bar */}
                 {active && !collapsed && (
-                  <span className="absolute -left-[5px] top-1.5 bottom-1.5 w-[4px] rounded-sm bg-signal" />
+                  <span className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r bg-signal shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
                 )}
+                
                 {!collapsed && (
                   <span className={cn(
-                    "font-mono text-[10px] tabular-nums w-6 text-center transition-colors",
-                    active ? "text-signal font-semibold" : "text-sidebar-foreground/40 group-hover:text-signal"
+                    "font-mono text-[10px] tabular-nums w-5 text-left transition-colors duration-300",
+                    active ? "text-signal font-bold" : "text-ink/40 group-hover:text-signal"
                   )}>
                     {num}
                   </span>
                 )}
+                
                 <span className={cn(
-                  "flex items-center justify-center shrink-0",
-                  collapsed && "h-8 w-8 rounded-md border",
+                  "flex items-center justify-center shrink-0 rounded-md transition-colors duration-300",
+                  collapsed && "h-8 w-8 border",
                   collapsed && active
-                    ? "bg-signal border-ink text-primary-foreground shadow-hard"
-                    : collapsed && "bg-paper/10 border-sidebar-border/50"
+                    ? "bg-signal/15 border-2 border-ink text-signal"
+                    : collapsed && "bg-paper border-ink"
                 )}>
                   <Icon
-                    className={cn("h-4 w-4", !collapsed && active && "text-signal")}
+                    className={cn("h-4 w-4 transition-colors duration-300", 
+                      active ? "text-signal" : "text-ink/75 group-hover:text-ink"
+                    )}
                     strokeWidth={active ? 2.25 : 1.75}
                   />
                 </span>
+                
                 {!collapsed && (
                   <>
-                    <span className={cn("truncate flex-1", active && "font-semibold tracking-tight")}>{item.title}</span>
+                    <span className={cn("truncate flex-1 tracking-wide", active && "font-bold text-ink")}>
+                      {item.title}
+                    </span>
                     {item.live && (
-                      <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-signal">
-                        <span className="h-1.5 w-1.5 rounded-full bg-signal pulse-alert" />
+                      <span className="flex items-center gap-1 font-mono text-[8px] uppercase tracking-widest text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-500/25">
+                        <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
                         Live
                       </span>
                     )}
                     {!item.live && item.badge && (
-                      <span className="rounded-sm border border-signal/50 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-signal">
+                      <span className="rounded border border-red-500/30 bg-red-50 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-red-600">
                         {item.badge}
                       </span>
                     )}
@@ -135,23 +150,33 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Classified stamp footer */}
-      <SidebarFooter className="p-0 bg-sidebar">
+      <SidebarFooter className="p-0 bg-paper border-t border-ink/15">
         {!collapsed ? (
-          <div className="m-3 rounded-md border border-signal/40 bg-signal/5 px-3 py-2">
+          <div className="m-3 rounded-lg border border-ink/15 bg-surface-2 p-3 shadow-inner space-y-1">
             <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-success pulse-alert" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-signal font-semibold">
-                Classified · Internal
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-signal font-bold">
+                SECURE CONSOLE
               </span>
             </div>
-            <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-sidebar-foreground/70">
-              <span>Feed live</span>
-              <span className="tabular-nums">↻ {stamp}</span>
+            <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
+              <span className="text-[9px] text-ink/50 uppercase tracking-wider">Feed Sync</span>
+              <span className="tabular-nums font-bold text-emerald-600">ONLINE</span>
+            </div>
+            <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
+              <span className="text-[9px] text-ink/50 uppercase tracking-wider">Telemetry</span>
+              <span className="tabular-nums text-ink/80">↻ {stamp}</span>
             </div>
           </div>
         ) : (
-          <div className="flex justify-center py-3">
-            <span className="h-2 w-2 rounded-full bg-success pulse-alert" />
+          <div className="flex justify-center py-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
           </div>
         )}
       </SidebarFooter>

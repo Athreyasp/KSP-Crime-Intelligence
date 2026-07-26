@@ -45,8 +45,8 @@ export function GlobalSearch({
     if (!q) return OFFENDERS.slice(0, 4);
     return OFFENDERS.filter(o =>
       o.name.toLowerCase().includes(q) ||
-      o.moTags.some(m => m.toLowerCase().includes(q)) ||
-      o.jurisdictions.some(j => j.toLowerCase().includes(q))
+      o.moTags.some((m: string) => m.toLowerCase().includes(q)) ||
+      o.jurisdictions.some((j: string) => j.toLowerCase().includes(q))
     ).slice(0, 5);
   }, [q]);
 
@@ -102,7 +102,7 @@ export function GlobalSearch({
                 <CommandItem
                   key={d.id}
                   value={`district ${d.name}`.toLowerCase()}
-                  onSelect={() => go("/hotspots")}
+                  onSelect={() => go(`/hotspots?district=${encodeURIComponent(d.name)}`)}
                 >
                   <Building2 className="mr-2 h-4 w-4 text-primary" />
                   <span>{d.name}</span>

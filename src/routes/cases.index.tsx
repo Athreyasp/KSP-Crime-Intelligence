@@ -25,21 +25,32 @@ export const Route = createFileRoute("/cases/")({
 function CasesPage() {
   const { cases: allCases } = useDb();
 
+  // Parse URL search parameters on mount
+  const params = useMemo(() => {
+    if (typeof window === "undefined") return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+  }, []);
+
+  const initialStatus = params.get("status") || "all";
+  const initialGravity = params.get("gravity") || "all";
+  const initialDistrict = params.get("district") || "all";
+  const initialQ = params.get("q") || "";
+
   // DRAFT filter states (modified in UI controls)
-  const [draftQ, setDraftQ] = useState("");
-  const [draftDistrict, setDraftDistrict] = useState<string>("all");
+  const [draftQ, setDraftQ] = useState(initialQ);
+  const [draftDistrict, setDraftDistrict] = useState<string>(initialDistrict);
   const [draftHead, setDraftHead] = useState<string>("all");
-  const [draftStatus, setDraftStatus] = useState<string>("all");
-  const [draftGravity, setDraftGravity] = useState<string>("all");
+  const [draftStatus, setDraftStatus] = useState<string>(initialStatus);
+  const [draftGravity, setDraftGravity] = useState<string>(initialGravity);
   const [draftCategory, setDraftCategory] = useState<string>("all");
 
   // APPLIED filter states (updated ONLY when user clicks "Apply Filters")
   const [appliedFilters, setAppliedFilters] = useState({
-    q: "",
-    district: "all",
+    q: initialQ,
+    district: initialDistrict,
     head: "all",
-    status: "all",
-    gravity: "all",
+    status: initialStatus,
+    gravity: initialGravity,
     category: "all"
   });
 
@@ -303,6 +314,7 @@ function CasesPage() {
                     <th className="px-4 py-3">Crime No.</th>
                     <th className="px-4 py-3">District & Police Station</th>
                     <th className="px-4 py-3">Crime Head</th>
+                    <th className="px-4 py-3">Photos</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3 text-right">Action</th>
@@ -322,6 +334,21 @@ function CasesPage() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-[#0f172a]">
                         {c.crimeHead.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          {c.officerPhoto ? (
+                            <img src={c.officerPhoto} title={`IO: ${c.registeringOfficer}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+                          ) : (
+                            <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
+                          )}
+                          {c.accused[0]?.photo && (
+                            <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+                          )}
+                          {c.victims[0]?.photo && (
+                            <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569]">
@@ -380,8 +407,24 @@ function SimpleFolderCard({ c }: { c: any }) {
         </p>
       </div>
 
+      {/* Roster Photo Preview Row */}
+      <div className="flex items-center gap-1 pt-1 border-t border-[#f1f5f9]">
+        <span className="text-[10px] text-[#64748b] font-medium mr-1.5">Roster:</span>
+        {c.officerPhoto ? (
+          <img src={c.officerPhoto} title={`IO: ${c.registeringOfficer}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+        ) : (
+          <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
+        )}
+        {c.accused[0]?.photo && (
+          <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+        )}
+        {c.victims[0]?.photo && (
+          <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+        )}
+      </div>
+
       {/* Minimal Footer Row */}
-      <div className="pt-2 border-t border-[#f1f5f9] flex items-center justify-between">
+      <div className="pt-2 flex items-center justify-between">
         <span className="text-[11px] font-semibold text-[#64748b]">
           Category: <strong className="text-[#334155]">{c.category}</strong>
         </span>

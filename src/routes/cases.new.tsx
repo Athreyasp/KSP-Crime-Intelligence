@@ -42,6 +42,57 @@ const REGISTERING_OFFICERS = [
   "PSI Vinayaka Hegde (KGID: 32490)"
 ];
 
+function PhotoUploadWidget({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (base64: string) => void;
+}) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onChange(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 min-w-[120px]">
+      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+        {label}
+      </label>
+      <div className="flex items-center gap-3">
+        {value ? (
+          <img
+            src={value}
+            alt="Preview"
+            className="h-10 w-10 rounded-full object-cover border border-signal/30 shadow-sm"
+          />
+        ) : (
+          <div className="h-10 w-10 rounded-full bg-surface-2 border border-border border-dashed flex items-center justify-center text-muted-foreground text-xs font-semibold">
+            N/A
+          </div>
+        )}
+        <label className="cursor-pointer bg-surface-2 border border-border text-ink hover:bg-surface-3 px-3 py-1.5 rounded-md text-xs font-medium transition-colors">
+          Upload
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function NewCasePage() {
   const navigate = useNavigate();
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -75,6 +126,7 @@ function NewCasePage() {
   const [officerRank, setOfficerRank] = useState("Police Inspector (PI)");
   const [courtName, setCourtName] = useState(COURTS[0]);
   const [infoReceivedPSDate, setInfoReceivedPSDate] = useState(formatDateLocal(new Date()));
+  const [officerPhoto, setOfficerPhoto] = useState("");
 
   // ==========================================
   // SECTION 3: VICTIM DETAILS
@@ -85,11 +137,12 @@ function NewCasePage() {
     gender: "M" | "F" | "T";
     isPolice: boolean;
     injuryStatus: string;
-  }>([
-    { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured" }
+    photo: string;
+  }[]>([
+    { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "" }
   ]);
 
-  const handleAddVictim = () => setVictims([...victims, { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured" }]);
+  const handleAddVictim = () => setVictims([...victims, { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "" }]);
   const handleRemoveVictim = (index: number) => setVictims(victims.filter((_, i) => i !== index));
   const handleUpdateVictim = (index: number, field: string, value: any) => {
     const updated = [...victims];
@@ -124,8 +177,9 @@ function NewCasePage() {
     arrestDistrict: string;
     ioName: string;
     courtName: string;
-  }>([
-    { name: "Unknown Suspect / John Doe", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0] }
+    photo: string;
+  }[]>([
+    { name: "", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0], photo: "" }
   ]);
 
   const handleAddAccused = () => setAccused([...accused, {
@@ -136,7 +190,8 @@ function NewCasePage() {
     arrestDate: formatDateLocal(new Date()).slice(0, 10),
     arrestDistrict: DISTRICTS[0].name,
     ioName: registeringOfficer,
-    courtName: courtName
+    courtName: courtName,
+    photo: ""
   }]);
   const handleRemoveAccused = (index: number) => setAccused(accused.filter((_, i) => i !== index));
   const handleUpdateAccused = (index: number, field: string, value: any) => {
@@ -232,6 +287,7 @@ function NewCasePage() {
       registeringOfficer,
       officerRank,
       courtName,
+      officerPhoto,
 
       complainant: {
         name: complainantName,
@@ -249,7 +305,8 @@ function NewCasePage() {
         age: v.age,
         gender: v.gender,
         isPolice: v.isPolice,
-        injuryStatus: v.injuryStatus
+        injuryStatus: v.injuryStatus,
+        photo: v.photo
       })),
       accused: accused.map((a, idx) => ({
         id: `A${idx + 1}`,
@@ -260,7 +317,8 @@ function NewCasePage() {
         arrestDate: a.arrested ? a.arrestDate : undefined,
         arrestDistrict: a.arrested ? a.arrestDistrict : undefined,
         ioName: a.arrested ? a.ioName : undefined,
-        courtName: a.arrested ? a.courtName : undefined
+        courtName: a.arrested ? a.courtName : undefined,
+        photo: a.photo
       })),
       latitude: Number(lat) || 12.9716,
       longitude: Number(lng) || 77.5946
@@ -277,7 +335,8 @@ function NewCasePage() {
         description: `Reflected in CaseMaster, Accused, Victim, ComplainantDetails, ArrestSurrender, ActSectionAssociation, & 21 Master tables at ${policeStation}, ${selectedDistrict.name}.`,
       });
 
-      navigate({ to: "/zoho-console" });
+      // Redirect to the live cases directory
+      navigate({ to: "/cases" });
     } catch (err: any) {
       setIsSubmitting(false);
       toast.error(`Failed to update database: ${err.message}`);
@@ -296,11 +355,6 @@ function NewCasePage() {
         description="Official FIR Form No. 1 entry. Populates all 27 database tables in your Zoho Console instantly."
         actions={
           <div className="flex gap-2">
-            <Link to="/zoho-console">
-              <Button variant="outline" className="h-8 text-xs border-signal/40 text-signal hover:bg-signal/10">
-                <Database className="mr-1 h-3.5 w-3.5" /> Zoho Console (27 Tables)
-              </Button>
-            </Link>
             <Button onClick={handleClearDb} variant="destructive" className="h-8 text-xs">
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear Database
             </Button>
@@ -328,8 +382,8 @@ function NewCasePage() {
               <Input placeholder="Enter complainant name" value={complainantName} onChange={e => setComplainantName(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age (AgeYear)</label>
-              <Input type="number" value={complainantAge} onChange={e => setComplainantAge(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age (AgeYear) *</label>
+              <Input type="number" value={complainantAge} onChange={e => setComplainantAge(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender (GenderID)</label>
@@ -340,8 +394,8 @@ function NewCasePage() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Contact Phone</label>
-              <Input value={complainantPhone} onChange={e => setComplainantPhone(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Contact Phone *</label>
+              <Input value={complainantPhone} onChange={e => setComplainantPhone(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occupation (OccupationID)</label>
@@ -368,12 +422,12 @@ function NewCasePage() {
               </select>
             </div>
             <div className="md:col-span-3 flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address</label>
-              <Input value={complainantAddress} onChange={e => setComplainantAddress(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address *</label>
+              <Input value={complainantAddress} onChange={e => setComplainantAddress(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Relation to Incident</label>
-              <Input value={complainantRelation} onChange={e => setComplainantRelation(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Relation to Incident *</label>
+              <Input value={complainantRelation} onChange={e => setComplainantRelation(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
           </CardContent>
         </Card>
@@ -401,8 +455,8 @@ function NewCasePage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Police Station Unit (PoliceStationID / UnitID)</label>
-              <Input value={policeStation} onChange={e => setPoliceStation(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Police Station Unit (PoliceStationID / UnitID) *</label>
+              <Input value={policeStation} onChange={e => setPoliceStation(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
 
             <div className="flex flex-col gap-1">
@@ -434,8 +488,16 @@ function NewCasePage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Info Received at PS Date & Time (InfoReceivedPSDate)</label>
-              <Input type="datetime-local" value={infoReceivedPSDate} onChange={e => setInfoReceivedPSDate(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Info Received at PS Date & Time (InfoReceivedPSDate) *</label>
+              <Input type="datetime-local" value={infoReceivedPSDate} onChange={e => setInfoReceivedPSDate(e.target.value)} className="bg-surface-2 border-border" required />
+            </div>
+
+            <div className="flex flex-col gap-1 md:col-span-3 pt-2 border-t border-border/40">
+              <PhotoUploadWidget
+                label="Registering Officer Profile Image"
+                value={officerPhoto}
+                onChange={setOfficerPhoto}
+              />
             </div>
           </CardContent>
         </Card>
@@ -464,8 +526,8 @@ function NewCasePage() {
                   <Input placeholder="Victim Full Name" value={victim.name} onChange={e => handleUpdateVictim(idx, "name", e.target.value)} className="bg-paper border-border" required />
                 </div>
                 <div className="w-20 flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age</label>
-                  <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" />
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                  <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
                 </div>
                 <div className="w-24 flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
@@ -484,6 +546,11 @@ function NewCasePage() {
                     <option value="Fatal">Fatal</option>
                   </select>
                 </div>
+                <PhotoUploadWidget
+                  label="Victim Photo"
+                  value={victim.photo}
+                  onChange={(base64) => handleUpdateVictim(idx, "photo", base64)}
+                />
                 <div className="flex items-center gap-2 h-9 px-2 pb-1">
                   <input
                     type="checkbox"
@@ -564,28 +631,28 @@ function NewCasePage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occurrence Location</label>
-              <Input value={occurrencePlace} onChange={e => setOccurrencePlace(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occurrence Location *</label>
+              <Input value={occurrencePlace} onChange={e => setOccurrencePlace(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident From (IncidentFromDate)</label>
-              <Input type="datetime-local" value={incidentFromDate} onChange={e => setIncidentFromDate(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident From (IncidentFromDate) *</label>
+              <Input type="datetime-local" value={incidentFromDate} onChange={e => setIncidentFromDate(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident To (IncidentToDate)</label>
-              <Input type="datetime-local" value={incidentToDate} onChange={e => setIncidentToDate(e.target.value)} className="bg-surface-2 border-border" />
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident To (IncidentToDate) *</label>
+              <Input type="datetime-local" value={incidentToDate} onChange={e => setIncidentToDate(e.target.value)} className="bg-surface-2 border-border" required />
             </div>
 
             <div className="flex gap-2">
               <div className="flex-1 flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Latitude</label>
-                <Input type="number" step="0.0001" value={lat} onChange={e => setLat(e.target.value)} className="bg-surface-2 border-border" />
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Latitude *</label>
+                <Input type="number" step="0.0001" value={lat} onChange={e => setLat(e.target.value)} className="bg-surface-2 border-border" required />
               </div>
               <div className="flex-1 flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Longitude</label>
-                <Input type="number" step="0.0001" value={lng} onChange={e => setLng(e.target.value)} className="bg-surface-2 border-border" />
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Longitude *</label>
+                <Input type="number" step="0.0001" value={lng} onChange={e => setLng(e.target.value)} className="bg-surface-2 border-border" required />
               </div>
             </div>
 
@@ -629,8 +696,8 @@ function NewCasePage() {
                     <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-surface-2 border-border" required />
                   </div>
                   <div className="w-20 flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age</label>
-                    <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-surface-2 border-border" />
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                    <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-surface-2 border-border" required />
                   </div>
                   <div className="w-24 flex flex-col gap-1">
                     <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
@@ -640,6 +707,11 @@ function NewCasePage() {
                       <option value="T">Transgender</option>
                     </select>
                   </div>
+                  <PhotoUploadWidget
+                    label="Mugshot"
+                    value={acc.photo}
+                    onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
+                  />
                   <div className="w-36 flex flex-col gap-1">
                     <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
                     <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-surface-2 px-2 py-1.5 rounded-md text-xs">
@@ -740,7 +812,17 @@ function NewCasePage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 <div><span className="text-muted-foreground">District:</span> <p className="font-semibold text-foreground">{selectedDistrictObj.name}</p></div>
                 <div><span className="text-muted-foreground">Police Station:</span> <p className="font-semibold text-foreground">{policeStation}</p></div>
-                <div><span className="text-muted-foreground">Investigating Officer:</span> <p className="font-semibold text-foreground">{registeringOfficer}</p></div>
+                <div>
+                  <span className="text-muted-foreground">Investigating Officer:</span>
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground mt-0.5">
+                    {officerPhoto ? (
+                      <img src={officerPhoto} alt="Officer" className="h-5 w-5 rounded-full object-cover border border-signal/20 shadow-sm shrink-0" />
+                    ) : (
+                      <div className="h-5 w-5 rounded-full bg-border flex items-center justify-center text-[7px] font-bold text-muted-foreground shrink-0">IO</div>
+                    )}
+                    <span>{registeringOfficer}</span>
+                  </div>
+                </div>
                 <div><span className="text-muted-foreground">Officer Rank:</span> <p className="font-semibold text-foreground">{officerRank}</p></div>
                 <div><span className="text-muted-foreground">Hearing Court:</span> <p className="font-semibold text-foreground">{courtName}</p></div>
                 <div><span className="text-muted-foreground">Info Received PS:</span> <p className="font-semibold text-foreground">{new Date(infoReceivedPSDate).toLocaleString()}</p></div>
@@ -758,9 +840,16 @@ function NewCasePage() {
               <div className="space-y-1.5">
                 {victims.map((v, i) => (
                   <div key={i} className="flex justify-between items-center p-2 rounded bg-paper border border-border/40 text-xs">
-                    <div>
-                      <span className="font-bold text-foreground">Victim #{i + 1}: {v.name}</span>
-                      <span className="text-muted-foreground ml-2">({v.age} yrs, {v.gender})</span>
+                    <div className="flex items-center gap-2">
+                      {v.photo ? (
+                        <img src={v.photo} alt="Victim" className="h-6 w-6 rounded-full object-cover border border-border shrink-0" />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full bg-border flex items-center justify-center text-[7px] font-bold text-muted-foreground shrink-0">VIC</div>
+                      )}
+                      <div>
+                        <span className="font-bold text-foreground">Victim #{i + 1}: {v.name}</span>
+                        <span className="text-muted-foreground ml-2">({v.age} yrs, {v.gender})</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {v.isPolice && <Badge variant="outline" className="text-[9px] border-signal text-signal">Police Duty</Badge>}
@@ -801,7 +890,14 @@ function NewCasePage() {
                   <div className="space-y-1 pt-1">
                     {accused.map((a, i) => (
                       <div key={i} className="text-[11px] font-medium text-foreground bg-paper p-1.5 rounded border border-border/40 flex justify-between items-center">
-                        <span>Accused #{i + 1}: {a.name} ({a.age} yrs, {a.gender})</span>
+                        <div className="flex items-center gap-2">
+                          {a.photo ? (
+                            <img src={a.photo} alt="Accused" className="h-6 w-6 rounded object-cover border border-border shrink-0" />
+                          ) : (
+                            <div className="h-6 w-6 rounded bg-border flex items-center justify-center text-[7px] font-bold text-muted-foreground shrink-0">MUG</div>
+                          )}
+                          <span>Accused #{i + 1}: {a.name} ({a.age} yrs, {a.gender})</span>
+                        </div>
                         <Badge variant={a.arrested ? "default" : "outline"} className="text-[9px]">
                           {a.arrested ? `Arrested (${a.arrestDistrict})` : "Wanted / At Large"}
                         </Badge>

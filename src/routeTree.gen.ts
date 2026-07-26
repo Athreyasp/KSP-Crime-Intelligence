@@ -16,7 +16,6 @@ import { Route as NetworkRouteImport } from './routes/network'
 import { Route as OffendersRouteImport } from './routes/offenders'
 import { Route as PredictiveRouteImport } from './routes/predictive'
 import { Route as SociologicalRouteImport } from './routes/sociological'
-import { Route as ZohoConsoleRouteImport } from './routes/zoho-console'
 import { Route as CasesIndexRouteImport } from './routes/cases.index'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as CasesNewRouteImport } from './routes/cases.new'
@@ -56,11 +55,6 @@ const SociologicalRoute = SociologicalRouteImport.update({
   path: '/sociological',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ZohoConsoleRoute = ZohoConsoleRouteImport.update({
-  id: '/zoho-console',
-  path: '/zoho-console',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CasesIndexRoute = CasesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/offenders': typeof OffendersRoute
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
-  '/zoho-console': typeof ZohoConsoleRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
   '/cases/new': typeof CasesNewRoute
   '/cases/': typeof CasesIndexRoute
@@ -97,7 +90,6 @@ export interface FileRoutesByTo {
   '/offenders': typeof OffendersRoute
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
-  '/zoho-console': typeof ZohoConsoleRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
   '/cases/new': typeof CasesNewRoute
   '/cases': typeof CasesIndexRoute
@@ -111,7 +103,6 @@ export interface FileRoutesById {
   '/offenders': typeof OffendersRoute
   '/predictive': typeof PredictiveRoute
   '/sociological': typeof SociologicalRoute
-  '/zoho-console': typeof ZohoConsoleRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
   '/cases/new': typeof CasesNewRoute
   '/cases/': typeof CasesIndexRoute
@@ -126,7 +117,6 @@ export interface FileRouteTypes {
     | '/offenders'
     | '/predictive'
     | '/sociological'
-    | '/zoho-console'
     | '/cases/$caseId'
     | '/cases/new'
     | '/cases/'
@@ -138,7 +128,6 @@ export interface FileRouteTypes {
     | '/offenders'
     | '/predictive'
     | '/sociological'
-    | '/zoho-console'
     | '/cases/$caseId'
     | '/cases/new'
     | '/cases'
@@ -151,7 +140,6 @@ export interface FileRouteTypes {
     | '/offenders'
     | '/predictive'
     | '/sociological'
-    | '/zoho-console'
     | '/cases/$caseId'
     | '/cases/new'
     | '/cases/'
@@ -165,7 +153,6 @@ export interface RootRouteChildren {
   OffendersRoute: typeof OffendersRoute
   PredictiveRoute: typeof PredictiveRoute
   SociologicalRoute: typeof SociologicalRoute
-  ZohoConsoleRoute: typeof ZohoConsoleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -219,13 +206,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SociologicalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/zoho-console': {
-      id: '/zoho-console'
-      path: '/zoho-console'
-      fullPath: '/zoho-console'
-      preLoaderRoute: typeof ZohoConsoleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/cases/': {
       id: '/cases/'
       path: '/'
@@ -272,7 +252,6 @@ const rootRouteChildren: RootRouteChildren = {
   OffendersRoute: OffendersRoute,
   PredictiveRoute: PredictiveRoute,
   SociologicalRoute: SociologicalRoute,
-  ZohoConsoleRoute: ZohoConsoleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
