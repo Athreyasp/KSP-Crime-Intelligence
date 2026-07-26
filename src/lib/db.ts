@@ -3,6 +3,9 @@ import { type RichNode, type RichEdge, type EntityType, type RelationType } from
 export type CrimeHead = (typeof CRIME_HEADS)[number];
 import { fetchLiveCases, insertLiveCase, clearLiveCases, seedLiveCases, updateLiveCase } from "./catalyst-api";
 
+// Shared API base — mirrors catalyst-api.ts so db.ts can also call Catalyst directly
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+
 
 function initCases(): Case[] {
   return [...SEED_CASES];
@@ -156,7 +159,7 @@ export async function recordAccusedArrest(caseMasterId: number, accusedName: str
   saveCases(updated);
 
   // Sync to remote Zoho Catalyst datastore
-  const res = await fetch("/server/api/cases", {
+  const res = await fetch(`${API_BASE}/server/api/cases`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ caseMasterId, accusedName, arrestDate, districtId })
@@ -188,7 +191,7 @@ export async function syncWithCatalyst() {
     if (liveCases && Array.isArray(liveCases) && liveCases.length > 0) {
       isCatalystSynced = true;
       catalystSyncCount = liveCases.length;
-      
+
       const localCases = loadedCases;
       const mergedCases = liveCases.map(liveCase => {
         const localCase = localCases.find(lc => lc.caseMasterId === liveCase.caseMasterId || lc.crimeNo === liveCase.crimeNo || String(lc.caseMasterId) === String(liveCase.caseMasterId));
@@ -232,9 +235,18 @@ export async function syncWithCatalyst() {
       });
 
       saveCases(mergedCases);
+    } else {
+      // API returned empty — use mock seed data so dashboard is never blank
+      if (loadedCases.length === 0) {
+        saveCases([...SEED_CASES]);
+      }
     }
   } catch (err: any) {
-    console.warn("Catalyst sync paused or waiting for API gateway configuration:", err?.message || err);
+    console.warn("Catalyst sync failed, falling back to mock seed data:", err?.message || err);
+    // Fall back to deterministic mock data so dashboard always shows something
+    if (loadedCases.length === 0) {
+      saveCases([...SEED_CASES]);
+    }
   }
 }
 
