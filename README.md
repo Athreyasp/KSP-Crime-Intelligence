@@ -4,7 +4,7 @@ An advanced, premium analytics dashboard and dossier management platform built f
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 ### 1. Unified Crime Intelligence Dashboard
 * **Real-time KPI Metrics**: High-level visual summaries tracking total FIRs, heinous crime share, active investigations, charge-sheeted clearances, and custody arrests.
@@ -39,7 +39,7 @@ An advanced, premium analytics dashboard and dossier management platform built f
 
 ---
 
-## 📦 Setup and Installation Instructions
+##  Setup and Installation Instructions
 
 ### Prerequisites
 * **Node.js** (v18.0.0 or higher) or **Bun** (v1.0 or higher)
@@ -49,8 +49,8 @@ An advanced, premium analytics dashboard and dossier management platform built f
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/Athreyasp/KSP---Crime-Intelligence.git
-   cd KSP---Crime-Intelligence
+   git clone https://github.com/Athreyasp/KSP-Crime-Intelligence.git
+   cd KSP-Crime-Intelligence
    ```
 
 2. **Install Frontend Dependencies**
