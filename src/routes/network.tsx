@@ -343,7 +343,7 @@ export function NetworkPage() {
 
                 {/* NODES */}
                 {svgNodes.map(n => {
-                  const t = TYPE_META[n.type as EntityType];
+                  const typeMeta = TYPE_META[n.type as EntityType];
                   const r = n.type === "accused" ? 15 : n.type === "case" ? 11 : 9;
                   const isSelected = selected === n.id;
                   const isConnected = connectedNeighborIds.has(n.id);
@@ -364,17 +364,17 @@ export function NetworkPage() {
                     >
                       {/* Node Halo */}
                       {isSelected && (
-                        <circle r={r + 8} fill={t.color} opacity={0.2} />
+                        <circle r={r + 8} fill={typeMeta.color} opacity={0.2} />
                       )}
 
                       {/* Node Shape */}
                       {n.type === "accused" ? (
                         <g>
-                          <circle r={r + 2} fill="#ffffff" stroke={t.color} strokeWidth={isSelected ? 3 : 2} />
-                          <circle r={r - 3} fill={t.color} />
+                          <circle r={r + 2} fill="#ffffff" stroke={typeMeta.color} strokeWidth={isSelected ? 3 : 2} />
+                          <circle r={r - 3} fill={typeMeta.color} />
                         </g>
                       ) : (
-                        <circle r={r} fill={t.color} stroke="#ffffff" strokeWidth={2} />
+                        <circle r={r} fill={typeMeta.color} stroke="#ffffff" strokeWidth={2} />
                       )}
 
                       {/* Clean Label */}
