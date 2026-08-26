@@ -12,21 +12,20 @@ import { useLanguage } from "@/hooks/use-language";
 
 type NavItem = { 
   title: string; 
-  translationKey: "navOverview" | "navHotspots" | "navNetwork" | "navOffenders" | "navPredictive" | "navSociological" | "navCases" | "navNewFir"; 
   url: string; 
   icon: typeof MapPin; 
   badge?: string 
 };
 
 const ITEMS: NavItem[] = [
-  { title: "Overview",     translationKey: "navOverview",     url: "/",             icon: LayoutDashboard },
-  { title: "Hotspots",     translationKey: "navHotspots",     url: "/hotspots",     icon: MapPin },
-  { title: "Network",      translationKey: "navNetwork",      url: "/network",      icon: Network },
-  { title: "Offenders",    translationKey: "navOffenders",    url: "/offenders",    icon: UserSearch },
-  { title: "Predictive",   translationKey: "navPredictive",   url: "/predictive",   icon: Brain },
-  { title: "Sociological", translationKey: "navSociological", url: "/sociological", icon: LineChart },
-  { title: "Cases",        translationKey: "navCases",        url: "/cases",        icon: FolderSearch },
-  { title: "New FIR",      translationKey: "navNewFir",      url: "/cases/new",    icon: Plus },
+  { title: "Overview",     url: "/",             icon: LayoutDashboard },
+  { title: "Hotspots",     url: "/hotspots",     icon: MapPin },
+  { title: "Network",      url: "/network",      icon: Network },
+  { title: "Offenders",    url: "/offenders",    icon: UserSearch },
+  { title: "Predictive",   url: "/predictive",   icon: Brain },
+  { title: "Sociological", url: "/sociological", icon: LineChart },
+  { title: "Cases",        url: "/cases",        icon: FolderSearch },
+  { title: "New FIR",      url: "/cases/new",    icon: Plus },
 ];
 
 export function AppSidebar() {
@@ -75,7 +74,7 @@ export function AppSidebar() {
           <div className="mx-4 mb-2 flex items-center gap-2">
             <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-ink/20 to-transparent" />
             <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink/50">
-              {t("navigationRegistry")}
+              {t("Navigation Registry")}
             </span>
             <div className="h-[1px] w-8 bg-signal" />
           </div>
@@ -92,7 +91,7 @@ export function AppSidebar() {
               <Link
                 key={item.url}
                 to={item.url}
-                title={collapsed ? t(item.translationKey) : undefined}
+                title={collapsed ? t(item.title) : undefined}
                 className={cn(
                   "group relative flex items-center gap-3 rounded-lg text-[13px] transition-all duration-300 font-medium",
                   collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
@@ -133,7 +132,7 @@ export function AppSidebar() {
                 {!collapsed && (
                   <>
                     <span className={cn("truncate flex-1 tracking-wide", active && "font-bold text-ink")}>
-                      {t(item.translationKey)}
+                      {t(item.title)}
                     </span>
                     {item.badge && (
                       <span className="rounded border border-red-500/30 bg-red-50 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-red-600">
