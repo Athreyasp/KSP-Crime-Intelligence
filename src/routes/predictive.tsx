@@ -463,7 +463,7 @@ function Predictive() {
                     <div className="py-12 px-4 text-center border border-dashed border-border rounded-md text-xs text-muted-foreground bg-surface-2">
                       <ShieldAlert className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
                       {language === "kn" ? (
-                        <>Strong>{t(selectedDistrictName)}</strong> ನಲ್ಲಿ ಯಾವುದೇ ಸಕ್ರಿಯ ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿಲ್ಲ.</>
+                        <strong>{t(selectedDistrictName)}</strong> ನಲ್ಲಿ ಯಾವುದೇ ಸಕ್ರಿಯ ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿಲ್ಲ.
                       ) : (
                         <>No active cases found registered for <strong>{t(selectedDistrictName)}</strong>.</>
                       )}
