@@ -216,14 +216,14 @@ export function Topbar() {
 
   const getTranslatedCrumb = (path: string): string => {
     switch (path) {
-      case "/": return t("navOverview");
-      case "/hotspots": return t("navHotspots");
-      case "/network": return t("navNetwork");
-      case "/offenders": return t("navOffenders");
-      case "/predictive": return t("navPredictive");
-      case "/sociological": return t("navSociological");
-      case "/cases": return t("navCases");
-      default: return label.crumb;
+      case "/": return t("Overview");
+      case "/hotspots": return t("Hotspots");
+      case "/network": return t("Network");
+      case "/offenders": return t("Offenders");
+      case "/predictive": return t("Predictive");
+      case "/sociological": return t("Sociological");
+      case "/cases": return t("Cases");
+      default: return t(label.crumb);
     }
   };
 
@@ -251,7 +251,7 @@ export function Topbar() {
               {getTranslatedCrumb(key)}
             </span>
             <span className="font-mono text-[9.5px] uppercase tracking-[0.28em] text-muted-foreground">
-              / {label.kicker}
+              / {t(label.kicker)}
             </span>
           </div>
 
@@ -266,7 +266,7 @@ export function Topbar() {
             <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-ink text-paper">
               <Search className="h-3 w-3" strokeWidth={2.5} />
             </span>
-            <span className="hidden sm:inline text-ink/70 group-hover:text-ink">{t("searchPlaceholder")}</span>
+            <span className="hidden sm:inline text-ink/70 group-hover:text-ink">{t("Search FIR, offender, district...")}</span>
             <span className="sm:hidden text-ink/70">Search…</span>
             <kbd className="ml-auto hidden sm:inline-flex items-center gap-0.5 rounded-sm border border-ink/30 bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-ink">
               {isMac ? <CmdIcon className="h-3 w-3" /> : "Ctrl"}<span>K</span>
