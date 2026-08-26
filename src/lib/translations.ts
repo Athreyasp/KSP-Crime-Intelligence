@@ -1,73 +1,280 @@
+export const districtTranslations: Record<string, string> = {
+  "Bengaluru Urban": "ಬೆಂಗಳೂರು ನಗರ",
+  "Bengaluru Rural": "ಬೆಂಗಳೂರು ಗ್ರಾಮಾಂತರ",
+  "Mysuru": "ಮೈಸೂರು",
+  "Mangaluru": "ಮಂಗಳೂರು",
+  "Hubballi-Dharwad": "ಹುಬ್ಬಳ್ಳಿ-ಧಾರವಾಡ",
+  "Belagavi": "ಬೆಳಗಾವಿ",
+  "Kalaburagi": "ಕಲಬುರಗಿ",
+  "Ballari": "ಬಳ್ಳಾರಿ",
+  "Vijayapura": "ವಿಜಯಪುರ",
+  "Tumakuru": "ತುಮಕೂರು",
+  "Shivamogga": "ಶಿವಮೊಗ್ಗ",
+  "Udupi": "ಉಡುಪಿ",
+  "Davanagere": "ದಾವಣಗೆರೆ",
+  "Raichur": "ರಾಯಚೂರು",
+  "Hassan": "ಹಾಸನ",
+  "Mandya": "ಮಂಡ್ಯ",
+  "Chikkamagaluru": "ಚಿಕ್ಕಮಗಳೂರು",
+  "Kodagu": "ಕೊಡಗು",
+  "Bidar": "ಬೀದರ್",
+  "Kolar": "ಕೋಲಾರ",
+  "Bagalkote": "ಬಾಗಲಕೋಟೆ",
+  "Chamarajanagara": "ಚಾಮರಾಜನಗರ",
+  "Chikkaballapura": "ಚಿಕ್ಕಬಳ್ಳಾಪುರ",
+  "Chitradurga": "ಚಿತ್ರದುರ್ಗ",
+  "Gadag": "ಗದಗ",
+  "Haveri": "ಹಾವೇರಿ",
+  "Koppal": "ಕೊಪ್ಪಳ",
+  "Ramanagara": "ರಾಮನಗರ",
+  "Uttara Kannada": "ಉತ್ತರ ಕನ್ನಡ",
+  "Yadgir": "ಯಾದಗಿರಿ",
+  "Vijayanagara": "ವಿಜಯನಗರ",
+};
+
+export const crimeHeadTranslations: Record<string, string> = {
+  "Crimes Against Body": "ದೇಹದ ವಿರುದ್ಧದ ಅಪರಾಧಗಳು",
+  "Crimes Against Property": "ಆಸ್ತಿ ವಿರುದ್ಧದ ಅಪರಾಧಗಳು",
+  "Crimes Against Women": "ಮಹಿಳೆಯರ ವಿರುದ್ಧದ ಅಪರಾಧಗಳು",
+  "Cyber Crimes": "ಸೈಬರ್ ಅಪರಾಧಗಳು",
+  "Economic Offences": "ಆರ್ಥಿಕ ಅಪರಾಧಗಳು",
+  "Narcotics": "ಮಾದಕ ದ್ರವ್ಯಗಳು",
+  "Public Order": "ಸಾರ್ವಜನಿಕ ಶಾಂತಿ ಮತ್ತು ಸುವ್ಯವಸ್ಥೆ",
+};
+
 export const translations = {
-  en: {
-    // Navigation items
-    navOverview: "Overview",
-    navHotspots: "Hotspots",
-    navNetwork: "Network",
-    navOffenders: "Offenders",
-    navPredictive: "Predictive",
-    navSociological: "Sociological",
-    navCases: "Cases",
-    navNewFir: "New FIR",
-
-    // Navigation Subtitle (Sidebar)
-    navigationRegistry: "Navigation Registry",
-
-    // Header
-    mastheadTitle: "The Karnataka Crime Daily.",
-    mastheadSub: "Strategic intelligence brief",
-    activeDistricts: "districts",
-    crimeHeads: "crime heads",
-    rolling30Days: "rolling 30-day window",
-    realtimeAnomaly: "real-time anomaly channel",
-    tagline: "Read the state, then the street.",
-    syncConsole: "Sync Live Console",
-    syncing: "Syncing Zoho Tables...",
-
-    // KPI Row
-    totalFirs: "Total FIRs",
-    heinousShare: "Heinous Share",
-    arrests: "Arrests",
-    chargeSheeted: "Charge-sheeted",
-
-    // UI Buttons and Search
-    searchPlaceholder: "Search FIR, offender, district...",
-  },
+  en: {} as Record<string, string>,
   kn: {
-    // Navigation items
-    navOverview: "ಅವಲೋಕನ",
-    navHotspots: "ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳು",
-    navNetwork: "ನೆಟ್‌ವರ್ಕ್",
-    navOffenders: "ಅಪರಾಧಿಗಳು",
-    navPredictive: "ಮುನ್ಸೂಚನೆ ಬುದ್ಧಿಮತ್ತೆ",
-    navSociological: "ಸಾಮಾಜಿಕ ಸಂಬಂಧ",
-    navCases: "ಪ್ರಕರಣಗಳು",
-    navNewFir: "ಹೊಸ ಎಫ್‌ಐಆರ್",
+    // Navigation / Sidebar
+    "Overview": "ಅವಲೋಕನ",
+    "Hotspots": "ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳು",
+    "Network": "ನೆಟ್‌ವರ್ಕ್",
+    "Offenders": "ಅಪರಾಧಿಗಳು",
+    "Predictive": "ಮುನ್ಸೂಚನೆ ಬುದ್ಧಿಮತ್ತೆ",
+    "Sociological": "ಸಾಮಾಜಿಕ ಸಂಬಂಧ",
+    "Cases": "ಪ್ರಕರಣಗಳು",
+    "New FIR": "ಹೊಸ ಎಫ್‌ಐಆರ್",
+    "Navigation Registry": "ನಾವಿಗೇಷನ್ ರಿಜಿಸ್ಟ್ರಿ",
 
-    // Navigation Subtitle (Sidebar)
-    navigationRegistry: "ನಾವಿಗೇಷನ್ ರಿಜಿಸ್ಟ್ರಿ",
+    // General Layout / Header
+    "The Karnataka Crime Daily.": "ಕರ್ನಾಟಕ ಅಪರಾಧ ದೈನಿಕ.",
+    "Strategic intelligence brief": "ಕಾರ್ಯತಂತ್ರದ ಬುದ್ಧಿಮತ್ತೆ ಸಂಕ್ಷಿಪ್ತ ಮಾಹಿತಿ",
+    "districts": "ಜಿಲ್ಲೆಗಳು",
+    "crime heads": "ಅಪರಾಧ ವಿಭಾಗಗಳು",
+    "rolling 30-day window": "ಚಲಿಸುವ 30-ದಿನಗಳ ಅವಧಿ",
+    "realtime anomaly channel": "ನೈಜ-ಸಮಯದ ಅಸಂಗತತೆ ಚಾನಲ್",
+    "Read the state, then the street.": "ರಾಜ್ಯವನ್ನು ಓದಿ, ನಂತರ ಬೀದಿಯನ್ನು ತಿಳಿಯಿರಿ.",
+    "Sync Live Console": "ಲೈವ್ ಕನ್ಸೋಲ್ ಸಿಂಕ್ ಮಾಡಿ",
+    "Syncing Zoho Tables...": "ಜೋಹೋ ಟೇಬಲ್ಸ್ ಸಿಂಕ್ ಆಗುತ್ತಿದೆ...",
+    "Search FIR, offender, district...": "ಎಫ್‌ಐಆರ್, ಅಪರಾಧಿ, ಜಿಲ್ಲೆಯನ್ನು ಹುಡುಕಿ...",
+    "Live Alerts Feed": "ಲೈವ್ ಎಚ್ಚರಿಕೆಗಳ ಫೀಡ್",
+    "Active": "ಸಕ್ರಿಯ",
+    "SCRB · SECURE SYSTEM": "ಎಸ್‌ಸಿಆರ್‌ಬಿ · ಸುರಕ್ಷಿತ ವ್ಯವಸ್ಥೆ",
 
-    // Header
-    mastheadTitle: "ಕರ್ನಾಟಕ ಅಪರಾಧ ದೈನಿಕ.",
-    mastheadSub: "ಕಾರ್ಯತಂತ್ರದ ಬುದ್ಧಿಮತ್ತೆ ಸಂಕ್ಷಿಪ್ತ ಮಾಹಿತಿ",
-    activeDistricts: "ಜಿಲ್ಲೆಗಳು",
-    crimeHeads: "ಅಪರಾಧ ವಿಭಾಗಗಳು",
-    rolling30Days: "ಚಲಿಸುವ 30-ದಿನಗಳ ಅವಧಿ",
-    realtimeAnomaly: "ನೈಜ-ಸಮಯದ ಅಸಂಗತತೆ ಚಾನಲ್",
-    tagline: "ರಾಜ್ಯವನ್ನು ಓದಿ, ನಂತರ ಬೀದಿಯನ್ನು ತಿಳಿಯಿರಿ.",
-    syncConsole: "ಲೈವ್ ಕನ್ಸೋಲ್ ಸಿಂಕ್ ಮಾಡಿ",
-    syncing: "ಜೋಹೋ ಟೇಬಲ್ಸ್ ಸಿಂಕ್ ಆಗುತ್ತಿದೆ...",
+    // KPI Rows
+    "Total FIRs": "ಒಟ್ಟು ಎಫ್‌ಐಆರ್‌ಗಳು",
+    "Heinous Share": "ಹೇಯ ಕೃತ್ಯಗಳ ಪಾಲು",
+    "Arrests": "ಬಂಧನಗಳು",
+    "Charge-sheeted": "ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ ಸಲ್ಲಿಕೆ",
 
-    // KPI Row
-    totalFirs: "ಒಟ್ಟು ಎಫ್‌ಐಆರ್‌ಗಳು",
-    heinousShare: "ಹೇಯ ಕೃತ್ಯಗಳ ಪಾಲು",
-    arrests: "ಬಂಧನಗಳು",
-    chargeSheeted: "ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ ಸಲ್ಲಿಕೆ",
+    // Overview Page
+    "Spatial Cartogram": "ಪ್ರಾದೇಶಿಕ ಕಾರ್ಟೋಗ್ರಾಮ್",
+    "Tap a district hex to interrogate the record": "ದಾಖಲೆಯನ್ನು ಪರಿಶೀಲಿಸಲು ಜಿಲ್ಲೆಯ ಹೆಕ್ಸ್ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ",
+    "Selected": "ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+    "CRITICAL THREAT ZONE": "ಅಪಾಯಕಾರಿ ವಲಯ",
+    "Threat index at": "ಅಪಾಯ ಸೂಚ್ಯಂಕ",
+    "MAX RATE ACCELERATION": "ಗರಿಷ್ಠ ಪ್ರಮಾಣದ ವೇಗೋತ್ಕರ್ಷ",
+    "Volume delta:": "ಪ್ರಮಾಣದ ವ್ಯತ್ಯಾಸ:",
+    "vs baseline": "ಬೇಸ್‌ಲೈನ್‌ಗೆ ಹೋಲಿಸಿದರೆ",
+    "SPIKE DENSITY MONITOR": "ಸ್ಪೈಕ್ ಸಾಂದ್ರತೆಯ ಮಾನಿಟರ್",
+    "Districts Spiking": "ಜಿಲ್ಲೆಗಳಲ್ಲಿ ಏರಿಕೆ",
+    "Exceeding standard": "ನಿಗದಿತ ಮಿತಿಗಿಂತ ಹೆಚ್ಚು",
+    "threshold alert": "ಮಿತಿ ಎಚ್ಚರಿಕೆ",
+    "DISTRICT DOSSIER": "ಜಿಲ್ಲೆಯ ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ",
+    "FIRs": "ಎಫ್‌ಐಆರ್‌ಗಳು",
+    "Heinous": "ಹೇಯ ಕೃತ್ಯ",
+    "Non-Heinous": "ಹೇಯವಲ್ಲದ ಕೃತ್ಯ",
+    "Risk score": "ಅಪಾಯದ ಅಂಕ",
+    "Drill into hotspots →": "ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ →",
+    "ANOMALY BULLETIN": "ಅಸಂಗತತೆ ಬುಲೆಟಿನ್",
+    "CRIT": "ಅಪಾಯಕಾರಿ",
+    "30-Day Registration Trend": "30-ದಿನಗಳ ನೋಂದಣಿ ಪ್ರವೃತ್ತಿ",
+    "By Crime Head": "ಅಪರಾಧ ವಿಭಾಗದ ಪ್ರಕಾರ",
+    "Clearance": "ಪ್ರಕರಣ ಇತ್ಯರ್ಥ",
+    "Recent FIR Filings & Profile Registry": "ಇತ್ತೀಚಿನ ಎಫ್‌ಐಆರ್ ದಾಖಲಾತಿಗಳು",
+    "FIR VOLUME": "ಅಪರಾಧ ಪ್ರಮಾಣ",
+    "LOW": "ಕಡಿಮೆ",
+    "HIGH": "ಹೆಚ್ಚು",
+    "Click to Interrogate": "ವಿಚಾರಣೆಗೆ ಕ್ಲಿಕ್ ಮಾಡಿ",
+    "Click to Interrogate sus": "ವಿಚಾರಣೆಗೆ ಕ್ಲಿಕ್ ಮಾಡಿ",
 
-    // UI Buttons and Search
-    searchPlaceholder: "ಎಫ್‌ಐಆರ್, ಅಪರಾಧಿ, ಜಿಲ್ಲೆಯನ್ನು ಹುಡುಕಿ...",
+    // Hotspots Page
+    "District Spatial Analytics": "ಜಿಲ್ಲಾ ಪ್ರಾದೇಶಿಕ ವಿಶ್ಲೇಷಣೆ",
+    "Interactive hot spot localization and station density mapping": "ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳು ಮತ್ತು ಪೊಲೀಸ್ ಠಾಣೆಗಳ ನಕ್ಷೆ",
+    "Options": "ಆಯ್ಕೆಗಳು",
+    "Heatmap": "ಹೀಟ್‌ಮ್ಯಾಪ್",
+    "Districts": "ಜಿಲ್ಲೆಗಳು",
+    "Stations": "ಠಾಣೆಗಳು",
+    "CRIME DENSITY": "ಅಪರಾಧ ಸಾಂದ್ರತೆ",
+    "STATION DENSITY": "ಠಾಣೆಗಳ ಸಾಂದ್ರತೆ",
+    "STATION COUNT": "ಠಾಣೆಗಳ ಸಂಖ್ಯೆ",
+    "TOTAL OFFENSES": "ಒಟ್ಟು ಅಪರಾಧಗಳು",
+    "SPIKE PERCENT": "ಏರಿಕೆ ಪ್ರಮಾಣ",
+    "HOTSPOT LEVEL": "ಹಾಟ್‌ಸ್ಪಾಟ್ ಮಟ್ಟ",
+    "CRITICAL": "ಅಪಾಯಕಾರಿ",
+    "Station-level Heatmap": "ಠಾಣಾ ಮಟ್ಟದ ಹೀಟ್‌ಮ್ಯಾಪ್",
+    "Crime Hotspot Distribution Map": "ಅಪರಾಧ ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳ ವಿತರಣಾ ನಕ್ಷೆ",
+    "District Metrics & Spatial Coverage": "ಜಿಲ್ಲಾ ಅಂಕಿಅಂಶಗಳು ಮತ್ತು ಪ್ರಾದೇಶಿಕ ವ್ಯಾಪ್ತಿ",
+    "Search Stations...": "ಠಾಣೆಗಳನ್ನು ಹುಡುಕಿ...",
+    "Stations in": "ಠಾಣೆಗಳು",
+
+    // Predictive Page
+    "AI Risk Forecast": "ಕೃತಕ ಬುದ್ಧಿಮತ್ತೆ ಅಪಾಯ ಮುನ್ಸೂಚನೆ",
+    "AI-driven risk scoring, anomaly detection and crime forecasting": "ಅಪಾಯದ ಅಂಕ, ಅಸಂಗತತೆ ಪತ್ತೆ ಮತ್ತು ಅಪರಾಧ ಮುನ್ಸೂಚನೆ",
+    "Syndicate AI Reconstruction": "ಅಪರಾಧ ಕೂಟಗಳ ಮರುನಿರ್ಮಾಣ",
+    "Operating Hours": "ಕಾರ್ಯಾಚರಣೆಯ ಸಮಯ",
+    "Hideout Location": "ಅಡಗುದಾಣ",
+    "Running Syndicate Analysis...": "ಅಪರಾಧ ಕೂಟದ ವಿಶ್ಲೇಷಣೆ ನಡೆಯುತ್ತಿದೆ...",
+    "Analyze Linkage": "ಸಂಪರ್ಕ ವಿಶ್ಲೇಷಿಸಿ",
+    "Temporal Similarity": "ಸಮಯದ ಸಾಮ್ಯತೆ",
+    "Spatial Overlap": "ಪ್ರಾದೇಶಿಕ ಸಾಮ್ಯತೆ",
+    "Behavioral Signature": "ವರ್ತನೆಯ ಸಾಮ್ಯತೆ",
+    "Suspect Name": "ಶಂಕಿತನ ಹೆಸರು",
+    "Match Score": "ಹೊಂದಾಣಿಕೆಯ ಅಂಕ",
+    "Traits": "ಲಕ್ಷಣಗಳು",
+    "Active district history": "ಸಕ್ರಿಯ ಜಿಲ್ಲಾ ಇತಿಹಾಸ",
+    "Known gang associate": "ತಿಳಿದಿರುವ ಗ್ಯಾಂಗ್ ಸದಸ್ಯ",
+    "History of similar offenses": "ಇದೇ ರೀತಿಯ ಅಪರಾಧಗಳ ಇತಿಹಾಸ",
+    "Spatiotemporal overlap": "ಸ್ಪೇಸಿಯೋಟೆಂಪರಲ್ ಓವರ್‌ಲ್ಯಾಪ್",
+    "FORECAST ENGINE ACTIVE": "ಮುನ್ಸೂಚನೆ ಎಂಜಿನ್ ಸಕ್ರಿಯ",
+    "HIGH RISK ZONES": "ಹೆಚ್ಚು ಅಪಾಯದ ವಲಯಗಳು",
+    "SPATIOTEMPORAL ANOMALIES": "ಪ್ರಾದೇಶಿಕ ಮತ್ತು ಕಾಲಿಕ ಅಸಂಗತತೆಗಳು",
+    "Threat Level": "ಅಪಾಯದ ಮಟ್ಟ",
+    "Confidence": "ವಿಶ್ವಾಸಾರ್ಹತೆ",
+    "Linkage Matrix & GNN Cluster": "ಲಿಂಕೇಜ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ ಮತ್ತು ಜಿಎನ್‌ಎನ್ ಕ್ಲಸ್ಟರ್",
+    "Select at least two cases to execute spatiotemporal graph convolutions.": "ಪ್ರಾದೇಶಿಕ ಗ್ರಾಫ್ ಕನ್ವಲ್ಯೂಷನ್ಗಳನ್ನು ಕಾರ್ಯಗತಗೊಳಿಸಲು ಕನಿಷ್ಠ ಎರಡು ಪ್ರಕರಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "Target Candidate Profile Reconstructed": "ಶಂಕಿತ ಅಭ್ಯರ್ಥಿಯ ಪ್ರೊಫೈಲ್ ಮರುನಿರ್ಮಾಣವಾಗಿದೆ",
+    "Match Confidence": "ಹೊಂದಾಣಿಕೆಯ ವಿಶ್ವಾಸಾರ್ಹತೆ",
+    "Possible Hideout Centroid": "ಸಂಭವನೀಯ ಅಡಗುದಾಣ ಕೇಂದ್ರ",
+
+    // Sociological Page
+    "Sociological Correlations": "ಸಾಮಾಜಿಕ ಸಹಸಂಬಂಧಗಳು",
+    "Correlate literacy, urbanization and population density with crime rates": "ಅಕ್ಷರಸ್ಥತೆ, ನಗರೀಕರಣ ಮತ್ತು ಜನಸಂಖ್ಯೆಯನ್ನು ಅಪರಾಧದೊಂದಿಗೆ ಲಿಂಕ್ ಮಾಡಿ",
+    "Literacy vs Crime Rate": "ಅಕ್ಷರಸ್ಥತೆ ಮತ್ತು ಅಪರಾಧ ದರ",
+    "Urbanization vs Crime Rate": "ನಗರೀಕರಣ ಮತ್ತು ಅಪರಾಧ ದರ",
+    "Population vs Crime Rate": "ಜನಸಂಖ್ಯೆ ಮತ್ತು ಅಪರಾಧ ದರ",
+    "Correlation Index": "ಸಹಸಂಬಂಧ ಸೂಚ್ಯಂಕ",
+    "Regression Formula": "ರಿಗ್ರೆಷನ್ ಸೂತ್ರ",
+    "Strong positive correlation": "ಬಲವಾದ ಧನಾತ್ಮಕ ಸಹಸಂಬಂಧ",
+    "Weak correlation": "ದುರ್ಬಲ ಸಹಸಂಬಂಧ",
+    "LITERACY RATE": "ಅಕ್ಷರಸ್ಥತೆ ಪ್ರಮಾಣ",
+    "CRIME RATE (PER 10K)": "ಅಪರಾಧ ದರ (ಪ್ರತಿ 10 ಸಾವಿರಕ್ಕೆ)",
+    "URBANIZATION RATE": "ನಗರೀಕರಣ ಪ್ರಮಾಣ",
+    "POPULATION DENSITY": "ಜನಸಂಖ್ಯೆ ಸಾಂದ್ರತೆ",
+    "DISTRICT CORRELATION MATRIX": "ಜಿಲ್ಲಾ ಸಹಸಂಬಂಧ ಮ್ಯಾಟ್ರಿಕ್ಸ್",
+
+    // Network Page
+    "Criminal Association Network": "ಅಪರಾಧಿಗಳ ಒಡನಾಟದ ನೆಟ್‌ವರ್ಕ್",
+    "Visualize co-accused link matrices and network connection strengths": "ಸಹ-ಆರೋಪಿಗಳ ಸಂಬಂಧಗಳು ಮತ್ತು ಸಂಪರ್ಕದ ಸಾಮರ್ಥ್ಯ",
+    "Co-Accused Graph": "ಸಹ-ಆರೋಪಿಗಳ ಗ್ರಾಫ್",
+    "Connection Strength": "ಸಂಪರ್ಕದ ತೀವ್ರತೆ",
+    "criminal": "ಅಪರಾಧಿ",
+    "connections": "ಸಂಪರ್ಕಗಳು",
+    "Role": "ಪಾತ್ರ",
+    "Co-Accused": "ಸಹ-ಆರೋಪಿ",
+    "Victim": "ಬಲಿಪಶು",
+    "Target Accused": "ಮುಖ್ಯ ಆರೋಪಿ",
+    "Click a criminal node to focus connection matrix.": "ಸಂಪರ್ಕ ಮ್ಯಾಟ್ರಿಕ್ಸ್ ಅನ್ನು ವೀಕ್ಷಿಸಲು ಅಪರಾಧಿ ನೋಡ್ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+    "criminal associations": "ಅಪರಾಧದ ಒಡನಾಟಗಳು",
+
+    // Offenders Page
+    "Repeat Offenders Monitor": "ಸರಣಿ ಅಪರಾಧಿಗಳ ಕಣ್ಗಾವಲು",
+    "Monitor high-recidivism individuals and active watchlists": "ಮತ್ತೆ ಅಪರಾಧ ಎಸಗುವ ಶಂಕಿತರ ಕಣ್ಗಾವಲು ಪಟ್ಟಿ",
+    "Watchlist Overview": "ಕಣ್ಗಾವಲು ಪಟ್ಟಿ ಅವಲೋಕನ",
+    "Name": "ಹೆಸರು",
+    "Age": "ವಯಸ್ಸು",
+    "District": "ಜಿಲ್ಲೆ",
+    "Total Offenses": "ಒಟ್ಟು ಅಪರಾಧಗಳು",
+    "Recidivism Chance": "ಮತ್ತೆ ಅಪರಾಧ ಎಸಗುವ ಸಾಧ್ಯತೆ",
+    "Last Active": "ಕೊನೆಯ ಬಾರಿಗೆ ಸಕ್ರಿಯ",
+    "Risk Level": "ಅಪಾಯದ ಮಟ್ಟ",
+    "Filter by District": "ಜಿಲ್ಲೆಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್ ಮಾಡಿ",
+    "Search Repeat Offenders...": "ಸರಣಿ ಅಪರಾಧಿಗಳನ್ನು ಹುಡುಕಿ...",
+    "All Districts": "ಎಲ್ಲಾ ಜಿಲ್ಲೆಗಳು",
+
+    // Case Explorer
+    "Case Explorer Archive": "ಪ್ರಕರಣಗಳ ಅನ್ವೇಷಣೆ ಸಂಗ್ರಹ",
+    "FIR Archive and registry record logs": "ಎಫ್‌ಐಆರ್ ದಾಖಲೆಗಳು ಮತ್ತು ದಾಖಲಾತಿಗಳು",
+    "Crime No": "ಅಪರಾಧ ಸಂಖ್ಯೆ",
+    "Accused": "ಆರೋಪಿ",
+    "Status": "ಸ್ಥಿತಿ",
+    "Gravity": "ತೀವ್ರತೆ",
+    "Crime Head": "ಅಪರಾಧ ವಿಭಾಗ",
+    "Date": "ದಿನಾಂಕ",
+    "Actions": "ಕ್ರಮಗಳು",
+    "Case File": "ಪ್ರಕರಣದ ಫೈಲ್",
+    "Registered Date": "ನೋಂದಾಯಿತ ದಿನಾಂಕ",
+    "Incident Date": "ಘಟನೆ ನಡೆದ ದಿನಾಂಕ",
+    "Police Station": "ಪೊಲೀಸ್ ಠಾಣೆ",
+    "Officer": "ಅಧಿಕಾರಿ",
+    "Victims": "ಬಲಿಪಶುಗಳು",
+    "Brief Facts": "ಸಂಕ್ಷಿಪ್ತ ವಿವರಣೆ",
+    "Under Investigation": "ತನಿಖೆಯಲ್ಲಿದೆ",
+    "Charge Sheeted": "ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ ಸಲ್ಲಿಕೆಯಾಗಿದೆ",
+    "Closed": "ಮುಕ್ತಾಯಗೊಂಡಿದೆ",
+    "Pending Trial": "ವಿಚಾರಣೆ ಬಾಕಿ ಇದೆ",
+    "FIR Details": "ಎಫ್‌ಐಆರ್ ವಿವರಗಳು",
+    "Filter by Status": "ಸ್ಥಿತಿಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್",
+    "Filter by Gravity": "ತೀವ್ರತೆಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್",
+    "Filter by Crime Head": "ಅಪರಾಧ ವಿಭಾಗದ ಪ್ರಕಾರ ಫಿಲ್ಟರ್",
+    "All Statuses": "ಎಲ್ಲಾ ಸ್ಥಿತಿಗಳು",
+    "All Gravities": "ಎಲ್ಲಾ ತೀವ್ರತೆಗಳು",
+    "All Crime Heads": "ಎಲ್ಲಾ ಅಪರಾಧ ವಿಭಾಗಗಳು",
+    "View Details": "ವಿವರ ವೀಕ್ಷಿಸಿ",
+
+    // New FIR Form
+    "New FIR Submission": "ಹೊಸ ಎಫ್‌ಐಆರ್ ಸಲ್ಲಿಕೆ",
+    "Submit new crime records to the state database": "ರಾಜ್ಯ ಡೇಟಾಬೇಸ್‌ಗೆ ಹೊಸ ಅಪರಾಧ ದಾಖಲೆಯನ್ನು ಸಲ್ಲಿಸಿ",
+    "Crime Number": "ಅಪರಾಧ ಸಂಖ್ಯೆ",
+    "Target Accused": "ಮುಖ್ಯ ಆರೋಪಿ",
+    "Brief Facts of the Case": "ಪ್ರಕರಣದ ಸಂಕ್ಷಿಪ್ತ ವಿವರಣೆ",
+    "Submit FIR": "ಎಫ್‌ಐಆರ್ ಸಲ್ಲಿಸಿ",
+    "Incident Date & Hour": "ಘಟನೆ ನಡೆದ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ",
+    "Investigating Officer": "ತನಿಖಾ अधिकारी",
+    "Victims (Comma-separated)": "ಬಲಿಪಶುಗಳು (ವಿರಾಮ ಚಿಹ್ನೆಯಿಂದ ಪ್ರತ್ಯೇಕಿಸಿ)",
+    "Accused (Comma-separated)": "ಆರೋಪಿಗಳು (ವಿರಾಮ ಚಿಹ್ನೆಯಿಂದ ಪ್ರತ್ಯೇಕಿಸಿ)",
+    "BNS Act & Sections": "ಬಿಎನ್‌ಎಸ್ ಕಾಯ್ದೆ ಮತ್ತು ಸೆಕ್ಷನ್ಗಳು",
+    "Modus Operandi Tag": "ಅಪರಾಧದ ವಿಧಾನ (MO)",
+
+    // Copilot Drawer
+    "Voice Input Not Supported": "ಧ್ವನಿ ಇನ್ಪುಟ್ ಬೆಂಬಲಿಸುವುದಿಲ್ಲ",
+    "This browser does not support Speech Recognition API.": "ನಿಮ್ಮ ಬ್ರೌಸರ್ ಧ್ವನಿ ಇನ್ಪುಟ್ ಬೆಂಬಲಿಸುವುದಿಲ್ಲ.",
+    "ಧ್ವನಿ ಇನ್ಪುಟ್": "ಧ್ವನಿ ಇನ್ಪುಟ್",
+    "Voice Input": "ಧ್ವನಿ ಇನ್ಪುಟ್",
+    "ಕೇಳಿಸಿಕೊಳ್ಳಲಾಗುತ್ತಿದೆ...": "ಕೇಳಿಸಿಕೊಳ್ಳಲಾಗುತ್ತಿದೆ...",
+    "LISTENING...": "ಕೇಳಿಸಿಕೊಳ್ಳಲಾಗುತ್ತಿದೆ...",
+    "FORMAT PREVIEW:": "ಸ್ವರೂಪ ಪೂರ್ವವೀಕ್ಷಣೆ:",
+    "AUTO": "ಸ್ವಯಂ",
+    "suggestionsTitle": "ಶಿಫಾರಸುಗಳು",
   },
 } as const;
 
 export type Language = "en" | "kn";
-export type TranslationKey = keyof typeof translations.en;
+
+export function translateText(text: string, lang: Language): string {
+  if (lang === "kn") {
+    // Exact match in general dictionary
+    if (translations.kn[text as keyof typeof translations.kn]) {
+      return translations.kn[text as keyof typeof translations.kn];
+    }
+    // District translation lookup
+    if (districtTranslations[text]) {
+      return districtTranslations[text];
+    }
+    // Crime head translation lookup
+    if (crimeHeadTranslations[text]) {
+      return crimeHeadTranslations[text];
+    }
+  }
+  return text;
+}

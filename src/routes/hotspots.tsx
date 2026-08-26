@@ -13,6 +13,7 @@ import { jsPDF } from "jspdf";
 import { CRIME_HEADS } from "@/data/mock";
 import { type SubArea, type MicroSpot } from "@/data/mock";
 import { useDb } from "@/hooks/use-db";
+import { useLanguage } from "@/hooks/use-language";
 import { computeSubAreas, computeMicroSpots } from "@/lib/db";
 import karnatakaMap from "@/data/karnataka-map.json";
 import { StateMapGL } from "@/components/hotspots/state-map-gl";
@@ -1136,6 +1137,7 @@ function StateMapSVG({
   lowT: number;
   highT: number;
 }) {
+  const { t } = useLanguage();
   return (
     <div
       className="relative h-full w-full bg-surface-2 grid-bg select-none overflow-hidden rounded-md border border-border"
@@ -1218,7 +1220,7 @@ function StateMapSVG({
                 strokeLinejoin: "round",
               }}
             >
-              {displayName}
+              {t(displayName)}
             </text>
           );
         })}
@@ -1256,6 +1258,7 @@ function DistrictMap({
   lowT: number;
   highT: number;
 }) {
+  const { t } = useLanguage();
   const bbox = useMemo(() => pathBBox(geo.d), [geo]);
   const polygon = useMemo(() => pathPoints(geo.d), [geo]);
   const pad = Math.max(bbox.w, bbox.h) * 0.08;
@@ -1322,8 +1325,8 @@ function DistrictMap({
           <button
             key={a.id}
             type="button"
-            title={`${a.name} · ${a.firs} FIRs · ${a.topCrime} · ${a.peakHours}`}
-            aria-label={`${a.name} · ${a.firs} FIRs`}
+            title={`${t(a.name)} · ${a.firs} ${t("FIRs")} · ${t(a.topCrime)} · ${t(a.peakHours)}`}
+            aria-label={`${t(a.name)} · ${a.firs} ${t("FIRs")}`}
             onClick={() => onSelectArea(a.id)}
             className={`absolute w-[116px] -translate-x-1/2 -translate-y-1/2 rounded-md border bg-background/95 px-2 py-1.5 text-left shadow-sm backdrop-blur transition-all hover:scale-[1.02] hover:bg-surface-1 ${
               active ? "border-primary ring-2 ring-primary/20" : dim ? "border-border/60 opacity-55" : "border-border"
@@ -1333,10 +1336,10 @@ function DistrictMap({
               top: `${((y - vb.y) / vb.h) * 100}%`,
             }}
           >
-            <span className="block truncate text-[11px] font-semibold leading-none text-foreground">{a.name}</span>
+            <span className="block truncate text-[11px] font-semibold leading-none text-foreground">{t(a.name)}</span>
             <span className="mt-1 flex items-center justify-between gap-2 text-[10px] leading-none text-muted-foreground">
-              <span>{a.firs} FIRs</span>
-              <span>{a.peakHours}</span>
+              <span>{a.firs} {t("FIRs")}</span>
+              <span>{t(a.peakHours)}</span>
             </span>
             <span className="mt-1 block h-1 rounded-full bg-surface-2 overflow-hidden">
               <span className="block h-full" style={{ width: `${Math.max(12, heat * 100)}%`, background: heatColor(heat, lowT, highT) }} />
@@ -1365,6 +1368,7 @@ function AreaMap({
   lowT: number;
   highT: number;
 }) {
+  const { t } = useLanguage();
   // Simple stylized street grid inside a rounded rect representing the sub-area
   const W = 100;
   const H = 80;
@@ -1384,7 +1388,7 @@ function AreaMap({
       ))}
       {/* label */}
       <text x={W / 2} y={9} textAnchor="middle" fontSize={3.2} fill="oklch(0.35 0.02 250)" fontFamily="Inter" fontWeight={600}>
-        {area.name}
+        {t(area.name)}
       </text>
 
       {/* hotspot points */}
@@ -1411,11 +1415,11 @@ function AreaMap({
               stroke={active ? "oklch(0.3 0.15 250)" : "oklch(0.98 0 0)"}
               strokeWidth={active ? 0.6 : 0.3}
             >
-              <title>{s.name} · {s.firs} FIRs · {s.topCrime} · {s.peakHours}</title>
+              <title>{t(s.name)} · {s.firs} {t("FIRs")} · {t(s.topCrime)} · {t(s.peakHours)}</title>
             </circle>
             {active && (
               <text x={cx} y={cy - r - 1.2} textAnchor="middle" fontSize={2.6} fill="oklch(0.2 0.02 250)" fontFamily="Inter" fontWeight={600} pointerEvents="none">
-                {s.name}
+                {t(s.name)}
               </text>
             )}
           </g>

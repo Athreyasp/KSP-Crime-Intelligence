@@ -11,6 +11,8 @@ import { useDb } from "@/hooks/use-db";
 import { Sparkles, TriangleAlert, TrendingUp, Cpu, Terminal, User, ShieldCheck, Search, Network, CheckSquare, Square, Clock, MapPin, Activity, ShieldAlert, Fingerprint } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { useState, useMemo, useEffect } from "react";
+import { useLanguage } from "@/hooks/use-language";
+
 
 export const Route = createFileRoute("/predictive")({
   head: () => ({
@@ -28,6 +30,7 @@ const chartAxis = { stroke: "#5f6368", fontSize: 10, fontFamily: "Inter, sans-se
 
 function Predictive() {
   const { districtStats: DISTRICT_STATS, cases: CASES } = useDb();
+  const { t, language } = useLanguage();
   const topRisk = DISTRICT_STATS.slice(0, 6);
   const anomalies = CASES.filter(c => c.gravity === "Heinous").slice(0, 4);
 
@@ -85,11 +88,11 @@ function Predictive() {
       const candidateB = districtAccused[1] || liveAccusedCandidates[1] || { name: "Karthik Naik", age: 22, id: "ACC-1082" };
 
       setAnalysisResult({
-        name: `Local Syndicate (${selectedDistrictName} Cluster)`,
+        name: `Local Syndicate (${t(selectedDistrictName)} Cluster)`,
         confidence: 85,
-        groupSize: "2 suspects (Local cell)",
-        hideout: `Bengaluru Sector (Centroid: ${unsolvedCases[0].latitude.toFixed(4)}°N, ${unsolvedCases[0].longitude.toFixed(4)}°E)`,
-        operatingHours: `Peak timeframe: ${unsolvedCases[0].timeWindow}`,
+        groupSize: language === "kn" ? "೨ ಶಂಕಿತರು (ಸ್ಥಳೀಯ ಸೆಲ್)" : "2 suspects (Local cell)",
+        hideout: `${t("Bengaluru Sector")} (Centroid: ${unsolvedCases[0].latitude.toFixed(4)}°N, ${unsolvedCases[0].longitude.toFixed(4)}°E)`,
+        operatingHours: `${t("Peak timeframe")}: ${unsolvedCases[0].timeWindow}`,
         clues: [
           { type: "Temporal", detail: "Spatiotemporal overlap alignment suggests coordinated timeline." },
           { type: "Spatial", detail: "Events coordinates cluster tightly inside municipal boundary." },
@@ -97,11 +100,11 @@ function Predictive() {
         ],
         suspects: [
           { id: candidateA.id || "ACC-3049", name: candidateA.name, age: candidateA.age || 24, similarity: 82, photo: candidateA.photo, traits: ["Active district history", "Aligned visual profile parameters"] },
-          { id: candidateB.id || "ACC-1082", name: candidateB.name, age: candidateB.age || 22, similarity: 75, photo: candidateB.photo, traits: ["Known gang associate", "History of similar offenses in this district"] }
+          { id: candidateB.id || "ACC-1082", name: candidateB.name, age: candidateB.age || 22, similarity: 75, photo: candidateB.photo, traits: ["Known gang associate", "History of similar offenses"] }
         ]
       });
     }
-  }, [unsolvedCases, liveAccusedCandidates]);
+  }, [unsolvedCases, liveAccusedCandidates, language]);
 
   // Execute dynamic linkage analysis
   const runSyndicateLinkage = () => {
@@ -278,10 +281,10 @@ function Predictive() {
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
         section="05"
-        eyebrow="AI/ML Powered · Model v2.4"
-        title="Predictive Intelligence Dashboard"
-        description="Forward-looking risk scoring, anomaly detection and crime forecasting."
-        actions={<Badge className="bg-primary/15 text-primary border border-primary/40 gap-1"><Sparkles className="h-3 w-3" /> Live model</Badge>}
+        eyebrow={t("AI/ML Powered · Model v2.4")}
+        title={t("AI Risk Forecast")}
+        description={t("AI-driven risk scoring, anomaly detection and crime forecasting")}
+        actions={<Badge className="bg-primary/15 text-primary border border-primary/40 gap-1"><Sparkles className="h-3 w-3" /> {t("Live model")}</Badge>}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -289,10 +292,10 @@ function Predictive() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold text-ink">14-Day Statewide Crime Forecast</CardTitle>
-                <p className="text-xs text-muted-foreground">Predicted FIR volume with 90% confidence band</p>
+                <CardTitle className="text-base font-semibold text-ink">{t("14-Day Statewide Crime Forecast")}</CardTitle>
+                <p className="text-xs text-muted-foreground">{t("Predicted FIR volume with 90% confidence band")}</p>
               </div>
-              <Badge className="bg-primary/10 text-primary border border-primary/20 gap-1"><TrendingUp className="h-3 w-3" /> Expected +8%</Badge>
+              <Badge className="bg-primary/10 text-primary border border-primary/20 gap-1"><TrendingUp className="h-3 w-3" /> {t("Expected +8%")}</Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -322,8 +325,8 @@ function Predictive() {
 
         <Card className="bg-surface-1 border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold text-ink">Top Risk Districts</CardTitle>
-            <p className="text-xs text-muted-foreground">High surveillance priority based on 30-day activity</p>
+            <CardTitle className="text-base font-semibold text-ink">{t("Top Risk Districts")}</CardTitle>
+            <p className="text-xs text-muted-foreground">{t("High surveillance priority based on 30-day activity")}</p>
           </CardHeader>
           <CardContent className="pt-2">
             <div className="space-y-4 pt-1">
@@ -339,10 +342,10 @@ function Predictive() {
                     <div className="flex items-center justify-between text-xs font-semibold">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground font-mono">0{index + 1}</span>
-                        <span className="text-ink group-hover:text-primary transition-colors">{d.district.name}</span>
+                        <span className="text-ink group-hover:text-primary transition-colors">{t(d.district.name)}</span>
                       </div>
                       <Badge className={`${riskBg} ${riskText} border-0 text-[10px] font-bold px-1.5 py-0.5 rounded-sm`}>
-                        Risk {d.riskScore}
+                        {t("Risk")} {d.riskScore}
                       </Badge>
                     </div>
                     <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden border border-border/40">
@@ -361,8 +364,8 @@ function Predictive() {
 
       <Card className="bg-surface-1 border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-alert" /> Anomaly Detection</CardTitle>
-          <p className="text-xs text-muted-foreground">Cases deviating from standard behavioural patterns · flagged for investigator review</p>
+          <CardTitle className="text-base flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-alert" /> {t("Anomaly Detection")}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t("Cases deviating from standard behavioural patterns · flagged for investigator review")}</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
@@ -370,34 +373,35 @@ function Predictive() {
               <div key={c.caseMasterId} className="rounded-md border border-alert/30 bg-alert/5 p-3">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs">FIR {c.crimeNo}</span>
-                  <Badge className="bg-alert text-alert-foreground">Anomaly · 0.87</Badge>
+                  <Badge className="bg-alert text-alert-foreground">{t("Anomaly")} · 0.87</Badge>
                 </div>
-                <p className="mt-2 text-sm font-medium">{c.crimeHead.name} — {c.district.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{c.briefFacts}</p>
+                <p className="mt-2 text-sm font-medium">{t(c.crimeHead.name)} — {t(c.district.name)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t(c.briefFacts)}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge variant="outline" className="text-[10px]">MO deviation</Badge>
-                  <Badge variant="outline" className="text-[10px]">Time pattern break</Badge>
-                  <Badge variant="outline" className="text-[10px]">Cross-district link</Badge>
+                  <Badge variant="outline" className="text-[10px]">{t("MO deviation")}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{t("Time pattern break")}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{t("Cross-district link")}</Badge>
                 </div>
               </div>
             ))}
             {anomalies.length === 0 && (
               <div className="col-span-full py-6 text-center text-xs text-muted-foreground italic">
-                No anomalous or heinous patterns identified in the current records database.
+                {t("No anomalous or heinous patterns identified in the current records database.")}
               </div>
             )}
           </div>
         </CardContent>
       </Card>
 
+
       {/* Advanced AI Case Linkage Workspace */}
       <Card className="bg-surface-1 border-border">
         <CardHeader className="pb-2 border-b border-border">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Network className="h-5 w-5 text-primary" /> AI Syndicate Linkage & Reconstruction Engine
+            <Network className="h-5 w-5 text-primary" /> {t("Syndicate AI Reconstruction")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Perform Graph Neural Network (GNN) evaluations across active unsolved cases to reconstruct criminal syndicates and identify repeat offender overlap.
+            {t("Perform Graph Neural Network (GNN) evaluations across active unsolved cases to reconstruct criminal syndicates and identify repeat offender overlap.")}
           </p>
         </CardHeader>
         <CardContent className="pt-4">
@@ -407,23 +411,23 @@ function Predictive() {
             <div className="lg:col-span-1 space-y-4">
               <div>
                 <div className="mb-4">
-                  <label className="block text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Select Analysis District</label>
+                  <label className="block text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{t("Select Analysis District")}</label>
                   <select
                     value={selectedDistrictName}
                     onChange={e => setSelectedDistrictName(e.target.value)}
                     className="w-full bg-surface-2 border border-border text-xs rounded px-2.5 py-1.5 focus:ring-1 focus:ring-primary text-ink"
                   >
                     {DISTRICTS.map(d => (
-                      <option key={d.id} value={d.name}>{d.name}</option>
+                      <option key={d.id} value={d.name}>{t(d.name)}</option>
                     ))}
                   </select>
                 </div>
 
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                  1. Select Unsolved Cases to Cluster
+                  {language === "kn" ? "೧. ಕ್ಲಸ್ಟರ್ ಮಾಡಲು ಬಗೆಹರಿಯದ ಪ್ರಕರಣಗಳನ್ನು ಆರಿಸಿ" : "1. Select Unsolved Cases to Cluster"}
                 </h3>
                 <p className="text-[10px] text-muted-foreground mb-3">
-                  Check two or more cases to analyze structural associations.
+                  {t("Select at least two cases to execute spatiotemporal graph convolutions.")}
                 </p>
                 
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -447,10 +451,10 @@ function Predictive() {
                           )}
                           <span className="font-mono text-[11px] text-ink">FIR {c.crimeNo}</span>
                         </div>
-                        <p className="mt-1 text-[11px] leading-snug line-clamp-2 text-ink">{c.dummyMo}</p>
+                        <p className="mt-1 text-[11px] leading-snug line-clamp-2 text-ink">{t(c.dummyMo)}</p>
                         <div className="mt-1.5 flex items-center gap-2 text-[9px] text-muted-foreground font-mono">
                           <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" /> {c.timeWindow}</span>
-                          {c.plateMock !== "Unknown" && <span className="flex items-center gap-0.5"><Activity className="h-3 w-3" /> {c.plateMock}</span>}
+                          {c.plateMock !== "Unknown" && <span className="flex items-center gap-0.5"><Activity className="h-3 w-3" /> {t(c.plateMock)}</span>}
                         </div>
                       </div>
                     );
@@ -458,8 +462,12 @@ function Predictive() {
                   {unsolvedCases.length === 0 && (
                     <div className="py-12 px-4 text-center border border-dashed border-border rounded-md text-xs text-muted-foreground bg-surface-2">
                       <ShieldAlert className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                      No active cases found registered for <strong>{selectedDistrictName}</strong>. 
-                      <p className="mt-1 text-[10px]">Try registering a new case in this district, or select another district from the dropdown.</p>
+                      {language === "kn" ? (
+                        <>Strong>{t(selectedDistrictName)}</strong> ನಲ್ಲಿ ಯಾವುದೇ ಸಕ್ರಿಯ ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿಲ್ಲ.</>
+                      ) : (
+                        <>No active cases found registered for <strong>{t(selectedDistrictName)}</strong>.</>
+                      )}
+                      <p className="mt-1 text-[10px]">{t("Try registering a new case in this district, or select another district from the dropdown.")}</p>
                     </div>
                   )}
                 </div>
@@ -471,20 +479,20 @@ function Predictive() {
                 className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary-glow font-medium transition-all py-4 rounded-md"
               >
                 <Cpu className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                {isAnalyzing ? "Processing GNN Clusters..." : "Run Syndicate Linkage"}
+                {isAnalyzing ? t("Processing GNN Clusters...") : t("Run Syndicate Linkage")}
               </Button>
 
               {/* Dynamic GNN Stepper Progress Logs */}
               <div className="rounded-md border border-border bg-surface-2 p-3 text-xs text-ink space-y-2 min-h-[140px] font-sans">
                 <p className="flex items-center gap-1.5 border-b border-border pb-1.5 uppercase tracking-wider text-[9px] font-bold text-muted-foreground">
-                  <Terminal className="h-3.5 w-3.5 text-primary" /> Linkage Engine Status
+                  <Terminal className="h-3.5 w-3.5 text-primary" /> {t("Linkage Engine Status")}
                 </p>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-                  {analysisLogs.length === 0 && <span className="text-muted-foreground italic text-[11px]">Awaiting case selections (select ≥ 2)...</span>}
+                  {analysisLogs.length === 0 && <span className="text-muted-foreground italic text-[11px]">{t("Awaiting case selections (select ≥ 2)...")}</span>}
                   {analysisLogs.map((log, idx) => (
                     <div key={idx} className={`flex items-center gap-1.5 text-[11px] ${log.includes("[SUCCESS]") ? "text-success font-semibold" : ""}`}>
                       <div className={`h-1.5 w-1.5 rounded-full ${log.includes("[SUCCESS]") ? "bg-success" : "bg-primary"}`} />
-                      <span>{log}</span>
+                      <span>{t(log)}</span>
                     </div>
                   ))}
                 </div>
@@ -495,9 +503,9 @@ function Predictive() {
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  2. AI Syndicate Reconstruction Dossier
+                  {language === "kn" ? "೨. ಕೃತಕ ಬುದ್ಧಿಮತ್ತೆ ಅಪರಾಧ ಕೂಟದ ಮರುನಿರ್ಮಾಣ ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ" : "2. AI Syndicate Reconstruction Dossier"}
                 </h3>
-                <Badge variant="outline" className="text-[10px] border-primary/20 text-primary">DBSCAN-GCN Linkage Model v2.4</Badge>
+                <Badge variant="outline" className="text-[10px] border-primary/20 text-primary">{t("Linkage Matrix & GNN Cluster")}</Badge>
               </div>
 
               {analysisResult ? (
@@ -507,9 +515,9 @@ function Predictive() {
                   <div className="space-y-4">
                     <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
                       <div>
-                        <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Identified Cluster Codenames</span>
+                        <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">{t("Identified Cluster Codenames")}</span>
                         <h4 className="text-base font-bold text-ink flex items-center gap-1.5 mt-0.5">
-                          <Fingerprint className="h-4 w-4 text-primary" /> {analysisResult.name}
+                          <Fingerprint className="h-4 w-4 text-primary" /> {t(analysisResult.name)}
                         </h4>
                       </div>
 
@@ -518,38 +526,38 @@ function Predictive() {
                           <span className="text-sm font-bold">{analysisResult.confidence}%</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Linkage Probability</span>
+                          <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">{t("Linkage Probability")}</span>
                           <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                            High structural density confirms these incidents are linked.
+                            {t("High structural density confirms these incidents are linked.")}
                           </p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border text-xs">
                         <div>
-                          <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider"><Clock className="h-3 w-3 inline mr-1 text-primary" /> Active Window</span>
-                          <span className="font-medium text-ink">{analysisResult.operatingHours}</span>
+                          <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider"><Clock className="h-3 w-3 inline mr-1 text-primary" /> {t("Active Window")}</span>
+                          <span className="font-medium text-ink">{t(analysisResult.operatingHours)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider"><User className="h-3 w-3 inline mr-1 text-primary" /> Estimated Size</span>
-                          <span className="font-medium text-ink">{analysisResult.groupSize}</span>
+                          <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider"><User className="h-3 w-3 inline mr-1 text-primary" /> {t("Estimated Size")}</span>
+                          <span className="font-medium text-ink">{t(analysisResult.groupSize)}</span>
                         </div>
                       </div>
 
                       <div className="pt-2 border-t border-border">
-                        <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider mb-1"><MapPin className="h-3 w-3 inline mr-1 text-primary" /> Estimated Hideout Hotspot</span>
-                        <Badge className="bg-paper text-primary border border-primary/20 text-[10px] py-0.5 rounded-sm">{analysisResult.hideout}</Badge>
+                        <span className="text-muted-foreground block text-[9.5px] uppercase tracking-wider mb-1"><MapPin className="h-3 w-3 inline mr-1 text-primary" /> {t("Possible Hideout Centroid")}</span>
+                        <Badge className="bg-paper text-primary border border-primary/20 text-[10px] py-0.5 rounded-sm">{t(analysisResult.hideout)}</Badge>
                       </div>
                     </div>
 
                     {/* SHARED CLUES LIST */}
                     <div className="space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Connected Vector Clues</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Connected Vector Clues")}</p>
                       <div className="space-y-1.5">
                         {analysisResult.clues.map((clue: any, index: number) => (
                           <div key={index} className="flex gap-2 p-2 bg-surface-2 rounded border border-border text-[11px]">
-                            <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-0 h-fit shrink-0 text-[9px]">{clue.type}</Badge>
-                            <span className="text-ink/80 leading-snug">{clue.detail}</span>
+                            <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-0 h-fit shrink-0 text-[9px]">{t(clue.type)}</Badge>
+                            <span className="text-ink/80 leading-snug">{t(clue.detail)}</span>
                           </div>
                         ))}
                       </div>
@@ -558,7 +566,7 @@ function Predictive() {
 
                   {/* RIGHT: candidate SUSPECT MUGSHOTS */}
                   <div className="space-y-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Candidate Repeat Offenders Match</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Candidate Repeat Offenders Match")}</p>
                     
                     <div className="space-y-3">
                       {analysisResult.suspects.map((susp: any, i: number) => (
@@ -570,21 +578,21 @@ function Predictive() {
                               ) : (
                                 <div className="flex flex-col items-center justify-center text-center">
                                   <User className="h-5 w-5 text-muted-foreground" />
-                                  <span className="text-[7px] font-bold text-muted-foreground uppercase">Mugshot</span>
+                                  <span className="text-[7px] font-bold text-muted-foreground uppercase">{t("Mugshot")}</span>
                                 </div>
                               )}
                             </div>
 
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-1">
-                                <span className="font-semibold text-xs truncate block text-ink">{susp.name}</span>
+                                <span className="font-semibold text-xs truncate block text-ink">{t(susp.name)}</span>
                                 <span className="font-mono text-[9px] text-muted-foreground shrink-0">{susp.id}</span>
                               </div>
                               <p className="text-[10.5px] text-muted-foreground mt-0.5">
-                                Age {susp.age} · Accused Overlap Match Weight:
+                                {t("Age")} {susp.age} · {t("Match Confidence")}:
                               </p>
                               <Badge className="bg-primary/10 text-primary hover:bg-primary/15 border-0 text-[9.5px] font-mono font-bold mt-1 px-1.5 py-0.5">
-                                {susp.similarity}% Match Probability
+                                {susp.similarity}% {t("Match Probability")}
                               </Badge>
                             </div>
                           </div>
@@ -592,7 +600,7 @@ function Predictive() {
                           <div className="pt-2 border-t border-border/40 space-y-1 flex flex-wrap gap-1">
                             {susp.traits.map((tr: string, index: number) => (
                               <Badge key={index} variant="outline" className="text-[9px] px-1 border-primary/20 text-primary">
-                                {tr}
+                                {t(tr)}
                               </Badge>
                             ))}
                           </div>
@@ -607,16 +615,16 @@ function Predictive() {
                   {isAnalyzing ? (
                     <>
                       <Cpu className="h-8 w-8 text-primary animate-spin mb-3" />
-                      <p className="text-xs font-bold text-ink">Running Graph Neural Network Linkages...</p>
+                      <p className="text-xs font-bold text-ink">{t("Running Graph Neural Network Linkages...")}</p>
                       <p className="text-[10.5px] text-muted-foreground mt-1 max-w-sm">
-                        Calculating spatial distance matrices and semantic modus operandi vector similarities.
+                        {t("Calculating spatial distance matrices and semantic modus operandi vector similarities.")}
                       </p>
                     </>
                   ) : (
                     <>
                       <ShieldAlert className="h-8 w-8 text-muted-foreground/60 mb-2" />
                       <p className="text-xs text-muted-foreground italic">
-                        Select two or more unsolved cases from the left panel and trigger the linkage analysis.
+                        {t("Select two or more unsolved cases from the left panel and trigger the linkage analysis.")}
                       </p>
                     </>
                   )}

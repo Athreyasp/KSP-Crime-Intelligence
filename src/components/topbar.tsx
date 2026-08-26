@@ -274,7 +274,7 @@ export function Topbar() {
           </button>
 
           {/* Language Switcher */}
-          <div className="flex items-center border-2 border-ink rounded-sm overflow-hidden bg-paper select-none shrink-0">
+          <div className="flex items-center border-2 border-ink rounded-sm overflow-hidden bg-paper select-none shrink-0 notranslate">
             <button
               onClick={() => setLanguage("en")}
               className={cn(

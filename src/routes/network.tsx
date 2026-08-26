@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type EntityType, type RichNode, type RelationType } from "@/data/network-rich";
 import { useDb } from "@/hooks/use-db";
+import { useLanguage } from "@/hooks/use-language";
 import { PageHeader } from "@/components/page-header";
 
 export const Route = createFileRoute("/network")({
@@ -81,6 +82,7 @@ export function NetworkPage() {
   const navigate = useNavigate();
   const { networkRich, cases } = useDb();
   const { nodes, links } = useForceLayout(networkRich);
+  const { t, language } = useLanguage();
 
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -210,18 +212,18 @@ export function NetworkPage() {
   const onPointerUp = () => (dragRef.current = null);
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 pb-12">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* GOOGLE MATERIAL CLEAN HEADER */}
       <PageHeader
-        section="02"
-        eyebrow="Karnataka State Police · State Crime Records Bureau"
-        title="Network & Association Atlas"
-        description="Clean & intuitive link intelligence workspace."
+        section="03"
+        eyebrow={t("Link Intelligence & Relational Graph")}
+        title={t("Criminal Association Network")}
+        description={t("Visualize co-accused link matrices and network connection strengths")}
         actions={
           <div className="flex items-center gap-2">
             <Badge className="bg-[#e8f0fe] text-[#0b57d0] border border-[#0b57d0]/20 font-bold px-3 py-1 flex items-center gap-1.5 shadow-sm">
               <Database className="h-3.5 w-3.5 text-[#0b57d0]" />
-              Live Association Map ({filteredNodes.length} Entities)
+              {t("Live Association Map")} ({filteredNodes.length} {t("Entities")})
             </Badge>
 
             <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-full">
@@ -232,7 +234,7 @@ export function NetworkPage() {
                   viewMode === "graph" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
                 )}
               >
-                <NetworkIcon className="h-3.5 w-3.5" /> Interactive Graph
+                <NetworkIcon className="h-3.5 w-3.5" /> {t("Interactive Graph")}
               </button>
               <button
                 onClick={() => setViewMode("directory")}
@@ -241,7 +243,7 @@ export function NetworkPage() {
                   viewMode === "directory" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
                 )}
               >
-                <LayoutGrid className="h-3.5 w-3.5" /> Link Directory
+                <LayoutGrid className="h-3.5 w-3.5" /> {t("Link Directory")}
               </button>
             </div>
 
@@ -251,7 +253,7 @@ export function NetworkPage() {
               onClick={() => { setSelected(null); setPan({ x: 0, y: 0 }); setZoom(1); setQuery(""); setTypeFilter("all"); }}
               className="h-8 border-[#dadce0] text-xs font-bold rounded-full bg-white text-[#202124] hover:bg-[#f8f9fa] shadow-sm"
             >
-              <RotateCcw className="mr-1 h-3.5 w-3.5 text-[#0b57d0]" /> Reset
+              <RotateCcw className="mr-1 h-3.5 w-3.5 text-[#0b57d0]" /> {t("Reset")}
             </Button>
           </div>
         }
@@ -265,7 +267,7 @@ export function NetworkPage() {
             <Input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search suspect name, FIR crime number, vehicle plate, wiretap phone..."
+              placeholder={t("Search suspect name, FIR crime number, vehicle plate, wiretap phone...")}
               className="h-10 pl-10 text-xs bg-[#f8f9fa] border-[#dadce0] focus:bg-white rounded-xl text-[#202124]"
             />
           </div>
@@ -283,7 +285,7 @@ export function NetworkPage() {
                     : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
                 )}
               >
-                {k}
+                {t(k)}
               </button>
             ))}
           </div>
@@ -385,7 +387,7 @@ export function NetworkPage() {
                         fill="#202124"
                         className="select-none"
                       >
-                        {n.label}
+                        {t(n.label)}
                       </text>
                     </g>
                   );

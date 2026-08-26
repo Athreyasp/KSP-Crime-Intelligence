@@ -58,6 +58,7 @@ function Cartogram({
   selectedId, onSelect,
 }: { selectedId: number | null; onSelect: (id: number) => void }) {
   const { kpis: KPIS, districtStats: DISTRICT_STATS } = useDb();
+  const { t: trans } = useLanguage();
   const W = 760, H = 560;
   const PAD = 60;
   const R = 34;
@@ -102,8 +103,8 @@ function Cartogram({
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ maxHeight: 600 }}>
       <defs>
-        <pattern id="dot-grid" width="16" height="16" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="0.8" fill={INK} opacity="0.10" />
+        <pattern id="carto-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke={RULE} strokeWidth="0.5" opacity="0.3" />
         </pattern>
         <filter id="hex-shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="2" dy="2" stdDeviation="0" floodColor={INK} floodOpacity="0.9" />
@@ -112,7 +113,7 @@ function Cartogram({
 
       {/* frame */}
       <rect x="0" y="0" width={W} height={H} fill={PAPER} />
-      <rect x="0" y="0" width={W} height={H} fill="url(#dot-grid)" />
+      <rect x="0" y="0" width={W} height={H} fill="url(#carto-grid)" />
       <rect x="8" y="8" width={W - 16} height={H - 16} fill="none" stroke={INK} strokeWidth="1" />
 
       {/* corner marks */}
@@ -124,8 +125,8 @@ function Cartogram({
       ))}
 
       {/* title stamp */}
-      <text x="20" y="30" fontFamily="JetBrains Mono, monospace" fontSize="9" fill={INK} letterSpacing="0.28em">
-        FIG.01 · KARNATAKA CARTOGRAM · FIR DENSITY
+      <text x="20" y="30" fontFamily="JetBrains Mono, monospace" fontSize="9" fill={INK} fontWeight="700" letterSpacing="0.1em">
+        {trans("KARNATAKA SPATIAL CARTOGRAM")}
       </text>
       <text x={W - 20} y="30" fontFamily="JetBrains Mono, monospace" fontSize="9" fill={MUTED} letterSpacing="0.24em" textAnchor="end">
         N={KPIS.totalFIRs}  ·  Δ30d
@@ -144,6 +145,7 @@ function Cartogram({
       {positioned.map(d => {
         const t = d.total / max;
         const isSelected = selectedId === d.district.id;
+        const displayName = trans(d.district.name);
         return (
           <g
             key={d.district.id}
@@ -174,7 +176,7 @@ function Cartogram({
               fontFamily="JetBrains Mono, monospace" fontSize="7.5"
               letterSpacing="0.05em"
               fill={t > 0.6 ? PAPER : INK} opacity="0.85">
-              {d.district.name.length > 12 ? d.district.name.slice(0, 11) + "…" : d.district.name.toUpperCase()}
+              {displayName.length > 12 ? displayName.slice(0, 11) + "…" : displayName}
             </text>
           </g>
         );
@@ -182,13 +184,13 @@ function Cartogram({
 
       {/* legend gradient */}
       <g transform={`translate(20 ${H - 32})`}>
-        <text fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED} letterSpacing="0.2em">FIR VOLUME</text>
+        <text fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED} letterSpacing="0.2em">{trans("FIR VOLUME")}</text>
         <g transform="translate(0 6)">
           {[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, i) => (
             <rect key={i} x={i * 22} y={0} width="20" height="8" fill={heatFill(t)} stroke={INK} strokeWidth="0.5" />
           ))}
-          <text x="0" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED}>LOW</text>
-          <text x="132" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED} textAnchor="end">HIGH</text>
+          <text x="0" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED}>{trans("LOW")}</text>
+          <text x="132" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED} textAnchor="end">{trans("HIGH")}</text>
         </g>
       </g>
     </svg>
@@ -419,14 +421,14 @@ function Overview() {
         <div className="bento-card p-4 md:p-5">
           <div className="mb-3 flex items-start justify-between border-b-2 border-ink pb-2">
             <div>
-              <h2 className="font-editorial text-2xl leading-none text-ink">Spatial Cartogram</h2>
+              <h2 className="font-editorial text-2xl leading-none text-ink">{t("Spatial Cartogram")}</h2>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Tap a district hex to interrogate the record
+                {t("Tap a district hex to interrogate the record")}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Selected</p>
-              <p className="font-display text-sm font-bold text-signal">{selected.district.name}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("Selected")}</p>
+              <p className="font-display text-sm font-bold text-signal">{t(selected.district.name)}</p>
             </div>
           </div>
           <Cartogram selectedId={selectedId} onSelect={setSelectedId} />
@@ -434,30 +436,30 @@ function Overview() {
           {/* Spatial intelligence ribbon to utilize card bottom space */}
           <div className="mt-4 pt-4 border-t border-ink/15 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">CRITICAL THREAT ZONE</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("CRITICAL THREAT ZONE")}</p>
               <p className="font-display text-base font-bold text-signal truncate">
-                {[...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.district.name || "None"}
+                {t([...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.district.name || "None")}
               </p>
               <p className="text-[10px] text-muted-foreground">
-                Threat index at <span className="font-mono text-signal font-bold">{[...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.riskScore || 0}/100</span>
+                {t("Threat index at")} <span className="font-mono text-signal font-bold">{[...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.riskScore || 0}/100</span>
               </p>
             </div>
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">MAX RATE ACCELERATION</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("MAX RATE ACCELERATION")}</p>
               <p className="font-display text-base font-bold text-ink truncate">
-                {[...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.district.name || "None"}
+                {t([...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.district.name || "None")}
               </p>
               <p className="text-[10px] text-muted-foreground font-mono">
-                Volume delta: <span className="text-emerald-600 font-bold">+{[...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.spike || 0}%</span> vs baseline
+                {t("Volume delta:")} <span className="text-emerald-600 font-bold">+{[...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.spike || 0}%</span> {t("vs baseline")}
               </p>
             </div>
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">SPIKE DENSITY MONITOR</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("SPIKE DENSITY MONITOR")}</p>
               <p className="font-display text-base font-bold text-ink truncate">
-                {DISTRICT_STATS.filter(d => d.spike > 15).length} Districts Spiking
+                {DISTRICT_STATS.filter(d => d.spike > 15).length} {t("Districts Spiking")}
               </p>
               <p className="text-[10px] text-muted-foreground">
-                Exceeding standard <span className="font-mono font-semibold text-signal">+15%</span> threshold alert
+                {t("Exceeding standard")} <span className="font-mono font-semibold text-signal">+15%</span> {t("threshold alert")}
               </p>
             </div>
           </div>
@@ -468,32 +470,36 @@ function Overview() {
           <div className="bento-card p-5">
             <div className="flex items-center gap-2 border-b border-ink/20 pb-2">
               <Radar className="h-4 w-4 text-signal" />
-              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">DISTRICT DOSSIER</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{t("DISTRICT DOSSIER")}</span>
               <span className="ml-auto font-mono text-[10px] text-muted-foreground">#{String(selected.district.id).padStart(3, "0")}</span>
             </div>
-            <h3 className="mt-3 font-editorial text-3xl leading-none text-ink">{selected.district.name}</h3>
+            <h3 className="mt-3 font-editorial text-3xl leading-none text-ink">{t(selected.district.name)}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              Population {(selected.district.population / 1e6).toFixed(2)}M · Urbanization {selected.district.urbanization}% · Literacy {selected.district.literacy}%
+              {language === "kn" ? (
+                <>ಜನಸಂಖ್ಯೆ {(selected.district.population / 1e6).toFixed(2)}M · ನಗರೀಕರಣ {selected.district.urbanization}% · ಅಕ್ಷರಸ್ಥತೆ {selected.district.literacy}%</>
+              ) : (
+                <>Population {(selected.district.population / 1e6).toFixed(2)}M · Urbanization {selected.district.urbanization}% · Literacy {selected.district.literacy}%</>
+              )}
             </p>
 
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div className="border-l-2 border-ink pl-2">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">FIRs</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("FIRs")}</p>
                 <p className="font-display text-xl font-bold">{selected.total}</p>
               </div>
               <div className="border-l-2 border-signal pl-2">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Heinous</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("Heinous")}</p>
                 <p className="font-display text-xl font-bold text-signal">{selected.heinous}</p>
               </div>
               <div className="border-l-2 border-ink pl-2">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Arrests</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("Arrests")}</p>
                 <p className="font-display text-xl font-bold">{selected.arrests}</p>
               </div>
             </div>
 
             <div className="mt-4 flex items-center justify-between">
               <div>
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Risk score</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("Risk score")}</p>
                 <p className="font-display text-lg font-bold">{selected.riskScore}<span className="text-xs text-muted-foreground">/100</span></p>
                 <div className="mt-1 h-1.5 w-32 border border-ink bg-paper">
                   <div className="h-full bg-signal" style={{ width: `${selected.riskScore}%` }} />
@@ -504,7 +510,7 @@ function Overview() {
 
             <Link to="/hotspots"
               className="mt-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.24em] text-ink hover:text-signal">
-              Drill into hotspots → </Link>
+              {t("Drill into hotspots →")} </Link>
           </div>
 
           {/* ANOMALY TICKER — side panel */}
@@ -512,10 +518,10 @@ function Overview() {
             <div className="flex items-center justify-between border-b border-ink/20 pb-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-signal" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">ANOMALY BULLETIN</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{t("ANOMALY BULLETIN")}</span>
               </div>
               <span className="rounded-sm bg-signal px-1.5 py-0.5 font-mono text-[9px] font-bold text-paper">
-                {critical} CRIT
+                {critical} {t("CRIT")}
               </span>
             </div>
             <ul className="mt-2 divide-y divide-ink/15">
@@ -523,8 +529,8 @@ function Overview() {
                 <li key={a.id} className="grid grid-cols-[22px_1fr_auto] items-start gap-2 py-2.5">
                   <span className="font-editorial text-lg leading-none text-signal">{i + 1}.</span>
                   <div>
-                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{a.severity} · {a.district}</p>
-                    <p className="mt-0.5 text-[12.5px] leading-snug text-ink">{a.text}</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t(a.severity)} · {t(a.district)}</p>
+                    <p className="mt-0.5 text-[12.5px] leading-snug text-ink">{t(a.text)}</p>
                   </div>
                   <span className="font-mono text-[9px] text-muted-foreground">{a.time}</span>
                 </li>
@@ -539,8 +545,8 @@ function Overview() {
         {/* TREND */}
         <div className="bento-card p-5 lg:col-span-3">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B1 · Temporal</span>
-            <h3 className="mt-1 font-editorial text-2xl leading-none">30-Day Registration Trend</h3>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B1 · {t("Temporal")}</span>
+            <h3 className="mt-1 font-editorial text-2xl leading-none">{t("30-Day Registration Trend")}</h3>
           </div>
           <TrendChart />
         </div>
@@ -548,8 +554,8 @@ function Overview() {
         {/* TAXONOMY */}
         <div className="bento-card p-5 lg:col-span-2">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B2 · Taxonomy</span>
-            <h3 className="mt-1 font-editorial text-2xl leading-none">By Crime Head</h3>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B2 · {t("Taxonomy")}</span>
+            <h3 className="mt-1 font-editorial text-2xl leading-none">{t("By Crime Head")}</h3>
           </div>
           <TaxonomyList />
         </div>
@@ -557,8 +563,8 @@ function Overview() {
         {/* CLEARANCE */}
         <div className="bento-card p-5 lg:col-span-1 flex flex-col">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B3 · Outcome</span>
-            <h3 className="mt-1 font-editorial text-xl leading-none">Clearance</h3>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B3 · {t("Outcome")}</span>
+            <h3 className="mt-1 font-editorial text-xl leading-none">{t("Clearance")}</h3>
           </div>
           <div className="flex flex-1 flex-col items-center justify-center">
             <div className="relative">
@@ -574,9 +580,9 @@ function Overview() {
             </div>
             <div className="mt-2 space-y-1 text-center">
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                {KPIS.chargeSheeted} of {KPIS.totalFIRs}
+                {KPIS.chargeSheeted} {t("of")} {KPIS.totalFIRs}
               </p>
-              <p className="font-editorial italic text-xs text-ink">charge-sheeted</p>
+              <p className="font-editorial italic text-xs text-ink">{t("charge-sheeted")}</p>
             </div>
           </div>
         </div>
@@ -586,10 +592,12 @@ function Overview() {
       <div className="bento-card p-5">
         <div className="border-b-2 border-ink pb-2 mb-4 flex items-center justify-between">
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">C1 · Live Registry Feed</span>
-            <h3 className="mt-1 font-editorial text-2xl leading-none">Recent FIR Filings & Profile Registry</h3>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">C1 · {t("Live Registry Feed")}</span>
+            <h3 className="mt-1 font-editorial text-2xl leading-none">{t("Recent FIR Filings & Profile Registry")}</h3>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">Showing last 4 cases</span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {language === "kn" ? "ಕೊನೆಯ 4 ಪ್ರಕರಣಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ" : "Showing last 4 cases"}
+          </span>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {allCases.slice(-4).reverse().map((c) => {
@@ -602,11 +610,11 @@ function Overview() {
                     <Badge variant="outline" className="font-mono text-[9px] border-signal text-signal px-2 py-0.5">{c.crimeNo}</Badge>
                     <span className="text-[10px] font-mono text-muted-foreground">{new Date(c.registeredDate).toLocaleDateString("en-IN")}</span>
                   </div>
-                  <h4 className="font-bold text-sm text-ink mt-2.5 truncate">{c.crimeHead.name}</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.policeStation}, {c.district.name}</p>
+                  <h4 className="font-bold text-sm text-ink mt-2.5 truncate">{t(c.crimeHead.name)}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{t(c.policeStation)}, {t(c.district.name)}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${c.status === 'Charge Sheeted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-ink/5 text-ink/70'}`}>
-                      {c.status}
+                      {t(c.status)}
                     </span>
                     {c.status === 'Charge Sheeted' && c.chargesheetNo && (
                       <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-200">
@@ -625,7 +633,7 @@ function Overview() {
                       <div className="h-6 w-6 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">IO</div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Investigating Officer</span>
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">{t("Investigating Officer")}</span>
                       <p className="font-medium text-ink truncate">{c.registeringOfficer || "Officer"}</p>
                     </div>
                   </div>
@@ -638,8 +646,8 @@ function Overview() {
                       <div className="h-6 w-6 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-[8px] font-bold text-emerald-600 shrink-0">VIC</div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Primary Victim</span>
-                      <p className="font-medium text-ink truncate">{primaryVictim?.name || "Unknown"}</p>
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">{t("Primary Victim")}</span>
+                      <p className="font-medium text-ink truncate">{primaryVictim?.name || t("Unknown")}</p>
                     </div>
                   </div>
 
@@ -651,15 +659,15 @@ function Overview() {
                       <div className="h-6 w-6 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-[8px] font-bold text-red-600 shrink-0">MUG</div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">Primary Accused</span>
-                      <p className="font-medium text-ink truncate">{primaryAccused?.name || "Unknown"}</p>
+                      <span className="text-[8px] uppercase font-bold text-muted-foreground block">{t("Primary Accused")}</span>
+                      <p className="font-medium text-ink truncate">{primaryAccused?.name || t("Unknown")}</p>
                     </div>
                   </div>
                 </div>
 
                 <Link to={`/cases/${c.caseMasterId}`} className="pt-2 text-center">
                   <Button variant="ghost" size="sm" className="w-full text-xs font-bold hover:text-signal transition-colors h-7 gap-1">
-                    Open File <ArrowRight className="h-3 w-3" />
+                    {t("Open File")} <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </div>
@@ -667,7 +675,7 @@ function Overview() {
           })}
           {allCases.length === 0 && (
             <div className="col-span-full py-8 text-center text-xs text-muted-foreground font-mono">
-              No live case files registered in datastore.
+              {t("No live case files registered in datastore.")}
             </div>
           )}
         </div>
@@ -679,6 +687,7 @@ function Overview() {
 /* ─── Trend line chart ─── */
 function TrendChart() {
   const { dailyTrend: DAILY_TREND } = useDb();
+  const { t } = useLanguage();
   const W = 460, H = 200, PAD = { l: 30, r: 12, t: 10, b: 22 };
   const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b };
   const max = Math.max(...DAILY_TREND.map((d: any) => d.firs), 1);
@@ -722,9 +731,9 @@ function TrendChart() {
       {/* legend */}
       <g transform={`translate(${W - 150} ${PAD.t + 4})`}>
         <line x1="0" y1="4" x2="14" y2="4" stroke={INK} strokeWidth="2" />
-        <text x="18" y="7" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={INK}>REGISTERED</text>
+        <text x="18" y="7" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={INK}>{t("REGISTERED")}</text>
         <rect x="80" y="1" width="8" height="6" fill={SIGNAL} />
-        <text x="92" y="7" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={INK}>HEINOUS</text>
+        <text x="92" y="7" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={INK}>{t("HEINOUS")}</text>
       </g>
     </svg>
   );
@@ -733,6 +742,7 @@ function TrendChart() {
 /* ─── Taxonomy list ─── */
 function TaxonomyList() {
   const { headDist: HEAD_DIST } = useDb();
+  const { t } = useLanguage();
   const total = HEAD_DIST.reduce((s: number, h: any) => s + h.value, 0) || 1;
   const sorted = [...HEAD_DIST].sort((a: any, b: any) => b.value - a.value);
   const max = sorted[0]?.value ?? 1;
@@ -745,7 +755,7 @@ function TaxonomyList() {
             <span className="font-mono text-[10px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
             <div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[12.5px] font-medium leading-tight">{h.name}</span>
+                <span className="text-[12.5px] font-medium leading-tight">{t(h.name)}</span>
                 <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{h.value}</span>
               </div>
               <div className="mt-1 h-1.5 w-full border border-ink bg-paper">
