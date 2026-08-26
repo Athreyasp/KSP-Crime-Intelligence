@@ -147,7 +147,7 @@
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }
 
-@utility font-editorial { font-family: var(--font-serif); font-feature-settings: "ss01"; }
+@utility font-editorial { font-family: var(--font-display); font-feature-settings: "ss01"; }
 
 @utility pulse-alert { animation: pulseAlert 1.8s ease-out infinite; }
 @keyframes pulseAlert {
