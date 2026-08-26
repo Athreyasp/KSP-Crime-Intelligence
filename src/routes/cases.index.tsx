@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DISTRICTS, CRIME_HEADS, CASE_STATUS, GRAVITY, CASE_CATEGORY } from "@/data/mock";
 import { useDb } from "@/hooks/use-db";
+import { useLanguage } from "@/hooks/use-language";
 import { PageHeader } from "@/components/page-header";
 import {
   Folder, FolderOpen, Search, Filter, CheckCircle2, Clock, AlertTriangle, ShieldAlert,
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/cases/")({
 
 function CasesPage() {
   const { cases: allCases } = useDb();
+  const { t, language } = useLanguage();
 
   // Parse URL search parameters on mount
   const params = useMemo(() => {
@@ -74,28 +76,30 @@ function CasesPage() {
     const query = q.trim().toLowerCase();
 
     return allCases.filter(c => {
+      if (!c) return false;
+
       const matchDistrict = district === "all" || 
-        c.district.name.trim().toLowerCase() === district.trim().toLowerCase();
+        (c.district && c.district.name && c.district.name.trim().toLowerCase() === district.trim().toLowerCase());
 
       const matchHead = head === "all" || 
-        c.crimeHead.name.trim().toLowerCase() === head.trim().toLowerCase();
+        (c.crimeHead && c.crimeHead.name && c.crimeHead.name.trim().toLowerCase() === head.trim().toLowerCase());
 
       const matchStatus = status === "all" || 
-        c.status.trim().toLowerCase() === status.trim().toLowerCase();
+        (c.status && c.status.trim().toLowerCase() === status.trim().toLowerCase());
 
       const matchGravity = gravity === "all" || 
-        c.gravity.trim().toLowerCase() === gravity.trim().toLowerCase();
+        (c.gravity && c.gravity.trim().toLowerCase() === gravity.trim().toLowerCase());
 
       const matchCategory = category === "all" || 
-        c.category.trim().toLowerCase() === category.trim().toLowerCase();
+        (c.category && c.category.trim().toLowerCase() === category.trim().toLowerCase());
 
       const matchQuery = !query || (
-        c.crimeNo.toLowerCase().includes(query) ||
-        c.complainant.name.toLowerCase().includes(query) ||
-        c.policeStation.toLowerCase().includes(query) ||
-        c.briefFacts.toLowerCase().includes(query) ||
-        c.actSections.some(sec => sec.toLowerCase().includes(query)) ||
-        c.accused.some(a => a.name.toLowerCase().includes(query))
+        (c.crimeNo && c.crimeNo.toLowerCase().includes(query)) ||
+        (c.complainant && c.complainant.name && c.complainant.name.toLowerCase().includes(query)) ||
+        (c.policeStation && c.policeStation.toLowerCase().includes(query)) ||
+        (c.briefFacts && c.briefFacts.toLowerCase().includes(query)) ||
+        (c.actSections && c.actSections.some(sec => sec && sec.toLowerCase().includes(query))) ||
+        (c.accused && c.accused.some(a => a && a.name && a.name.toLowerCase().includes(query)))
       );
 
       return matchDistrict && matchHead && matchStatus && matchGravity && matchCategory && matchQuery;
@@ -113,13 +117,13 @@ function CasesPage() {
       {/* Header */}
       <PageHeader
         section="07"
-        eyebrow="Karnataka State Police · Crime Records"
-        title="Case File Repository"
-        description="Browse state FIR records. Select district or category filters and click Apply Filters to view matching folders."
+        eyebrow={t("Karnataka State Police · Crime Records")}
+        title={t("Case File Repository")}
+        description={t("Browse state FIR records. Select district or category filters and click Apply Filters to view matching folders.")}
         actions={
           <Link to="/cases/new">
             <Button size="sm" className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold flex items-center gap-1.5 rounded-full px-4 shadow-sm">
-              <Plus className="h-4 w-4" /> Register New FIR
+              <Plus className="h-4 w-4" /> {t("Register New FIR")}
             </Button>
           </Link>
         }
@@ -127,23 +131,22 @@ function CasesPage() {
 
       {/* Minimalist Metric Cards Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <MetricCard label="Total FIR Files" value={allCases.length} icon={<Folder className="h-4 w-4 text-[#2563eb]" />} />
-        <MetricCard label="Heinous Offences" value={heinousCount} highlightRed icon={<AlertTriangle className="h-4 w-4 text-[#ef4444]" />} />
-        <MetricCard label="Under Investigation" value={activeCount} icon={<Clock className="h-4 w-4 text-[#f59e0b]" />} />
-        <MetricCard label="Charge Sheeted" value={chargeSheetedCount} icon={<CheckCircle2 className="h-4 w-4 text-[#10b981]" />} />
-        <MetricCard label="Custody Arrests" value={totalArrests} icon={<ShieldAlert className="h-4 w-4 text-[#2563eb]" />} />
+        <MetricCard label={t("Total FIR Files")} value={allCases.length} icon={<Folder className="h-4 w-4 text-[#2563eb]" />} />
+        <MetricCard label={t("Heinous Offences")} value={heinousCount} highlightRed icon={<AlertTriangle className="h-4 w-4 text-[#ef4444]" />} />
+        <MetricCard label={t("Under Investigation")} value={activeCount} icon={<Clock className="h-4 w-4 text-[#f59e0b]" />} />
+        <MetricCard label={t("Charge Sheeted")} value={chargeSheetedCount} icon={<CheckCircle2 className="h-4 w-4 text-[#10b981]" />} />
+        <MetricCard label={t("Custody Arrests")} value={totalArrests} icon={<ShieldAlert className="h-4 w-4 text-[#2563eb]" />} />
       </div>
 
       {/* Minimalist Soothing Filter Bar */}
       <Card className="bg-white border-[#e2e8f0] rounded-2xl shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           
-          {/* Top Row: Search Input & View Toggle */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 min-w-[280px]">
               <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#94a3b8]" />
               <Input
-                placeholder="Search Crime No., Complainant, Accused, or Station..."
+                placeholder={t("Search Crime No., Complainant, Accused, or Station...")}
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 className="pl-10 bg-[#f8fafc] border-[#e2e8f0] focus:bg-white focus:ring-2 focus:ring-[#2563eb] rounded-xl text-sm"
@@ -157,7 +160,7 @@ function CasesPage() {
                 onClick={() => setViewMode("grid")}
                 className={`h-8 px-3 text-xs font-semibold rounded-lg ${viewMode === "grid" ? "bg-[#2563eb] text-white" : "text-[#64748b]"}`}
               >
-                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Folder Grid
+                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> {t("Folder Grid")}
               </Button>
               <Button
                 variant={viewMode === "table" ? "default" : "ghost"}
@@ -165,7 +168,7 @@ function CasesPage() {
                 onClick={() => setViewMode("table")}
                 className={`h-8 px-3 text-xs font-semibold rounded-lg ${viewMode === "table" ? "bg-[#2563eb] text-white" : "text-[#64748b]"}`}
               >
-                <List className="mr-1.5 h-3.5 w-3.5" /> Table List
+                <List className="mr-1.5 h-3.5 w-3.5" /> {t("Table List")}
               </Button>
             </div>
           </div>
@@ -216,7 +219,7 @@ function CasesPage() {
           {/* Action Row: APPLY FILTERS Button & Reset */}
           <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f9]">
             <div className="text-xs text-[#64748b]">
-              Showing <strong className="text-[#0f172a] font-bold">{matchingCases.length}</strong> matching files (Total database: {allCases.length})
+              {t("Showing")} <strong className="text-[#0f172a] font-bold">{matchingCases.length}</strong> {t("matching files (Total database:")} {allCases.length})
             </div>
 
             <div className="flex items-center gap-2">
@@ -227,7 +230,7 @@ function CasesPage() {
                   size="sm"
                   className="h-9 px-4 text-xs font-semibold bg-[#fee2e2] hover:bg-[#fcd3d3] text-[#ef4444] rounded-full flex items-center gap-1.5 shadow-sm transition-all duration-150"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" /> Clear Filters
+                  <RotateCcw className="h-3.5 w-3.5" /> {t("Clear Filters")}
                 </Button>
               )}
             </div>
@@ -242,7 +245,7 @@ function CasesPage() {
             <div className="flex items-center justify-between p-3 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] text-[#1e40af] text-xs font-bold">
               <span className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#2563eb]" />
-                <span>ACTIVE FILTER: Showing {matchingCases.length} matching folder(s) for {district !== "all" ? district : "selected criteria"}</span>
+                <span>{t("ACTIVE FILTER: Showing")} {matchingCases.length} {t("matching folder(s) for")} {district !== "all" ? t(district) : t("selected criteria")}</span>
               </span>
             </div>
           )}
@@ -256,8 +259,8 @@ function CasesPage() {
             {matchingCases.length === 0 && (
               <div className="col-span-full py-16 text-center rounded-2xl border border-dashed border-[#cbd5e1] bg-[#f8fafc]">
                 <FolderOpen className="mx-auto h-12 w-12 text-[#94a3b8]" />
-                <h3 className="mt-3 text-base font-bold text-[#0f172a]">No Cases Found for Selected Filter</h3>
-                <p className="mt-1 text-xs text-[#64748b]">No FIR case files match the current district or status criteria.</p>
+                <h3 className="mt-3 text-base font-bold text-[#0f172a]">{t("No Cases Found for Selected Filter")}</h3>
+                <p className="mt-1 text-xs text-[#64748b]">{t("No FIR case files match the current district or status criteria.")}</p>
               </div>
             )}
           </div>
@@ -272,13 +275,13 @@ function CasesPage() {
               <table className="w-full text-xs text-left border-collapse">
                 <thead className="bg-[#f8fafc] text-[#64748b] font-bold border-b border-[#e2e8f0] uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="px-4 py-3">Crime No.</th>
-                    <th className="px-4 py-3">District & Police Station</th>
-                    <th className="px-4 py-3">Crime Head</th>
-                    <th className="px-4 py-3">Photos</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3 text-right">Action</th>
+                    <th className="px-4 py-3">{t("Crime No.")}</th>
+                    <th className="px-4 py-3">{t("District & Police Station")}</th>
+                    <th className="px-4 py-3">{t("Crime Head")}</th>
+                    <th className="px-4 py-3">{t("Photos")}</th>
+                    <th className="px-4 py-3">{t("Status")}</th>
+                    <th className="px-4 py-3">{t("Date")}</th>
+                    <th className="px-4 py-3 text-right">{t("Action")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f1f5f9]">
@@ -290,11 +293,11 @@ function CasesPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-bold text-[#0f172a]">{c.district.name}</div>
-                        <div className="text-[11px] text-[#64748b]">{c.policeStation}</div>
+                        <div className="font-bold text-[#0f172a]">{t(c.district.name)}</div>
+                        <div className="text-[11px] text-[#64748b]">{t(c.policeStation)}</div>
                       </td>
                       <td className="px-4 py-3 font-semibold text-[#0f172a]">
-                        {c.crimeHead.name}
+                        {t(c.crimeHead.name)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
@@ -303,10 +306,10 @@ function CasesPage() {
                           ) : (
                             <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
                           )}
-                          {c.accused[0]?.photo && (
+                          {c.accused?.[0]?.photo && (
                             <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
                           )}
-                          {c.victims[0]?.photo && (
+                          {c.victims?.[0]?.photo && (
                             <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
                           )}
                         </div>
@@ -318,7 +321,7 @@ function CasesPage() {
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
                             : "bg-[#f1f5f9] text-[#475569]"
                         )}>
-                          {c.status}
+                          {t(c.status)}
                         </span>
                         {c.status === "Charge Sheeted" && c.chargesheetNo && (
                           <div className="text-[9px] font-mono text-emerald-600 mt-1 font-bold">
@@ -332,12 +335,21 @@ function CasesPage() {
                       <td className="px-4 py-3 text-right">
                         <Link to="/cases/$caseId" params={{ caseId: String(c.caseMasterId) }}>
                           <Button size="sm" variant="ghost" className="h-8 text-xs font-bold text-[#2563eb] hover:bg-[#eff6ff] rounded-full">
-                            View File <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                            {t("View File")} <ArrowRight className="ml-1 h-3.5 w-3.5" />
                           </Button>
                         </Link>
                       </td>
                     </tr>
                   ))}
+                  {matchingCases.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-16 text-center text-muted-foreground bg-[#f8fafc]">
+                        <FolderOpen className="mx-auto h-12 w-12 text-[#94a3b8]" />
+                        <h3 className="mt-3 text-base font-bold text-[#0f172a]">{t("No Cases Found for Selected Filter")}</h3>
+                        <p className="mt-1 text-xs text-[#64748b]">{t("No FIR case files match the current district or status criteria.")}</p>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -354,7 +366,7 @@ function SimpleFolderCard({ c }: { c: any }) {
     <div className="group relative pt-4 flex flex-col transition-all duration-200">
       {/* Folder Tab Header */}
       <div className="absolute top-0 left-4 h-4.5 px-3 bg-[#f8fafc] group-hover:bg-[#eff6ff] border-t border-x border-[#e2e8f0] group-hover:border-[#2563eb] rounded-t-lg text-[8px] font-mono font-bold text-muted-foreground/80 group-hover:text-[#2563eb] flex items-center justify-center transition-colors duration-200">
-        FILE INDEX // {c.category.toUpperCase()}
+        {t("FILE INDEX")} // {t(c.category)}
       </div>
 
       {/* Folder Main Body */}
@@ -366,7 +378,7 @@ function SimpleFolderCard({ c }: { c: any }) {
               <Folder className="h-4 w-4" />
             </div>
             <span className="font-mono text-xs font-bold text-[#1e293b]">
-              FIR #{c.crimeNo}
+              {t("FIR")} #{c.crimeNo}
             </span>
           </div>
 
@@ -376,17 +388,17 @@ function SimpleFolderCard({ c }: { c: any }) {
               ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
               : "bg-[#f1f5f9] text-[#475569]"
           )}>
-            {c.status}
+            {t(c.status)}
           </span>
         </div>
 
         {/* Main Title & Location Subtitle */}
         <div>
           <h3 className="font-display text-base font-bold text-[#0f172a] group-hover:text-[#2563eb] transition-colors line-clamp-1">
-            {c.crimeHead.name}
+            {t(c.crimeHead.name)}
           </h3>
           <p className="text-xs text-[#64748b] mt-0.5">
-            {c.policeStation}, {c.district.name} District · {new Date(c.registeredDate).toLocaleDateString("en-IN")}
+            {t(c.policeStation)}, {t(c.district.name)} {t("District")} · {new Date(c.registeredDate).toLocaleDateString("en-IN")}
           </p>
           {c.status === "Charge Sheeted" && c.chargesheetNo && (
             <p className="text-[10px] font-mono text-emerald-600 bg-emerald-50/50 border border-emerald-200/50 rounded px-1.5 py-0.5 mt-1.5 inline-block font-bold">
@@ -397,16 +409,16 @@ function SimpleFolderCard({ c }: { c: any }) {
 
         {/* Roster Photo Preview Row */}
         <div className="flex items-center gap-1 pt-1 border-t border-[#f1f5f9]">
-          <span className="text-[10px] text-[#64748b] font-medium mr-1.5">Roster:</span>
+          <span className="text-[10px] text-[#64748b] font-medium mr-1.5">{t("Roster:")}</span>
           {c.officerPhoto ? (
             <img src={c.officerPhoto} title={`IO: ${c.registeringOfficer}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
           ) : (
             <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
           )}
-          {c.accused[0]?.photo && (
+          {c.accused?.[0]?.photo && (
             <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
           )}
-          {c.victims[0]?.photo && (
+          {c.victims?.[0]?.photo && (
             <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
           )}
         </div>
@@ -414,12 +426,12 @@ function SimpleFolderCard({ c }: { c: any }) {
         {/* Minimal Footer Row */}
         <div className="pt-2 flex items-center justify-between">
           <span className="text-[11px] font-semibold text-[#64748b]">
-            Category: <strong className="text-[#334155]">{c.category}</strong>
+            {t("Category:")} <strong className="text-[#334155]">{t(c.category)}</strong>
           </span>
 
           <Link to="/cases/$caseId" params={{ caseId: String(c.caseMasterId) }}>
             <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-[#2563eb] hover:bg-[#eff6ff] rounded-full flex items-center gap-1">
-              View File <ArrowRight className="h-3.5 w-3.5" />
+              {t("View File")} <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </Link>
         </div>
@@ -429,10 +441,11 @@ function SimpleFolderCard({ c }: { c: any }) {
 }
 
 function MetricCard({ label, value, highlightRed, icon }: { label: string; value: number; highlightRed?: boolean; icon: React.ReactNode }) {
+  const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-[#e2e8f0] bg-white p-3.5 shadow-sm">
       <div className="flex items-center justify-between text-[#64748b]">
-        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider">{t(label)}</span>
         {icon}
       </div>
       <p className={`mt-1 font-display text-2xl font-extrabold ${highlightRed ? "text-[#ef4444]" : "text-[#0f172a]"}`}>
@@ -443,9 +456,10 @@ function MetricCard({ label, value, highlightRed, icon }: { label: string; value
 }
 
 function MinimalSelect({ label, defaultLabel, value, onChange, options }: { label: string; defaultLabel: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase font-bold text-[#64748b]">{label}</span>
+      <span className="text-[10px] uppercase font-bold text-[#64748b]">{t(label)}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -453,7 +467,7 @@ function MinimalSelect({ label, defaultLabel, value, onChange, options }: { labe
       >
         {options.map(o => (
           <option key={o} value={o}>
-            {o === "all" ? defaultLabel : o}
+            {o === "all" ? t(defaultLabel) : t(o)}
           </option>
         ))}
       </select>
