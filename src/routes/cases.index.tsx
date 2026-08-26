@@ -362,6 +362,7 @@ function CasesPage() {
 
 {/* ULTRA-SIMPLE & SOOTHING MINIMALIST FOLDER CARD */}
 function SimpleFolderCard({ c }: { c: any }) {
+  const { t } = useLanguage();
   return (
     <div className="group relative pt-4 flex flex-col transition-all duration-200">
       {/* Folder Tab Header */}
