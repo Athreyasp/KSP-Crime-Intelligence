@@ -159,7 +159,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
           arrested: isArrested,
           arrestId: isArrested ? Number(accusedMasterId) || (aIdx + 1) : undefined,
           arrestDate: isArrested ? String(arrestRecord.ArrestSurrenderDate || "").slice(0, 10) : undefined,
-          arrestDistrict: isArrested ? (DISTRICTS.find(d => d.id === Number(arrestRecord.ArrestSurrenderDistrictId))?.name || "Bengaluru City") : undefined,
+          arrestDistrict: isArrested ? (DISTRICTS.find(d => d.id === Number(arrestRecord.ArrestSurrenderDistrictId))?.name || "Bengaluru Urban") : undefined,
           ioName: isArrested ? `Officer ID ${arrestRecord.IOID}` : undefined,
           courtName: isArrested ? (COURTS[Number(arrestRecord.CourtID) - 1] || "JMFC Court") : undefined,
           photo: a.photo || ""
@@ -294,11 +294,18 @@ export async function insertLiveCase(newCase: Omit<Case, "caseMasterId">): Promi
   return result.data;
 }
 
-export async function updateLiveCase(caseMasterId: number, status: string, briefFacts: string): Promise<void> {
+export async function updateLiveCase(
+  caseMasterId: number, 
+  status: string, 
+  briefFacts: string,
+  chargesheetNo?: string,
+  chargesheetDate?: string,
+  chargesheetType?: string
+): Promise<void> {
   const res = await fetch(`${API_BASE}/server/api/cases`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ caseMasterId, status, briefFacts })
+    body: JSON.stringify({ caseMasterId, status, briefFacts, chargesheetNo, chargesheetDate, chargesheetType })
   });
   if (!res.ok) {
     const errorText = await res.text();

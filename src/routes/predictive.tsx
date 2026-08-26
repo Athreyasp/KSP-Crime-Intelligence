@@ -32,7 +32,7 @@ function Predictive() {
   const anomalies = CASES.filter(c => c.gravity === "Heinous").slice(0, 4);
 
   // Syndicate AI Reconstruction States
-  const [selectedDistrictName, setSelectedDistrictName] = useState<string>("Bengaluru City");
+  const [selectedDistrictName, setSelectedDistrictName] = useState<string>("Bengaluru Urban");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
@@ -277,7 +277,7 @@ function Predictive() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
-        section="§ 05"
+        section="05"
         eyebrow="AI/ML Powered · Model v2.4"
         title="Predictive Intelligence Dashboard"
         description="Forward-looking risk scoring, anomaly detection and crime forecasting."

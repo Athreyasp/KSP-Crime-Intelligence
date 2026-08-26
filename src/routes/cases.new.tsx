@@ -97,6 +97,7 @@ function NewCasePage() {
   const navigate = useNavigate();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState(1);
 
   // Helper to format date for datetime-local value
   const formatDateLocal = (date: Date) => {
@@ -236,23 +237,86 @@ function NewCasePage() {
     }
   };
 
+  // Step validation helpers
+  const handleNextStep = () => {
+    if (step === 1) {
+      if (!complainantName.trim()) {
+        toast.error("Please enter complainant name in Step 1.");
+        return;
+      }
+      if (!complainantPhone.trim()) {
+        toast.error("Please enter complainant contact phone.");
+        return;
+      }
+      if (!complainantAddress.trim()) {
+        toast.error("Please enter complainant address.");
+        return;
+      }
+    }
+    if (step === 2) {
+      if (!policeStation.trim()) {
+        toast.error("Please enter police station unit name in Step 2.");
+        return;
+      }
+    }
+    if (step === 3) {
+      if (!occurrencePlace.trim()) {
+        toast.error("Please enter occurrence location in Step 3.");
+        return;
+      }
+      if (!lat.trim() || !lng.trim()) {
+        toast.error("Please enter coordinates (Latitude/Longitude) in Step 3.");
+        return;
+      }
+    }
+    if (step === 4) {
+      if (victims.some(v => !v.name.trim())) {
+        toast.error("Please fill in names for all victims in Step 4.");
+        return;
+      }
+      if (accused.some(a => !a.name.trim())) {
+        toast.error("Please fill in names for all accused persons in Step 4.");
+        return;
+      }
+    }
+    setStep(prev => Math.min(prev + 1, 5));
+  };
+
+  const handlePrevStep = () => {
+    setStep(prev => Math.max(prev - 1, 1));
+  };
+
   // Step 1: Open Review Modal Popup on Form Submit
   const handleOpenReviewModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!complainantName.trim()) {
-      toast.error("Please enter complainant name in Section 1");
+      toast.error("Please enter complainant name.");
+      setStep(1);
+      return;
+    }
+    if (!policeStation.trim()) {
+      toast.error("Please enter police station name.");
+      setStep(2);
+      return;
+    }
+    if (!occurrencePlace.trim()) {
+      toast.error("Please enter occurrence place.");
+      setStep(3);
       return;
     }
     if (victims.some(v => !v.name.trim())) {
-      toast.error("Please fill in names for all victims in Section 3");
+      toast.error("Please fill in names for all victims.");
+      setStep(4);
       return;
     }
     if (accused.some(a => !a.name.trim())) {
-      toast.error("Please fill in names for all accused persons in Section 4");
+      toast.error("Please fill in names for all accused.");
+      setStep(4);
       return;
     }
     if (!briefFacts.trim()) {
-      toast.error("Please provide brief facts of the crime in Section 4");
+      toast.error("Please provide brief facts of the crime in Step 5.");
+      setStep(5);
       return;
     }
 
@@ -349,7 +413,7 @@ function NewCasePage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <PageHeader
-        section="§ 08"
+        section="08"
         eyebrow="Karnataka State Police · Record Entry"
         title="New FIR Registration"
         description="Official FIR Form No. 1 entry. Populates all 27 database tables in your Zoho Console instantly."
@@ -362,398 +426,493 @@ function NewCasePage() {
         }
       />
 
+      <div className="rounded-2xl border border-border bg-surface-1 p-5 shadow-sm">
+        <div className="flex justify-between items-center max-w-4xl mx-auto">
+          {[
+            { num: 1, label: "Complainant" },
+            { num: 2, label: "Police & Station" },
+            { num: 3, label: "Acts & Occurrence" },
+            { num: 4, label: "Accused & Victims" },
+            { num: 5, label: "Facts & Narrative" }
+          ].map((s, idx) => {
+            const isCompleted = step > s.num;
+            const isActive = step === s.num;
+            return (
+              <div key={s.num} className="flex-1 flex items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (s.num < step) {
+                      setStep(s.num);
+                    }
+                  }}
+                  className="flex flex-col items-center gap-1.5 focus:outline-none relative z-10"
+                >
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center border font-mono text-xs font-bold transition-all duration-200 ${
+                    isCompleted
+                      ? "bg-success text-success-foreground border-success"
+                      : isActive
+                        ? "bg-[#2563eb] text-white border-[#2563eb] shadow-sm"
+                        : "bg-surface-2 text-muted-foreground border-border"
+                  }`}>
+                    {isCompleted ? <Check className="h-4 w-4" /> : s.num}
+                  </div>
+                  <span className={`text-[10px] font-sans font-bold uppercase tracking-wider hidden md:inline transition-colors duration-200 ${
+                    isActive ? "text-[#2563eb]" : "text-muted-foreground"
+                  }`}>
+                    {s.label}
+                  </span>
+                </button>
+                {idx < 4 && (
+                  <div className={`flex-1 h-0.5 mx-2 rounded-full transition-colors duration-200 ${
+                    isCompleted ? "bg-success" : "bg-border"
+                  }`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <form onSubmit={handleOpenReviewModal} className="space-y-6 pb-12">
 
         {/* SECTION 1: COMPLAINANT DETAILS */}
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="border-b border-border/60 pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
-                <User className="h-4.5 w-4.5 text-signal" /> Section 1: Complainant Details (ComplainantDetails)
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-[10px] uppercase border-signal/40 text-signal">
-                Part 1 of 4
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 grid gap-4 md:grid-cols-4">
-            <div className="md:col-span-2 flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Complainant Full Name *</label>
-              <Input placeholder="Enter complainant name" value={complainantName} onChange={e => setComplainantName(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age (AgeYear) *</label>
-              <Input type="number" value={complainantAge} onChange={e => setComplainantAge(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender (GenderID)</label>
-              <select value={complainantGender} onChange={e => setComplainantGender(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                <option value="M">Male (M)</option>
-                <option value="F">Female (F)</option>
-                <option value="T">Transgender (T)</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Contact Phone *</label>
-              <Input value={complainantPhone} onChange={e => setComplainantPhone(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occupation (OccupationID)</label>
-              <select value={complainantOccupation} onChange={e => setComplainantOccupation(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {OCCUPATIONS.map(occ => (
-                  <option key={occ} value={occ}>{occ}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Religion (ReligionID)</label>
-              <select value={complainantReligion} onChange={e => setComplainantReligion(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {RELIGIONS.map(rel => (
-                  <option key={rel} value={rel}>{rel}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Caste (CasteID)</label>
-              <select value={complainantCaste} onChange={e => setComplainantCaste(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {CASTES.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-3 flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address *</label>
-              <Input value={complainantAddress} onChange={e => setComplainantAddress(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Relation to Incident *</label>
-              <Input value={complainantRelation} onChange={e => setComplainantRelation(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-          </CardContent>
-        </Card>
+        {step === 1 && (
+          <Card className="bg-surface-1 border-border">
+            <CardHeader className="border-b border-border/60 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
+                  <User className="h-4.5 w-4.5 text-signal" /> Section 1: Complainant Details (ComplainantDetails)
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase border-[#2563eb]/45 text-[#2563eb]">
+                  Step 1 of 5
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 grid gap-4 md:grid-cols-4">
+              <div className="md:col-span-2 flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Complainant Full Name *</label>
+                <Input placeholder="Enter complainant name" value={complainantName} onChange={e => setComplainantName(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age (AgeYear) *</label>
+                <Input type="number" value={complainantAge} onChange={e => setComplainantAge(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender (GenderID)</label>
+                <select value={complainantGender} onChange={e => setComplainantGender(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  <option value="M">Male (M)</option>
+                  <option value="F">Female (F)</option>
+                  <option value="T">Transgender (T)</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Contact Phone *</label>
+                <Input value={complainantPhone} onChange={e => setComplainantPhone(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occupation (OccupationID)</label>
+                <select value={complainantOccupation} onChange={e => setComplainantOccupation(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {OCCUPATIONS.map(occ => (
+                    <option key={occ} value={occ}>{occ}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Religion (ReligionID)</label>
+                <select value={complainantReligion} onChange={e => setComplainantReligion(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {RELIGIONS.map(rel => (
+                    <option key={rel} value={rel}>{rel}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Caste (CasteID)</label>
+                <select value={complainantCaste} onChange={e => setComplainantCaste(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {CASTES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-3 flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address *</label>
+                <Input value={complainantAddress} onChange={e => setComplainantAddress(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Relation to Incident *</label>
+                <Input value={complainantRelation} onChange={e => setComplainantRelation(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* SECTION 2: POLICE DETAILS */}
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="border-b border-border/60 pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
-                <Landmark className="h-4.5 w-4.5 text-signal" /> Section 2: Police Station & Officer Details (Unit & Employee)
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-[10px] uppercase border-signal/40 text-signal">
-                Part 2 of 4
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">District (DistrictID)</label>
-              <select value={districtId} onChange={e => setDistrictId(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {DISTRICTS.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Police Station Unit (PoliceStationID / UnitID) *</label>
-              <Input value={policeStation} onChange={e => setPoliceStation(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Registering Officer / IO (PolicePersonID / EmployeeID)</label>
-              <select value={registeringOfficer} onChange={e => setRegisteringOfficer(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {REGISTERING_OFFICERS.map(o => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Officer Rank (RankID)</label>
-              <select value={officerRank} onChange={e => setOfficerRank(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                <option value="Police Inspector (PI)">Police Inspector (PI)</option>
-                <option value="Police Sub-Inspector (PSI)">Police Sub-Inspector (PSI)</option>
-                <option value="Deputy Superintendent (DySP)">Deputy Superintendent (DySP)</option>
-                <option value="Assistant Sub-Inspector (ASI)">Assistant Sub-Inspector (ASI)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Hearing Court (CourtID)</label>
-              <select value={courtName} onChange={e => setCourtName(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {COURTS.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Info Received at PS Date & Time (InfoReceivedPSDate) *</label>
-              <Input type="datetime-local" value={infoReceivedPSDate} onChange={e => setInfoReceivedPSDate(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-
-            <div className="flex flex-col gap-1 md:col-span-3 pt-2 border-t border-border/40">
-              <PhotoUploadWidget
-                label="Registering Officer Profile Image"
-                value={officerPhoto}
-                onChange={setOfficerPhoto}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* SECTION 3: VICTIM DETAILS */}
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="border-b border-border/60 pb-3 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4.5 w-4.5 text-signal" />
-              <CardTitle className="text-base font-semibold text-foreground">Section 3: Victim Details (Victim)</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-mono text-[10px] uppercase border-signal/40 text-signal">
-                Part 3 of 4
-              </Badge>
-              <Button type="button" onClick={handleAddVictim} variant="outline" className="h-7 px-2.5 text-[11px]">
-                <Plus className="mr-1 h-3 w-3" /> Add Victim
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            {victims.map((victim, idx) => (
-              <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
-                <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Victim {idx + 1} Name *</label>
-                  <Input placeholder="Victim Full Name" value={victim.name} onChange={e => handleUpdateVictim(idx, "name", e.target.value)} className="bg-paper border-border" required />
-                </div>
-                <div className="w-20 flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
-                  <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
-                </div>
-                <div className="w-24 flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
-                  <select value={victim.gender} onChange={e => handleUpdateVictim(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="T">Transgender</option>
-                  </select>
-                </div>
-                <div className="w-36 flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Injury Status</label>
-                  <select value={victim.injuryStatus} onChange={e => handleUpdateVictim(idx, "injuryStatus", e.target.value)} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
-                    <option value="Uninjured">Uninjured</option>
-                    <option value="Minor Injuries">Minor Injuries</option>
-                    <option value="Severe / Hospitalized">Severe / Hospitalized</option>
-                    <option value="Fatal">Fatal</option>
-                  </select>
-                </div>
-                <PhotoUploadWidget
-                  label="Victim Photo"
-                  value={victim.photo}
-                  onChange={(base64) => handleUpdateVictim(idx, "photo", base64)}
-                />
-                <div className="flex items-center gap-2 h-9 px-2 pb-1">
-                  <input
-                    type="checkbox"
-                    id={`v-police-${idx}`}
-                    checked={victim.isPolice}
-                    onChange={e => handleUpdateVictim(idx, "isPolice", e.target.checked)}
-                    className="form-checkbox h-4 w-4 text-signal rounded border-border"
-                  />
-                  <label htmlFor={`v-police-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Police Duty? (VictimPolice)</label>
-                </div>
-                {victims.length > 1 && (
-                  <Button type="button" onClick={() => handleRemoveVictim(idx)} variant="destructive" className="h-9 px-3">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* SECTION 4: CASE & OFFENCE DETAILS */}
-        <Card className="bg-surface-1 border-border">
-          <CardHeader className="border-b border-border/60 pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
-                <FileText className="h-4.5 w-4.5 text-signal" /> Section 4: Case & Offence Details (CaseMaster & ActSection)
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-[10px] uppercase border-signal/40 text-signal">
-                Part 4 of 4
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category (CaseCategoryID)</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                <option value="FIR">FIR (First Information Report)</option>
-                <option value="UDR">UDR (Un-natural Death Report)</option>
-                <option value="Zero FIR">Zero FIR</option>
-                <option value="PAR">PAR (Petty Case)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gravity of Offence (GravityOffenceID)</label>
-              <select value={gravity} onChange={e => setGravity(e.target.value as any)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                <option value="Non-Heinous">Non-Heinous</option>
-                <option value="Heinous">Heinous (Severe)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Major Crime Head (CrimeMajorHeadID)</label>
-              <select value={crimeHeadId} onChange={e => setCrimeHeadId(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {CRIME_HEADS.map(h => (
-                  <option key={h.id} value={h.id}>{h.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Case Status (CaseStatusID)</label>
-              <select value={status} onChange={e => setStatus(e.target.value as any)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                <option value="Under Investigation">Under Investigation</option>
-                <option value="Charge Sheeted">Charge Sheeted</option>
-                <option value="Pending Trial">Pending Trial</option>
-                <option value="Closed">Closed</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Modus Operandi Tag</label>
-              <select value={moTag} onChange={e => setMoTag(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
-                {MO_TAGS.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occurrence Location *</label>
-              <Input value={occurrencePlace} onChange={e => setOccurrencePlace(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident From (IncidentFromDate) *</label>
-              <Input type="datetime-local" value={incidentFromDate} onChange={e => setIncidentFromDate(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident To (IncidentToDate) *</label>
-              <Input type="datetime-local" value={incidentToDate} onChange={e => setIncidentToDate(e.target.value)} className="bg-surface-2 border-border" required />
-            </div>
-
-            <div className="flex gap-2">
-              <div className="flex-1 flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Latitude *</label>
-                <Input type="number" step="0.0001" value={lat} onChange={e => setLat(e.target.value)} className="bg-surface-2 border-border" required />
-              </div>
-              <div className="flex-1 flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Longitude *</label>
-                <Input type="number" step="0.0001" value={lng} onChange={e => setLng(e.target.value)} className="bg-surface-2 border-border" required />
-              </div>
-            </div>
-
-            {/* Act & Section Association Sub-block */}
-            <div className="md:col-span-3 rounded-md bg-surface-2 border border-border/50 p-3.5 space-y-2">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-                <Scale className="h-3.5 w-3.5 text-signal" /> Act & Section Association (ActSectionAssociation)
-              </label>
-              <div className="flex items-center gap-3">
-                <Input placeholder="Enter legal act/section e.g. BNS 303 / IPC 379" value={newActSection} onChange={e => setNewActSection(e.target.value)} className="bg-paper border-border max-w-sm" />
-                <Button type="button" onClick={handleAddActSection} size="sm" className="h-9">
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add Section
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {actSections.map((sec, idx) => (
-                  <Badge key={idx} variant="secondary" className="bg-paper border border-border gap-2 px-3 py-1 text-xs">
-                    <span>{sec}</span>
-                    <button type="button" onClick={() => handleRemoveActSection(idx)} className="text-signal hover:text-red-700 font-bold">
-                      &times;
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Accused & Arrest Record Sub-block */}
-            <div className="md:col-span-3 rounded-md bg-surface-2 border border-border/50 p-3.5 space-y-3">
+        {step === 2 && (
+          <Card className="bg-surface-1 border-border">
+            <CardHeader className="border-b border-border/60 pb-3">
               <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
+                  <Landmark className="h-4.5 w-4.5 text-signal" /> Section 2: Police Station & Officer Details (Unit & Employee)
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase border-[#2563eb]/45 text-[#2563eb]">
+                  Step 2 of 5
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">District (DistrictID)</label>
+                <select value={districtId} onChange={e => setDistrictId(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {DISTRICTS.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Police Station Unit (PoliceStationID / UnitID) *</label>
+                <Input value={policeStation} onChange={e => setPoliceStation(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Registering Officer / IO (PolicePersonID / EmployeeID)</label>
+                <select value={registeringOfficer} onChange={e => setRegisteringOfficer(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {REGISTERING_OFFICERS.map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Officer Rank (RankID)</label>
+                <select value={officerRank} onChange={e => setOfficerRank(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  <option value="Police Inspector (PI)">Police Inspector (PI)</option>
+                  <option value="Police Sub-Inspector (PSI)">Police Sub-Inspector (PSI)</option>
+                  <option value="Deputy Superintendent (DySP)">Deputy Superintendent (DySP)</option>
+                  <option value="Assistant Sub-Inspector (ASI)">Assistant Sub-Inspector (ASI)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Hearing Court (CourtID)</label>
+                <select value={courtName} onChange={e => setCourtName(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {COURTS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Info Received at PS Date & Time (InfoReceivedPSDate) *</label>
+                <Input type="datetime-local" value={infoReceivedPSDate} onChange={e => setInfoReceivedPSDate(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+
+              <div className="flex flex-col gap-1 md:col-span-3 pt-2 border-t border-border/40">
+                <PhotoUploadWidget
+                  label="Registering Officer Profile Image"
+                  value={officerPhoto}
+                  onChange={setOfficerPhoto}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* STEP 3: ACTS & OCCURRENCE */}
+        {step === 3 && (
+          <Card className="bg-surface-1 border-border animate-fade-in">
+            <CardHeader className="border-b border-border/60 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
+                  <FileText className="h-4.5 w-4.5 text-[#2563eb]" /> Section 3: Case & Offence Details (CaseMaster & ActSection)
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase border-[#2563eb]/45 text-[#2563eb]">
+                  Step 3 of 5
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category (CaseCategoryID)</label>
+                <select value={category} onChange={e => setCategory(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  <option value="FIR">FIR (First Information Report)</option>
+                  <option value="UDR">UDR (Un-natural Death Report)</option>
+                  <option value="Zero FIR">Zero FIR</option>
+                  <option value="PAR">PAR (Petty Case)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gravity of Offence (GravityOffenceID)</label>
+                <select value={gravity} onChange={e => setGravity(e.target.value as any)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  <option value="Non-Heinous">Non-Heinous</option>
+                  <option value="Heinous">Heinous (Severe)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Major Crime Head (CrimeMajorHeadID)</label>
+                <select value={crimeHeadId} onChange={e => setCrimeHeadId(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {CRIME_HEADS.map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Case Status (CaseStatusID)</label>
+                <select value={status} onChange={e => setStatus(e.target.value as any)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  <option value="Under Investigation">Under Investigation</option>
+                  <option value="Charge Sheeted">Charge Sheeted</option>
+                  <option value="Pending Trial">Pending Trial</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Modus Operandi Tag</label>
+                <select value={moTag} onChange={e => setMoTag(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                  {MO_TAGS.map(tag => (
+                    <option key={tag} value={tag}>{tag}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Occurrence Location *</label>
+                <Input value={occurrencePlace} onChange={e => setOccurrencePlace(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident From (IncidentFromDate) *</label>
+                <Input type="datetime-local" value={incidentFromDate} onChange={e => setIncidentFromDate(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident To (IncidentToDate) *</label>
+                <Input type="datetime-local" value={incidentToDate} onChange={e => setIncidentToDate(e.target.value)} className="bg-surface-2 border-border" required />
+              </div>
+
+              <div className="flex gap-2">
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Latitude *</label>
+                  <Input type="number" step="0.0001" value={lat} onChange={e => setLat(e.target.value)} className="bg-surface-2 border-border" required />
+                </div>
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Longitude *</label>
+                  <Input type="number" step="0.0001" value={lng} onChange={e => setLng(e.target.value)} className="bg-surface-2 border-border" required />
+                </div>
+              </div>
+
+              {/* Act & Section Association Sub-block */}
+              <div className="md:col-span-3 rounded-md bg-surface-2 border border-border/50 p-3.5 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-                  <ShieldAlert className="h-3.5 w-3.5 text-signal" /> Accused / Suspect Record (Accused & ArrestSurrender)
+                  <Scale className="h-3.5 w-3.5 text-[#2563eb]" /> Act & Section Association (ActSectionAssociation)
                 </label>
+                <div className="flex items-center gap-3">
+                  <Input placeholder="Enter legal act/section e.g. BNS 303 / IPC 379" value={newActSection} onChange={e => setNewActSection(e.target.value)} className="bg-paper border-border max-w-sm" />
+                  <Button type="button" onClick={handleAddActSection} size="sm" className="h-9 bg-[#2563eb] text-white hover:bg-[#1d4ed8]">
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Section
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {actSections.map((sec, idx) => (
+                    <Badge key={idx} variant="secondary" className="bg-paper border border-border gap-2 px-3 py-1 text-xs">
+                      <span>{sec}</span>
+                      <button type="button" onClick={() => handleRemoveActSection(idx)} className="text-red-500 hover:text-red-700 font-bold">
+                        &times;
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* STEP 4: ACCUSED & VICTIMS */}
+        {step === 4 && (
+          <div className="space-y-6 animate-fade-in">
+            {/* SECTION A: VICTIM DETAILS */}
+            <Card className="bg-surface-1 border-border">
+              <CardHeader className="border-b border-border/60 pb-3 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4.5 w-4.5 text-[#2563eb]" />
+                  <CardTitle className="text-base font-semibold text-foreground">Section 4A: Victim Details (Victim)</CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-[10px] uppercase border-[#2563eb]/45 text-[#2563eb]">
+                    Step 4 of 5
+                  </Badge>
+                  <Button type="button" onClick={handleAddVictim} variant="outline" className="h-7 px-2.5 text-[11px]">
+                    <Plus className="mr-1 h-3 w-3" /> Add Victim
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                {victims.map((victim, idx) => (
+                  <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
+                    <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Victim {idx + 1} Name *</label>
+                      <Input placeholder="Victim Full Name" value={victim.name} onChange={e => handleUpdateVictim(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                    </div>
+                    <div className="w-20 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                      <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                    </div>
+                    <div className="w-24 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                      <select value={victim.gender} onChange={e => handleUpdateVictim(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="T">Transgender</option>
+                      </select>
+                    </div>
+                    <div className="w-36 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Injury Status</label>
+                      <select value={victim.injuryStatus} onChange={e => handleUpdateVictim(idx, "injuryStatus", e.target.value)} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
+                        <option value="Uninjured">Uninjured</option>
+                        <option value="Minor Injuries">Minor Injuries</option>
+                        <option value="Severe / Hospitalized">Severe / Hospitalized</option>
+                        <option value="Fatal">Fatal</option>
+                      </select>
+                    </div>
+                    <PhotoUploadWidget
+                      label="Victim Photo"
+                      value={victim.photo}
+                      onChange={(base64) => handleUpdateVictim(idx, "photo", base64)}
+                    />
+                    <div className="flex items-center gap-2 h-9 px-2 pb-1">
+                      <input
+                        type="checkbox"
+                        id={`v-police-${idx}`}
+                        checked={victim.isPolice}
+                        onChange={e => handleUpdateVictim(idx, "isPolice", e.target.checked)}
+                        className="form-checkbox h-4 w-4 text-signal rounded border-border"
+                      />
+                      <label htmlFor={`v-police-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Police Duty? (VictimPolice)</label>
+                    </div>
+                    {victims.length > 1 && (
+                      <Button type="button" onClick={() => handleRemoveVictim(idx)} variant="destructive" className="h-9 px-3">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* SECTION B: ACCUSED DETAILS */}
+            <Card className="bg-surface-1 border-border">
+              <CardHeader className="border-b border-border/60 pb-3 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="h-4.5 w-4.5 text-[#2563eb]" />
+                  <CardTitle className="text-base font-semibold text-foreground">Section 4B: Accused / Suspect Record (Accused & ArrestSurrender)</CardTitle>
+                </div>
                 <Button type="button" onClick={handleAddAccused} variant="outline" className="h-7 px-2.5 text-[11px]">
                   <Plus className="mr-1 h-3 w-3" /> Add Accused
                 </Button>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                {accused.map((acc, idx) => (
+                  <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
+                    <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Accused {idx + 1} Name *</label>
+                      <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                    </div>
+                    <div className="w-20 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                      <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                    </div>
+                    <div className="w-24 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                      <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="T">Transgender</option>
+                      </select>
+                    </div>
+                    <PhotoUploadWidget
+                      label="Mugshot"
+                      value={acc.photo}
+                      onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
+                    />
+                    <div className="w-36 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
+                      <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
+                        <option value="0">Wanted / At Large</option>
+                        <option value="1">Arrested / In Custody</option>
+                      </select>
+                    </div>
+                    {accused.length > 1 && (
+                      <Button type="button" onClick={() => handleRemoveAccused(idx)} variant="destructive" className="h-9 px-3">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* STEP 5: FACTS & NARRATIVE */}
+        {step === 5 && (
+          <Card className="bg-surface-1 border-border animate-fade-in">
+            <CardHeader className="border-b border-border/60 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2 text-foreground font-semibold">
+                  <FileText className="h-4.5 w-4.5 text-[#2563eb]" /> Section 5: Brief Facts & Generated Details
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase border-[#2563eb]/45 text-[#2563eb]">
+                  Step 5 of 5
+                </Badge>
               </div>
-              {accused.map((acc, idx) => (
-                <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3 bg-paper border border-border/60 rounded-md">
-                  <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Accused {idx + 1} Name *</label>
-                    <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-surface-2 border-border" required />
-                  </div>
-                  <div className="w-20 flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
-                    <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-surface-2 border-border" required />
-                  </div>
-                  <div className="w-24 flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
-                    <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-surface-2 px-2 py-1.5 rounded-md text-sm">
-                      <option value="M">Male</option>
-                      <option value="F">Female</option>
-                      <option value="T">Transgender</option>
-                    </select>
-                  </div>
-                  <PhotoUploadWidget
-                    label="Mugshot"
-                    value={acc.photo}
-                    onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
-                  />
-                  <div className="w-36 flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
-                    <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-surface-2 px-2 py-1.5 rounded-md text-xs">
-                      <option value="0">Wanted / At Large</option>
-                      <option value="1">Arrested / In Custody</option>
-                    </select>
-                  </div>
-                  {accused.length > 1 && (
-                    <Button type="button" onClick={() => handleRemoveAccused(idx)} variant="destructive" className="h-9 px-3">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {/* Brief Facts Text Area */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Brief Facts of the Crime (BriefFacts) *</label>
+                <textarea value={briefFacts} onChange={e => setBriefFacts(e.target.value)} rows={6} placeholder="Describe the comprehensive incident narrative as reported..." className="form-textarea border border-border bg-surface-2 px-3 py-2 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2563eb] w-full" required />
+              </div>
+
+              {/* Structured Crime Number Banner */}
+              <div className="rounded-md bg-emerald-50 border border-emerald-200 p-4 flex justify-between items-center shadow-sm">
+                <div>
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-700 font-semibold">System Generated Structured Crime Number (CrimeNo)</span>
+                  <p className="font-mono text-base font-bold text-emerald-900 tracking-widest mt-0.5">{getCrimeNoPreview()}</p>
                 </div>
-              ))}
-            </div>
-
-            {/* Brief Facts Text Area */}
-            <div className="md:col-span-3 flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Brief Facts of the Crime (BriefFacts) *</label>
-              <textarea value={briefFacts} onChange={e => setBriefFacts(e.target.value)} rows={4} placeholder="Describe the comprehensive incident narrative as reported..." className="form-textarea border border-border bg-surface-2 px-3 py-2 rounded-md text-sm resize-none focus:outline-none" required />
-            </div>
-
-            {/* Structured Crime Number Banner */}
-            <div className="md:col-span-3 mt-1 rounded-md bg-signal/5 border border-signal/25 p-3 flex justify-between items-center">
-              <div>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-signal font-semibold">System Generated Structured Crime Number (CrimeNo)</span>
-                <p className="font-mono text-base font-bold text-ink tracking-widest">{getCrimeNoPreview()}</p>
+                <Badge className="bg-emerald-600 text-white font-mono text-[10px] uppercase hover:bg-emerald-700">{category}</Badge>
               </div>
-              <Badge variant="outline" className="border-signal text-signal font-mono text-[10px]">{category}</Badge>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Submit Action Button */}
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Link to="/cases" className="rounded-md border border-ink/20 bg-paper px-5 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2 transition-colors">
-            Cancel
-          </Link>
-          <Button type="submit" size="lg" className="px-7 py-3 text-sm font-bold shadow-md bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4" />
-            Submit FIR & Review Details
-          </Button>
+        {/* Stepper Navigation Actions Footer */}
+        <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div>
+            {step > 1 && (
+              <Button type="button" onClick={handlePrevStep} variant="outline" className="px-5">
+                &larr; Back
+              </Button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Link to="/cases" className="rounded-md border border-ink/20 bg-paper px-5 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2 transition-colors">
+              Cancel
+            </Link>
+            {step < 5 ? (
+              <Button type="button" onClick={handleNextStep} className="px-7 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold flex items-center gap-1.5">
+                Continue Step {step + 1} &rarr;
+              </Button>
+            ) : (
+              <Button type="submit" size="lg" className="px-7 py-3 text-sm font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Submit FIR & Review Details
+              </Button>
+            )}
+          </div>
         </div>
       </form>
 

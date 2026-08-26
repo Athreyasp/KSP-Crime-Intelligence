@@ -11,6 +11,7 @@ import {
   LayoutGrid, List, Plus, RotateCcw, ArrowRight, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/")({
   head: () => ({
@@ -36,89 +37,57 @@ function CasesPage() {
   const initialDistrict = params.get("district") || "all";
   const initialQ = params.get("q") || "";
 
-  // DRAFT filter states (modified in UI controls)
-  const [draftQ, setDraftQ] = useState(initialQ);
-  const [draftDistrict, setDraftDistrict] = useState<string>(initialDistrict);
-  const [draftHead, setDraftHead] = useState<string>("all");
-  const [draftStatus, setDraftStatus] = useState<string>(initialStatus);
-  const [draftGravity, setDraftGravity] = useState<string>(initialGravity);
-  const [draftCategory, setDraftCategory] = useState<string>("all");
-
-  // APPLIED filter states (updated ONLY when user clicks "Apply Filters")
-  const [appliedFilters, setAppliedFilters] = useState({
-    q: initialQ,
-    district: initialDistrict,
-    head: "all",
-    status: initialStatus,
-    gravity: initialGravity,
-    category: "all"
-  });
+  // Filter states (reactive and instant)
+  const [q, setQ] = useState(initialQ);
+  const [district, setDistrict] = useState<string>(initialDistrict);
+  const [head, setHead] = useState<string>("all");
+  const [status, setStatus] = useState<string>(initialStatus);
+  const [gravity, setGravity] = useState<string>(initialGravity);
+  const [category, setCategory] = useState<string>("all");
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   const hasActiveFilters = useMemo(() => {
     return Boolean(
-      appliedFilters.q.trim() ||
-      appliedFilters.district !== "all" ||
-      appliedFilters.head !== "all" ||
-      appliedFilters.status !== "all" ||
-      appliedFilters.gravity !== "all" ||
-      appliedFilters.category !== "all"
+      q.trim() ||
+      district !== "all" ||
+      head !== "all" ||
+      status !== "all" ||
+      gravity !== "all" ||
+      category !== "all"
     );
-  }, [appliedFilters]);
-
-  // Handle Apply Filters Action
-  const handleApplyFilters = () => {
-    setAppliedFilters({
-      q: draftQ,
-      district: draftDistrict,
-      head: draftHead,
-      status: draftStatus,
-      gravity: draftGravity,
-      category: draftCategory
-    });
-    const distText = draftDistrict !== "all" ? ` for ${draftDistrict}` : "";
-    toast.success(`Filters applied successfully${distText}! Showing matching records.`);
-  };
+  }, [q, district, head, status, gravity, category]);
 
   // Handle Reset Filters Action
   const handleResetFilters = () => {
-    setDraftQ("");
-    setDraftDistrict("all");
-    setDraftHead("all");
-    setDraftStatus("all");
-    setDraftGravity("all");
-    setDraftCategory("all");
-    setAppliedFilters({
-      q: "",
-      district: "all",
-      head: "all",
-      status: "all",
-      gravity: "all",
-      category: "all"
-    });
+    setQ("");
+    setDistrict("all");
+    setHead("all");
+    setStatus("all");
+    setGravity("all");
+    setCategory("all");
     toast.info("Filters reset to default.");
   };
 
-  // STRICTLY filter cases: ONLY matching cases are returned
+  // STRICTLY filter cases: ONLY matching cases are returned instantly
   const matchingCases = useMemo(() => {
-    const query = appliedFilters.q.trim().toLowerCase();
+    const query = q.trim().toLowerCase();
 
     return allCases.filter(c => {
-      const matchDistrict = appliedFilters.district === "all" || 
-        c.district.name.trim().toLowerCase() === appliedFilters.district.trim().toLowerCase();
+      const matchDistrict = district === "all" || 
+        c.district.name.trim().toLowerCase() === district.trim().toLowerCase();
 
-      const matchHead = appliedFilters.head === "all" || 
-        c.crimeHead.name.trim().toLowerCase() === appliedFilters.head.trim().toLowerCase();
+      const matchHead = head === "all" || 
+        c.crimeHead.name.trim().toLowerCase() === head.trim().toLowerCase();
 
-      const matchStatus = appliedFilters.status === "all" || 
-        c.status.trim().toLowerCase() === appliedFilters.status.trim().toLowerCase();
+      const matchStatus = status === "all" || 
+        c.status.trim().toLowerCase() === status.trim().toLowerCase();
 
-      const matchGravity = appliedFilters.gravity === "all" || 
-        c.gravity.trim().toLowerCase() === appliedFilters.gravity.trim().toLowerCase();
+      const matchGravity = gravity === "all" || 
+        c.gravity.trim().toLowerCase() === gravity.trim().toLowerCase();
 
-      const matchCategory = appliedFilters.category === "all" || 
-        c.category.trim().toLowerCase() === appliedFilters.category.trim().toLowerCase();
+      const matchCategory = category === "all" || 
+        c.category.trim().toLowerCase() === category.trim().toLowerCase();
 
       const matchQuery = !query || (
         c.crimeNo.toLowerCase().includes(query) ||
@@ -131,19 +100,19 @@ function CasesPage() {
 
       return matchDistrict && matchHead && matchStatus && matchGravity && matchCategory && matchQuery;
     });
-  }, [allCases, appliedFilters]);
+  }, [allCases, q, district, head, status, gravity, category]);
 
   // Aggregate stats directly from database
   const heinousCount = useMemo(() => allCases.filter(c => c.gravity === "Heinous").length, [allCases]);
   const activeCount = useMemo(() => allCases.filter(c => c.status === "Under Investigation").length, [allCases]);
   const chargeSheetedCount = useMemo(() => allCases.filter(c => c.status === "Charge Sheeted").length, [allCases]);
-  const totalArrests = useMemo(() => allCases.reduce((acc, c) => acc + c.accused.filter(a => a.arrestId || a.arrested).length, 0), [allCases]);
+  const totalArrests = useMemo(() => allCases.reduce((acc, c) => acc + c.accused.filter(a => a.arrestId).length, 0), [allCases]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Header */}
       <PageHeader
-        section="§ 07"
+        section="07"
         eyebrow="Karnataka State Police · Crime Records"
         title="Case File Repository"
         description="Browse state FIR records. Select district or category filters and click Apply Filters to view matching folders."
@@ -175,8 +144,8 @@ function CasesPage() {
               <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#94a3b8]" />
               <Input
                 placeholder="Search Crime No., Complainant, Accused, or Station..."
-                value={draftQ}
-                onChange={e => setDraftQ(e.target.value)}
+                value={q}
+                onChange={e => setQ(e.target.value)}
                 className="pl-10 bg-[#f8fafc] border-[#e2e8f0] focus:bg-white focus:ring-2 focus:ring-[#2563eb] rounded-xl text-sm"
               />
             </div>
@@ -206,40 +175,40 @@ function CasesPage() {
             <MinimalSelect
               label="District"
               defaultLabel="All Districts"
-              value={draftDistrict}
-              onChange={setDraftDistrict}
+              value={district}
+              onChange={setDistrict}
               options={["all", ...DISTRICTS.map(d => d.name)]}
             />
 
             <MinimalSelect
               label="Major Crime Head"
               defaultLabel="All Major Crime Heads"
-              value={draftHead}
-              onChange={setDraftHead}
+              value={head}
+              onChange={setHead}
               options={["all", ...CRIME_HEADS.map(c => c.name)]}
             />
 
             <MinimalSelect
               label="Status"
               defaultLabel="All Statuses"
-              value={draftStatus}
-              onChange={setDraftStatus}
+              value={status}
+              onChange={setStatus}
               options={["all", ...CASE_STATUS]}
             />
 
             <MinimalSelect
               label="Gravity"
               defaultLabel="All Gravities"
-              value={draftGravity}
-              onChange={setDraftGravity}
+              value={gravity}
+              onChange={setGravity}
               options={["all", ...GRAVITY]}
             />
 
             <MinimalSelect
               label="Category"
               defaultLabel="All Categories"
-              value={draftCategory}
-              onChange={setDraftCategory}
+              value={category}
+              onChange={setCategory}
               options={["all", ...CASE_CATEGORY]}
             />
           </div>
@@ -251,24 +220,16 @@ function CasesPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleResetFilters}
-                className="h-9 px-3 text-xs font-semibold text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9]"
-              >
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
-              </Button>
-
-              <Button
-                type="button"
-                onClick={handleApplyFilters}
-                size="sm"
-                className="h-9 px-5 text-xs font-bold bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full shadow-sm flex items-center gap-1.5"
-              >
-                <Filter className="h-3.5 w-3.5" /> Apply Filters
-              </Button>
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  onClick={handleResetFilters}
+                  size="sm"
+                  className="h-9 px-4 text-xs font-semibold bg-[#fee2e2] hover:bg-[#fcd3d3] text-[#ef4444] rounded-full flex items-center gap-1.5 shadow-sm transition-all duration-150"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Clear Filters
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -281,7 +242,7 @@ function CasesPage() {
             <div className="flex items-center justify-between p-3 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] text-[#1e40af] text-xs font-bold">
               <span className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#2563eb]" />
-                <span>ACTIVE FILTER: Showing {matchingCases.length} matching folder(s) for {appliedFilters.district !== "all" ? appliedFilters.district : "selected criteria"}</span>
+                <span>ACTIVE FILTER: Showing {matchingCases.length} matching folder(s) for {district !== "all" ? district : "selected criteria"}</span>
               </span>
             </div>
           )}
@@ -350,10 +311,20 @@ function CasesPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569]">
+                       <td className="px-4 py-3">
+                        <span className={cn(
+                          "text-[10px] font-semibold px-2.5 py-0.5 rounded-full inline-block",
+                          c.status === "Charge Sheeted" 
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                            : "bg-[#f1f5f9] text-[#475569]"
+                        )}>
                           {c.status}
                         </span>
+                        {c.status === "Charge Sheeted" && c.chargesheetNo && (
+                          <div className="text-[9px] font-mono text-emerald-600 mt-1 font-bold">
+                            {c.chargesheetNo}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-[#64748b] font-mono text-[11px]">
                         {new Date(c.registeredDate).toLocaleDateString("en-IN")}
@@ -380,60 +351,78 @@ function CasesPage() {
 {/* ULTRA-SIMPLE & SOOTHING MINIMALIST FOLDER CARD */}
 function SimpleFolderCard({ c }: { c: any }) {
   return (
-    <div className="group flex flex-col rounded-2xl border border-[#e2e8f0] bg-white p-4 space-y-3 shadow-sm hover:border-[#2563eb] hover:shadow transition-all duration-200">
-      {/* Top Header: Soft Folder icon + FIR Badge + Soft Status Badge */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-[#eff6ff] text-[#2563eb]">
-            <Folder className="h-4 w-4" />
+    <div className="group relative pt-4 flex flex-col transition-all duration-200">
+      {/* Folder Tab Header */}
+      <div className="absolute top-0 left-4 h-4.5 px-3 bg-[#f8fafc] group-hover:bg-[#eff6ff] border-t border-x border-[#e2e8f0] group-hover:border-[#2563eb] rounded-t-lg text-[8px] font-mono font-bold text-muted-foreground/80 group-hover:text-[#2563eb] flex items-center justify-center transition-colors duration-200">
+        FILE INDEX // {c.category.toUpperCase()}
+      </div>
+
+      {/* Folder Main Body */}
+      <div className="flex flex-col rounded-2xl rounded-tl-none border border-[#e2e8f0] group-hover:border-[#2563eb] bg-white p-4 space-y-3 shadow-sm group-hover:shadow transition-all duration-200">
+        {/* Top Header: Soft Folder icon + FIR Badge + Soft Status Badge */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-[#eff6ff] text-[#2563eb]">
+              <Folder className="h-4 w-4" />
+            </div>
+            <span className="font-mono text-xs font-bold text-[#1e293b]">
+              FIR #{c.crimeNo}
+            </span>
           </div>
-          <span className="font-mono text-xs font-bold text-[#1e293b]">
-            FIR #{c.crimeNo}
+
+          <span className={cn(
+            "text-[11px] font-semibold px-2.5 py-0.5 rounded-full",
+            c.status === "Charge Sheeted" 
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+              : "bg-[#f1f5f9] text-[#475569]"
+          )}>
+            {c.status}
           </span>
         </div>
 
-        <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569]">
-          {c.status}
-        </span>
-      </div>
+        {/* Main Title & Location Subtitle */}
+        <div>
+          <h3 className="font-display text-base font-bold text-[#0f172a] group-hover:text-[#2563eb] transition-colors line-clamp-1">
+            {c.crimeHead.name}
+          </h3>
+          <p className="text-xs text-[#64748b] mt-0.5">
+            {c.policeStation}, {c.district.name} District · {new Date(c.registeredDate).toLocaleDateString("en-IN")}
+          </p>
+          {c.status === "Charge Sheeted" && c.chargesheetNo && (
+            <p className="text-[10px] font-mono text-emerald-600 bg-emerald-50/50 border border-emerald-200/50 rounded px-1.5 py-0.5 mt-1.5 inline-block font-bold">
+              📄 CS ID: {c.chargesheetNo}
+            </p>
+          )}
+        </div>
 
-      {/* Main Title & Location Subtitle */}
-      <div>
-        <h3 className="font-display text-base font-bold text-[#0f172a] group-hover:text-[#2563eb] transition-colors line-clamp-1">
-          {c.crimeHead.name}
-        </h3>
-        <p className="text-xs text-[#64748b] mt-0.5">
-          {c.policeStation}, {c.district.name} District · {new Date(c.registeredDate).toLocaleDateString("en-IN")}
-        </p>
-      </div>
+        {/* Roster Photo Preview Row */}
+        <div className="flex items-center gap-1 pt-1 border-t border-[#f1f5f9]">
+          <span className="text-[10px] text-[#64748b] font-medium mr-1.5">Roster:</span>
+          {c.officerPhoto ? (
+            <img src={c.officerPhoto} title={`IO: ${c.registeringOfficer}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+          ) : (
+            <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
+          )}
+          {c.accused[0]?.photo && (
+            <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+          )}
+          {c.victims[0]?.photo && (
+            <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
+          )}
+        </div>
 
-      {/* Roster Photo Preview Row */}
-      <div className="flex items-center gap-1 pt-1 border-t border-[#f1f5f9]">
-        <span className="text-[10px] text-[#64748b] font-medium mr-1.5">Roster:</span>
-        {c.officerPhoto ? (
-          <img src={c.officerPhoto} title={`IO: ${c.registeringOfficer}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
-        ) : (
-          <div title="IO" className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-bold text-gray-500 shrink-0">IO</div>
-        )}
-        {c.accused[0]?.photo && (
-          <img src={c.accused[0].photo} title={`Accused: ${c.accused[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
-        )}
-        {c.victims[0]?.photo && (
-          <img src={c.victims[0].photo} title={`Victim: ${c.victims[0].name}`} className="h-5 w-5 rounded-full border border-[#e2e8f0] object-cover shrink-0" />
-        )}
-      </div>
+        {/* Minimal Footer Row */}
+        <div className="pt-2 flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-[#64748b]">
+            Category: <strong className="text-[#334155]">{c.category}</strong>
+          </span>
 
-      {/* Minimal Footer Row */}
-      <div className="pt-2 flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-[#64748b]">
-          Category: <strong className="text-[#334155]">{c.category}</strong>
-        </span>
-
-        <Link to="/cases/$caseId" params={{ caseId: String(c.caseMasterId) }}>
-          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-[#2563eb] hover:bg-[#eff6ff] rounded-full flex items-center gap-1">
-            View File <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-        </Link>
+          <Link to="/cases/$caseId" params={{ caseId: String(c.caseMasterId) }}>
+            <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-[#2563eb] hover:bg-[#eff6ff] rounded-full flex items-center gap-1">
+              View File <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   );

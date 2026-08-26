@@ -91,7 +91,7 @@ function Sociological() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
-        section="§ 06"
+        section="06"
         eyebrow="AI Demographic Correlation Analysis"
         title="Sociological & AI Insights"
         description="Overlaying structural data (urbanization, literacy, population distribution) with crime records to reveal demographic correlation indicators."

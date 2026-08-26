@@ -8,6 +8,9 @@ import appCss from "../styles.css?url";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Topbar } from "@/components/topbar";
+import { LanguageProvider } from "@/hooks/use-language";
+import { Toaster } from "@/components/ui/sonner";
+import { CopilotDrawer } from "@/components/copilot-drawer";
 
 function NotFoundComponent() {
   return (
@@ -80,19 +83,49 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    // Define global callback for Google Translate initialization
+    (window as any).googleTranslateElementInit = () => {
+      if ((window as any).google && (window as any).google.translate) {
+        new (window as any).google.translate.TranslateElement({
+          pageLanguage: 'en',
+          includedLanguages: 'kn',
+          layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false
+        }, 'google_translate_element');
+      }
+    };
+
+    // Load elements script if not present
+    if (!document.getElementById("google-translate-script")) {
+      const script = document.createElement("script");
+      script.id = "google-translate-script";
+      script.type = "text/javascript";
+      script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      document.body.appendChild(script);
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background text-foreground">
-          <AppSidebar />
-          <div className="flex-1 flex flex-col min-w-0">
-            <Topbar />
-            <main className="flex-1 p-4 md:p-6">
-              <Outlet />
-            </main>
+      <LanguageProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full bg-background text-foreground">
+            <AppSidebar />
+            <div className="flex-1 flex flex-col min-w-0">
+              <Topbar />
+              <main className="flex-1 p-4 md:p-6">
+                <Outlet />
+              </main>
+            </div>
           </div>
-        </div>
-      </SidebarProvider>
+          {/* Google Translate Hidden Element */}
+          <div id="google_translate_element" style={{ display: "none" }} className="hidden" />
+          <Toaster />
+          <CopilotDrawer />
+        </SidebarProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

@@ -8,23 +8,32 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-type NavItem = { title: string; url: string; icon: typeof MapPin; live?: boolean; badge?: string };
+import { useLanguage } from "@/hooks/use-language";
+
+type NavItem = { 
+  title: string; 
+  translationKey: "navOverview" | "navHotspots" | "navNetwork" | "navOffenders" | "navPredictive" | "navSociological" | "navCases" | "navNewFir"; 
+  url: string; 
+  icon: typeof MapPin; 
+  badge?: string 
+};
 
 const ITEMS: NavItem[] = [
-  { title: "Overview",     url: "/",             icon: LayoutDashboard, live: true },
-  { title: "Hotspots",     url: "/hotspots",     icon: MapPin },
-  { title: "Network",      url: "/network",      icon: Network },
-  { title: "Offenders",    url: "/offenders",    icon: UserSearch },
-  { title: "Predictive",   url: "/predictive",   icon: Brain,           live: true },
-  { title: "Sociological", url: "/sociological", icon: LineChart },
-  { title: "Cases",        url: "/cases",        icon: FolderSearch },
-  { title: "New FIR",      url: "/cases/new",    icon: Plus },
+  { title: "Overview",     translationKey: "navOverview",     url: "/",             icon: LayoutDashboard },
+  { title: "Hotspots",     translationKey: "navHotspots",     url: "/hotspots",     icon: MapPin },
+  { title: "Network",      translationKey: "navNetwork",      url: "/network",      icon: Network },
+  { title: "Offenders",    translationKey: "navOffenders",    url: "/offenders",    icon: UserSearch },
+  { title: "Predictive",   translationKey: "navPredictive",   url: "/predictive",   icon: Brain },
+  { title: "Sociological", translationKey: "navSociological", url: "/sociological", icon: LineChart },
+  { title: "Cases",        translationKey: "navCases",        url: "/cases",        icon: FolderSearch },
+  { title: "New FIR",      translationKey: "navNewFir",      url: "/cases/new",    icon: Plus },
 ];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: s => s.location.pathname });
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { t } = useLanguage();
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
     if (url === "/cases") return pathname.startsWith("/cases") && !pathname.startsWith("/cases/new");
@@ -50,12 +59,8 @@ export function AppSidebar() {
         )}>
           <div className="relative">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper border-2 border-ink shadow-sm">
-              <Shield className="h-4 w-4 text-signal animate-pulse" strokeWidth={2.5} />
+              <Shield className="h-4 w-4 text-signal" strokeWidth={2.5} />
             </div>
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
           </div>
           {!collapsed && (
             <div className="min-w-0 leading-tight">
@@ -70,7 +75,7 @@ export function AppSidebar() {
           <div className="mx-4 mb-2 flex items-center gap-2">
             <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-ink/20 to-transparent" />
             <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink/50">
-              Navigation Registry
+              {t("navigationRegistry")}
             </span>
             <div className="h-[1px] w-8 bg-signal" />
           </div>
@@ -87,7 +92,7 @@ export function AppSidebar() {
               <Link
                 key={item.url}
                 to={item.url}
-                title={collapsed ? item.title : undefined}
+                title={collapsed ? t(item.translationKey) : undefined}
                 className={cn(
                   "group relative flex items-center gap-3 rounded-lg text-[13px] transition-all duration-300 font-medium",
                   collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
@@ -128,15 +133,9 @@ export function AppSidebar() {
                 {!collapsed && (
                   <>
                     <span className={cn("truncate flex-1 tracking-wide", active && "font-bold text-ink")}>
-                      {item.title}
+                      {t(item.translationKey)}
                     </span>
-                    {item.live && (
-                      <span className="flex items-center gap-1 font-mono text-[8px] uppercase tracking-widest text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-500/25">
-                        <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
-                        Live
-                      </span>
-                    )}
-                    {!item.live && item.badge && (
+                    {item.badge && (
                       <span className="rounded border border-red-500/30 bg-red-50 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-red-600">
                         {item.badge}
                       </span>

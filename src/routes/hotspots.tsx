@@ -19,7 +19,7 @@ import { StateMapGL } from "@/components/hotspots/state-map-gl";
 import { SubAreaMapGL } from "@/components/hotspots/sub-area-map-gl";
 
 const NAME_ALIAS: Record<string, string> = {
-  "Bengaluru City": "Bangalore",
+  "Bengaluru Urban": "Bangalore",
   "Bengaluru Rural": "Bangalore Rural",
   "Mysuru": "Mysore",
   "Mangaluru": "Dakshina Kannada",
@@ -248,7 +248,7 @@ function Hotspots() {
       if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
       const total = cases.length;
       const heinous = cases.filter(c => c.gravity === "Heinous").length;
-      const arrests = cases.reduce((acc, c) => acc + (c.accused?.filter(a => a.arrestId || a.arrested).length || 0), 0);
+      const arrests = cases.reduce((acc, c) => acc + (c.accused?.filter(a => a.arrestId).length || 0), 0);
       return { ...s, total, heinous, arrests };
     });
   }, [DISTRICT_STATS, allCases, crimeFilter, hour]);
@@ -256,7 +256,7 @@ function Hotspots() {
   const filteredMaxTotal = Math.max(...filteredDistrictStats.map(d => d.total), 1);
   const filteredMinTotal = Math.min(...filteredDistrictStats.map(d => d.total), 0);
 
-  const selected = filteredDistrictStats.find(d => d.district.id === selectedId) ?? filteredDistrictStats[0] ?? { district: { id: 1, name: "Bengaluru City" }, total: 0, heinous: 0, arrests: 0, riskScore: 50, spike: 0 };
+  const selected = filteredDistrictStats.find(d => d.district.id === selectedId) ?? filteredDistrictStats[0] ?? { district: { id: 1, name: "Bengaluru Urban" }, total: 0, heinous: 0, arrests: 0, riskScore: 50, spike: 0 };
   const activeDistrict = useMemo(() => {
     const targetId = hoveredId ?? selectedId;
     return filteredDistrictStats.find(d => d.district.id === targetId) ?? selected;
@@ -998,16 +998,23 @@ function Hotspots() {
                       <span className="font-mono text-[10px] uppercase tracking-wider font-bold text-foreground">Weekly Incident Velocity</span>
                     </div>
                   </div>
-                  <div className="flex items-end gap-1.5 h-12 pt-2">
+                  <div className="flex items-end gap-2 h-14 pt-2 pb-1 border-b border-border/30">
                     {activeDayOfWeek.map(dw => {
                       const hPct = Math.max(10, (dw.count / dw.maxVal) * 100);
                       return (
-                        <div key={dw.day} className="flex-1 flex flex-col items-center gap-1">
-                          <div className="w-full bg-primary/80 rounded-t-sm hover:bg-primary" style={{ height: `${hPct}%` }} title={`${dw.day}: ${dw.count} FIRs`} />
-                          <span className="font-mono text-[8px] text-muted-foreground">{dw.day}</span>
-                        </div>
+                        <div
+                          key={dw.day}
+                          title={`${dw.day}: ${dw.count} FIRs`}
+                          className="flex-1 bg-primary/80 hover:bg-primary rounded-t-sm transition-all cursor-pointer"
+                          style={{ height: `${hPct}%` }}
+                        />
                       );
                     })}
+                  </div>
+                  <div className="flex justify-between font-mono text-[8px] text-muted-foreground px-0.5">
+                    {activeDayOfWeek.map(dw => (
+                      <span key={dw.day} className="flex-1 text-center">{dw.day}</span>
+                    ))}
                   </div>
                 </div>
               </>
@@ -1090,7 +1097,6 @@ function Hotspots() {
 }
 
 const SVG_NAME_ALIAS: Record<string, string> = {
-  "Bengaluru City": "Bangalore",
   "Bengaluru Urban": "Bangalore",
   "Bengaluru Rural": "Bangalore Rural",
   "Mangaluru": "Dakshina Kannada",

@@ -217,3 +217,86 @@
   100% { transform: translateX(-50%); }
 }
 @utility ticker-scroll { animation: tickerScroll 45s linear infinite; }
+
+/* Google Translate styling overrides to hide translate UI banner, tooltips and frame widgets */
+body {
+  top: 0px !important;
+}
+.skiptranslate,
+.goog-te-banner-frame,
+.goog-te-gadget,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+iframe.goog-te-banner-frame {
+  display: none !important;
+  visibility: hidden !important;
+}
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* CRT terminal screen effects and keyframes */
+@keyframes crt-glow {
+  0% { opacity: 0.95; }
+  50% { opacity: 1; }
+  100% { opacity: 0.95; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@utility terminal-glow-green {
+  color: #10b981;
+  text-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+}
+
+@utility terminal-glow-amber {
+  color: #f59e0b;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.6);
+}
+
+@utility terminal-bg {
+  background-color: #050811;
+  background-image: radial-gradient(circle, #0e172a 0%, #020617 100%);
+}
+
+@utility scanlines {
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.04));
+    z-index: 99;
+    background-size: 100% 4px, 6px 100%;
+    pointer-events: none;
+  }
+}
+
+@utility terminal-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 12px;
+  background: currentColor;
+  animation: crt-glow 0.8s steps(2, start) infinite;
+}
+
+@keyframes soundwave {
+  0%, 100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1.2);
+  }
+}

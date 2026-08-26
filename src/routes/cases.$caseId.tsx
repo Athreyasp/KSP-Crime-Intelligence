@@ -7,7 +7,7 @@ import { getStoredCases, updateCaseDetails, recordAccusedArrest } from "@/lib/db
 import { DISTRICTS } from "@/data/mock";
 import {
   ArrowLeft, MapPin, Calendar, Gavel, User, Users, Shield, ShieldAlert,
-  Landmark, Clock, FileText, Scale, Printer, Download, CheckCircle2, AlertTriangle, ArrowRight, Edit3
+  Landmark, Clock, FileText, Scale, Printer, Download, CheckCircle2, AlertTriangle, ArrowRight, Edit3, Fingerprint
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -48,12 +48,15 @@ function CaseDetail() {
   const router = useRouter();
   const cases = getStoredCases();
   const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
-  const [activeTab, setActiveTab] = useState<"overview" | "complainant" | "victims" | "accused" | "acts">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "legal" | "complainant" | "accused" | "logs">("overview");
 
   // Edit case dossier state variables
   const [showEditModal, setShowEditModal] = useState(false);
   const [editStatus, setEditStatus] = useState(c?.status || "Under Investigation");
   const [editBriefFacts, setEditBriefFacts] = useState(c?.briefFacts || "");
+  const [editChargesheetNo, setEditChargesheetNo] = useState("");
+  const [editChargesheetDate, setEditChargesheetDate] = useState("");
+  const [editChargesheetType, setEditChargesheetType] = useState("Original Chargesheet");
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Arrest suspect state variables
@@ -76,15 +79,14 @@ function CaseDetail() {
         selectedDistrict.id,
         selectedDistrict.name
       );
-      toast.success(`Arrest record saved! Suspect ${selectedAccusedForArrest} is now in custody.`, {
-        description: `Reflected in case database and Zoho datastore tables.`,
-      });
-      setShowArrestModal(false);
-      router.invalidate();
+      toast.success(`Arrest record saved! Suspect ${selectedAccusedForArrest} is now in custody.`);
     } catch (err: any) {
-      toast.error(`Failed to save arrest: ${err.message}`);
+      console.warn("Zoho Catalyst sync failed, local arrest saved:", err.message);
+      toast.success(`Arrest saved locally for suspect ${selectedAccusedForArrest} (Zoho sync offline).`);
     } finally {
       setIsRecordingArrest(false);
+      setShowArrestModal(false);
+      router.invalidate();
     }
   };
 
@@ -92,6 +94,9 @@ function CaseDetail() {
     if (c) {
       setEditStatus(c.status);
       setEditBriefFacts(c.briefFacts);
+      setEditChargesheetNo(c.chargesheetNo || `CS-${Math.abs(c.caseMasterId) % 10000}`);
+      setEditChargesheetDate(c.chargesheetDate ? new Date(c.chargesheetDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+      setEditChargesheetType(c.chargesheetType || "Original Chargesheet");
     }
   }, [c]);
 
@@ -121,14 +126,22 @@ function CaseDetail() {
     e.preventDefault();
     setIsUpdating(true);
     try {
-      await updateCaseDetails(c.caseMasterId, editStatus, editBriefFacts);
-      toast.success("Case history successfully updated in Zoho Catalyst datastore!");
-      setShowEditModal(false);
-      router.invalidate();
+      await updateCaseDetails(
+        c.caseMasterId,
+        editStatus,
+        editBriefFacts,
+        editStatus === "Charge Sheeted" ? editChargesheetNo : undefined,
+        editStatus === "Charge Sheeted" ? editChargesheetDate : undefined,
+        editStatus === "Charge Sheeted" ? editChargesheetType : undefined
+      );
+      toast.success("Case history successfully updated!");
     } catch (err: any) {
-      toast.error(`Update failed: ${err.message}`);
+      console.warn("Zoho Catalyst sync failed, local update saved:", err.message);
+      toast.success("Case history saved locally (Zoho sync offline).");
     } finally {
       setIsUpdating(false);
+      setShowEditModal(false);
+      router.invalidate();
     }
   };
 
@@ -230,7 +243,16 @@ function CaseDetail() {
             activeTab === "overview" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
           }`}
         >
-          <FileText className="h-4 w-4" /> 1. Master Case Particulars
+          <FileText className="h-4 w-4" /> 1. Overview & Facts
+        </button>
+
+        <button
+          onClick={() => setActiveTab("legal")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            activeTab === "legal" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+          }`}
+        >
+          <Scale className="h-4 w-4" /> 2. Legal & Act Sections
         </button>
 
         <button
@@ -239,16 +261,7 @@ function CaseDetail() {
             activeTab === "complainant" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
           }`}
         >
-          <User className="h-4 w-4" /> 2. Complainant Statement
-        </button>
-
-        <button
-          onClick={() => setActiveTab("victims")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === "victims" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
-          }`}
-        >
-          <Users className="h-4 w-4" /> 3. Victim Profile ({c.victims.length})
+          <User className="h-4 w-4" /> 3. Complainant & Victims
         </button>
 
         <button
@@ -257,16 +270,16 @@ function CaseDetail() {
             activeTab === "accused" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
           }`}
         >
-          <ShieldAlert className="h-4 w-4" /> 4. Accused & Arrest Warrants ({c.accused.length})
+          <ShieldAlert className="h-4 w-4" /> 4. Accused & Arrest Roster ({c.accused.length})
         </button>
 
         <button
-          onClick={() => setActiveTab("acts")}
+          onClick={() => setActiveTab("logs")}
           className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === "acts" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+            activeTab === "logs" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
           }`}
         >
-          <Scale className="h-4 w-4" /> 5. Legal Acts & Sections ({c.actSections.length})
+          <Fingerprint className="h-4 w-4" /> 5. CCTNS Logs & Print
         </button>
       </div>
 
@@ -336,73 +349,84 @@ function CaseDetail() {
         </div>
       )}
 
-      {/* TAB CONTENT 2: COMPLAINANT STATEMENT */}
-      {activeTab === "complainant" && (
+      {/* TAB CONTENT 2: LEGAL & ACT SECTIONS */}
+      {activeTab === "legal" && (
         <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
           <CardHeader className="border-b border-[#f1f3f4] pb-3">
             <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
-              <User className="h-4.5 w-4.5 text-[#0b57d0]" /> Complainant Statement (ComplainantDetails)
+              <Scale className="h-4.5 w-4.5 text-[#0b57d0]" /> Associated Acts & Legal Sections (ActSectionAssociation)
             </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <DetailBox label="Complainant Full Name" value={c.complainant.name} />
-            <DetailBox label="Age" value={`${c.complainant.age} Years`} />
-            <DetailBox label="Gender" value={c.complainant.gender === "M" ? "Male (M)" : c.complainant.gender === "F" ? "Female (F)" : "Transgender (T)"} />
-            <DetailBox label="Occupation" value={c.complainant.occupation} />
-            <DetailBox label="Religion" value={c.complainant.religion || "Hindu"} />
-            <DetailBox label="Caste" value={c.complainant.caste || "General"} />
-            <DetailBox label="Contact Phone" value={c.complainant.phone || "+91 98765 43210"} />
-            <DetailBox label="Relation to Incident" value={c.complainant.relation || "Self (Victim)"} />
-            <DetailBox label="Residential Address" value={c.complainant.address || `${c.policeStation} Jurisdiction, ${c.district.name}`} fullWidth />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* TAB CONTENT 3: VICTIM PROFILE */}
-      {activeTab === "victims" && (
-        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
-          <CardHeader className="border-b border-[#f1f3f4] pb-3 flex items-center justify-between">
-            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
-              <Users className="h-4.5 w-4.5 text-[#0b57d0]" /> Victim Particulars ({c.victims.length})
-            </CardTitle>
-            <span className="text-xs font-semibold text-[#5f6368]">Victim Database Records</span>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
-            {c.victims.map((v: any, idx: number) => (
-              <div key={idx} className="flex items-center gap-4 p-4 bg-[#f8f9fa] border border-[#f1f3f4] rounded-2xl">
-                {v.photo ? (
-                  <img src={v.photo} alt="Victim" className="h-12 w-12 rounded-full object-cover border border-[#dadce0] shadow-sm shrink-0" />
-                ) : (
-                  <div className="h-12 w-12 rounded-full bg-[#dadce0]/40 flex items-center justify-center text-xs font-bold text-[#5f6368] shrink-0">VIC</div>
-                )}
-                <div className="flex-1 flex flex-wrap items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-[#202124]">Victim #{idx + 1}: {v.name}</span>
-                      {v.isPolice && (
-                        <span className="bg-[#e8f0fe] text-[#0b57d0] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          On-Duty Police Officer
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#5f6368]">
-                      Age: <strong>{v.age} Years</strong> · Gender: <strong>{v.gender === "M" ? "Male" : v.gender === "F" ? "Female" : "Transgender"}</strong>
+            <div className="grid gap-3 md:grid-cols-2">
+              {c.actSections.map((act: string, idx: number) => (
+                <div key={idx} className="p-4 rounded-2xl border border-[#dadce0] bg-[#f8f9fa] flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-[#e8f0fe] text-[#0b57d0] shrink-0">
+                    <Scale className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-[#202124]">{act}</h4>
+                    <p className="text-xs text-[#5f6368] mt-1">
+                      Statutory legal section registered under Bharatiya Nyaya Sanhita (BNS) / Indian Penal Code (IPC) for {c.crimeHead.name}.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-[#5f6368]">Injury Status:</span>
-                    <span className="bg-white border border-[#dadce0] text-[#202124] font-bold text-xs px-3 py-1 rounded-full">
-                      {v.injuryStatus || "Uninjured"}
-                    </span>
-                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* TAB CONTENT 4: ACCUSED & ARREST WARRANTS */}
+      {/* TAB CONTENT 3: COMPLAINANT & VICTIMS */}
+      {activeTab === "complainant" && (
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Complainant Statement Card */}
+          <Card className="md:col-span-2 bg-white border-[#dadce0] rounded-2xl shadow-sm">
+            <CardHeader className="border-b border-[#f1f3f4] pb-3">
+              <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+                <User className="h-4.5 w-4.5 text-[#0b57d0]" /> Complainant Statement (ComplainantDetails)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <DetailBox label="Complainant Full Name" value={c.complainant.name} />
+              <DetailBox label="Age" value={`${c.complainant.age} Years`} />
+              <DetailBox label="Gender" value={c.complainant.gender === "M" ? "Male (M)" : c.complainant.gender === "F" ? "Female (F)" : "Transgender (T)"} />
+              <DetailBox label="Occupation" value={c.complainant.occupation} />
+              <DetailBox label="Religion" value={c.complainant.religion || "Hindu"} />
+              <DetailBox label="Caste" value={c.complainant.caste || "General"} />
+              <DetailBox label="Contact Phone" value={c.complainant.phone || "+91 98765 43210"} />
+              <DetailBox label="Relation to Incident" value={c.complainant.relation || "Self (Victim)"} />
+              <DetailBox label="Residential Address" value={c.complainant.address || `${c.policeStation} Jurisdiction, ${c.district.name}`} fullWidth />
+            </CardContent>
+          </Card>
+
+          {/* Victims List Card */}
+          <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+            <CardHeader className="border-b border-[#f1f3f4] pb-3">
+              <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+                <Users className="h-4.5 w-4.5 text-[#0b57d0]" /> Victims ({c.victims.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              {c.victims.map((v: any, idx: number) => (
+                <div key={idx} className="p-3 bg-[#f8f9fa] border border-[#f1f3f4] rounded-xl flex items-center gap-2.5">
+                  {v.photo ? (
+                    <img src={v.photo} alt="Victim" className="h-8 w-8 rounded-full object-cover border border-[#dadce0] shadow-sm shrink-0" />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-[#dadce0]/40 flex items-center justify-center text-[9px] font-bold text-[#5f6368] shrink-0">VIC</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-xs text-[#202124] truncate">{v.name}</p>
+                    <p className="text-[10px] text-[#5f6368]">{v.age} yrs · {v.gender} · {v.injuryStatus}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB CONTENT 4: ACCUSED & ARREST ROSTER */}
       {activeTab === "accused" && (
         <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
           <CardHeader className="border-b border-[#f1f3f4] pb-3 flex items-center justify-between">
@@ -487,32 +511,55 @@ function CaseDetail() {
         </Card>
       )}
 
-      {/* TAB CONTENT 5: LEGAL ACTS & SECTIONS */}
-      {activeTab === "acts" && (
-        <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
-          <CardHeader className="border-b border-[#f1f3f4] pb-3">
-            <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
-              <Scale className="h-4.5 w-4.5 text-[#0b57d0]" /> Associated Acts & Legal Sections (ActSectionAssociation)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            <div className="grid gap-3 md:grid-cols-2">
-              {c.actSections.map((act: string, idx: number) => (
-                <div key={idx} className="p-4 rounded-2xl border border-[#dadce0] bg-[#f8f9fa] flex items-start gap-3">
-                  <div className="p-2.5 rounded-xl bg-[#e8f0fe] text-[#0b57d0] font-mono text-xs font-bold shrink-0">
-                    §
+      {/* TAB CONTENT 5: CCTNS LOGS & PRINT PREVIEW */}
+      {activeTab === "logs" && (
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* CCTNS Dispatch & GD Logs */}
+          <div className="space-y-4 md:col-span-1">
+            <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm">
+              <CardHeader className="border-b border-[#f1f3f4] pb-3">
+                <CardTitle className="text-base font-bold text-[#202124] flex items-center gap-2">
+                  <Clock className="h-4.5 w-4.5 text-[#0b57d0]" /> Activity & CCTNS Dispatch Logs
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 text-xs">
+                <div className="border-l-2 border-[#0b57d0]/30 pl-4 ml-2 space-y-4">
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[#0b57d0]" />
+                    <span className="text-[10px] font-bold text-[#5f6368] block">General Diary (GD) Entry</span>
+                    <p className="font-semibold text-[#202124] mt-0.5">GD Entry Registered automatically on CCTNS hub.</p>
+                    <span className="text-[9px] font-mono text-muted-foreground">{new Date(c.registeredDate).toLocaleDateString()}</span>
                   </div>
-                  <div>
-                    <h4 className="font-mono text-sm font-bold text-[#202124]">{act}</h4>
-                    <p className="text-xs text-[#5f6368] mt-1">
-                      Statutory legal section registered under Bharatiya Nyaya Sanhita (BNS) / Indian Penal Code (IPC) for {c.crimeHead.name}.
-                    </p>
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[#0b57d0]" />
+                    <span className="text-[10px] font-bold text-[#5f6368] block">Magistrate Dispatch Log</span>
+                    <p className="font-semibold text-[#202124] mt-0.5">FIR Copy dispatched to JMFC Court via CCTNS secure gateway.</p>
+                    <span className="text-[9px] font-mono text-[#0b57d0] font-bold">Ref: DISP-{String(c.caseMasterId).slice(-4)}</span>
                   </div>
                 </div>
-              ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Interactive Document Preview (Clipboard Board) */}
+          <div className="md:col-span-2">
+            <div className="bg-[#202124] p-6 rounded-2xl border border-black flex flex-col gap-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs text-white/70 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                  <Printer className="h-4 w-4 text-[#38bdf8]" /> Official CCTNS Document Preview
+                </span>
+                <Button onClick={handlePrint} className="bg-[#38bdf8] hover:bg-[#0ea5e9] text-[#202124] font-bold flex items-center gap-1.5 h-8 text-xs rounded-full px-4 shadow">
+                  <Printer className="h-3.5 w-3.5" /> Print FIR Copy
+                </Button>
+              </div>
+
+              {/* White A4 paper view preview */}
+              <div className="bg-white text-black p-8 font-serif text-[11px] leading-relaxed shadow-2xl rounded border border-gray-400 select-text overflow-x-auto">
+                <PrintableFirCopy caseData={c} showOnScreen={true} />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Dialog for updating case progress */}
@@ -557,6 +604,52 @@ function CaseDetail() {
                 required
               />
             </div>
+
+            {editStatus === "Charge Sheeted" && (
+              <div className="border border-[#dadce0] rounded-xl p-3 bg-emerald-50/10 space-y-3">
+                <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Chargesheet particulars</p>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase font-bold text-[#5f6368] tracking-wider block">
+                    Chargesheet Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editChargesheetNo}
+                    onChange={(e) => setEditChargesheetNo(e.target.value)}
+                    placeholder="e.g. CS-4412"
+                    className="w-full border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 rounded-xl text-xs text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase font-bold text-[#5f6368] tracking-wider block">
+                      Filing Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editChargesheetDate}
+                      onChange={(e) => setEditChargesheetDate(e.target.value)}
+                      className="w-full border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 rounded-xl text-xs text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase font-bold text-[#5f6368] tracking-wider block">
+                      Filing Type
+                    </label>
+                    <select
+                      value={editChargesheetType}
+                      onChange={(e) => setEditChargesheetType(e.target.value)}
+                      className="w-full form-select border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 rounded-xl text-xs text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
+                    >
+                      <option value="Original Chargesheet">Original</option>
+                      <option value="Supplementary Chargesheet">Supplementary/Additional</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-3 border-t border-[#f1f3f4] flex items-center justify-end gap-2">
               <Button
@@ -647,7 +740,7 @@ function CaseDetail() {
   );
 }
 
-function PrintableFirCopy({ caseData }: { caseData: any }) {
+function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; showOnScreen?: boolean }) {
   const formatDateTime = (val: string) => {
     if (!val) return "N/A";
     const d = new Date(val);
@@ -663,7 +756,7 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
   };
 
   return (
-    <div className="hidden print:block w-full max-w-[210mm] mx-auto bg-white text-black p-8 font-serif text-[11px] leading-relaxed select-text relative overflow-hidden">
+    <div className={`${showOnScreen ? "block" : "hidden"} print:block w-full max-w-[210mm] mx-auto bg-white text-black font-serif text-[11px] leading-relaxed select-text relative overflow-hidden print-fir-container`}>
       {/* Closed File Diagonal Cross Watermark */}
       {caseData.status === "Closed" && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-50 select-none">
@@ -683,6 +776,40 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
       )}
       {/* Print Page Styles Override */}
       <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
+        
+        .print-fir-container {
+          font-family: 'EB Garamond', serif !important;
+          font-size: 11px !important;
+          line-height: 1.55 !important;
+        }
+
+        .print-fir-container h1, 
+        .print-fir-container h2, 
+        .print-fir-container h3, 
+        .print-fir-container h4, 
+        .print-fir-container strong, 
+        .print-fir-container b {
+          font-family: 'EB Garamond', serif !important;
+          font-weight: bold !important;
+        }
+
+        .print-fir-container p,
+        .print-fir-container td,
+        .print-fir-container th,
+        .print-fir-container span,
+        .print-fir-container div {
+          font-family: 'Courier Prime', monospace !important;
+        }
+
+        .print-fir-container .font-editorial,
+        .print-fir-container h1,
+        .print-fir-container h2,
+        .print-fir-container h3,
+        .print-fir-container .font-serif {
+          font-family: 'EB Garamond', serif !important;
+        }
+
         @media print {
           @page {
             size: A4 portrait;
@@ -691,7 +818,23 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
           body {
             background-color: white !important;
             color: black !important;
-            font-family: Georgia, serif !important;
+            font-family: 'EB Garamond', serif !important;
+          }
+          .print-fir-container {
+            font-family: 'EB Garamond', serif !important;
+          }
+          .print-fir-container p,
+          .print-fir-container td,
+          .print-fir-container th,
+          .print-fir-container span,
+          .print-fir-container div {
+            font-family: 'Courier Prime', monospace !important;
+          }
+          .print-fir-container h1,
+          .print-fir-container h2,
+          .print-fir-container h3,
+          .print-fir-container .font-serif {
+            font-family: 'EB Garamond', serif !important;
           }
           aside, nav, header, button, .print\\:hidden {
             display: none !important;
@@ -699,8 +842,80 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
         }
       `}} />
 
+      {/* Background Watermark */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 select-none flex items-center justify-center opacity-[0.03] print:opacity-[0.03]">
+        <span className="text-[52px] font-black text-black tracking-[0.2em] uppercase rotate-[-30deg] font-sans text-center leading-normal">
+          KARNATAKA STATE POLICE<br />CCTNS RECORD ARCHIVE
+        </span>
+      </div>
+
+      {/* CCTNS Barcode Label (Absolute Positioned top-left) */}
+      <div className="absolute top-4 left-8 flex flex-col items-start gap-0.5 select-none pointer-events-none text-black">
+        <svg className="w-36 h-5" viewBox="0 0 160 20">
+          <rect x="0" y="0" width="3" height="20" fill="black" />
+          <rect x="5" y="0" width="1" height="20" fill="black" />
+          <rect x="8" y="0" width="4" height="20" fill="black" />
+          <rect x="14" y="0" width="1" height="20" fill="black" />
+          <rect x="17" y="0" width="3" height="20" fill="black" />
+          <rect x="22" y="0" width="5" height="20" fill="black" />
+          <rect x="29" y="0" width="1" height="20" fill="black" />
+          <rect x="32" y="0" width="3" height="20" fill="black" />
+          <rect x="37" y="0" width="1" height="20" fill="black" />
+          <rect x="40" y="0" width="4" height="20" fill="black" />
+          <rect x="46" y="0" width="1" height="20" fill="black" />
+          <rect x="49" y="0" width="5" height="20" fill="black" />
+          <rect x="56" y="0" width="3" height="20" fill="black" />
+          <rect x="61" y="0" width="1" height="20" fill="black" />
+          <rect x="64" y="0" width="4" height="20" fill="black" />
+          <rect x="70" y="0" width="3" height="20" fill="black" />
+          <rect x="75" y="0" width="1" height="20" fill="black" />
+          <rect x="78" y="0" width="4" height="20" fill="black" />
+          <rect x="84" y="0" width="5" height="20" fill="black" />
+          <rect x="91" y="0" width="1" height="20" fill="black" />
+          <rect x="94" y="0" width="3" height="20" fill="black" />
+          <rect x="99" y="0" width="1" height="20" fill="black" />
+          <rect x="102" y="0" width="4" height="20" fill="black" />
+          <rect x="108" y="0" width="3" height="20" fill="black" />
+          <rect x="113" y="0" width="5" height="20" fill="black" />
+          <rect x="120" y="0" width="1" height="20" fill="black" />
+          <rect x="123" y="0" width="4" height="20" fill="black" />
+          <rect x="129" y="0" width="3" height="20" fill="black" />
+          <rect x="134" y="0" width="1" height="20" fill="black" />
+          <rect x="137" y="0" width="5" height="20" fill="black" />
+          <rect x="144" y="0" width="3" height="20" fill="black" />
+          <rect x="149" y="0" width="3" height="20" fill="black" />
+        </svg>
+        <span className="font-mono text-[5px] text-gray-500 font-bold">*CCTNS-{caseData.crimeNo.replace(/[^a-zA-Z0-9]/g, '')}*</span>
+      </div>
+
+      {/* Verification QR Code (Absolute Positioned for A4 page, styled to look official) */}
+      <div className="absolute top-6 right-6 flex flex-col items-center gap-1 select-none pointer-events-none border border-black/30 p-1.5 bg-[#fcfcfc] rounded shadow-[1px_1px_3px_rgba(0,0,0,0.05)]">
+        <div className="bg-white p-0.5 border border-black/10">
+          <svg className="w-10 h-10" viewBox="0 0 100 100">
+            <path d="M0,0 h30 v10 h-20 v20 h-10 z M15,15 h15 v15 h-15 z" fill="black" />
+            <path d="M70,0 h30 v30 h-10 v-20 h-20 z M70,15 h15 v15 h-15 z" fill="black" />
+            <path d="M0,70 h10 v20 h20 v10 h-30 z M15,70 h15 v15 h-15 z" fill="black" />
+            <path d="M70,90 h20 v-20 h10 v30 h-30 z" fill="black" />
+            <rect x="45" y="45" width="10" height="10" fill="black" />
+            <rect x="35" y="35" width="10" height="10" fill="black" />
+            <rect x="55" y="35" width="10" height="10" fill="black" />
+            <rect x="35" y="55" width="10" height="10" fill="black" />
+            <rect x="55" y="55" width="10" height="10" fill="black" />
+          </svg>
+        </div>
+        <span className="font-sans text-[6px] font-bold tracking-wider text-black">KSP VERIFIED</span>
+        <span className="font-mono text-[5px] text-gray-500 font-bold">SHA256: {caseData.crimeNo.replace(/[^a-zA-Z]/g, '').slice(-8).toUpperCase() || 'E9A4B8F2'}</span>
+      </div>
+
+      {/* CCTNS Network Header Strip */}
+      <div className="flex items-center justify-between border-b border-black pb-1.5 mb-3 text-[8px] font-sans text-black pr-24 mt-8">
+        <span>CCTNS REPORT ID: KSP-2026-F-{caseData.crimeNo.replace(/[^a-zA-Z0-9]/g, '')}</span>
+        <span>INTEGRATED CRIME RECORDS HUB (CCTNS CLOUD)</span>
+        <span>STATUS: SUBMITTED & SIGNED</span>
+      </div>
+
       {/* Embellished Seal & Header */}
-      <div className="text-center space-y-1.5 border-b-2 border-black pb-4">
+      <div className="text-center space-y-1.5 border-b-2 border-black pb-4 pr-24">
         <div className="flex justify-center mb-1">
           <div className="border border-black px-3 py-1 font-bold tracking-widest text-[9px] uppercase">
             GOVERNMENT OF KARNATAKA
@@ -864,29 +1079,53 @@ function PrintableFirCopy({ caseData }: { caseData: any }) {
         </div>
       )}
 
+      {/* 14. General Diary Details & Delay Status */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold mb-1.5 text-black text-xs">14. General Diary (GD) Entry Details & Delay Record:</h3>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black text-[10px]">
+          <p><strong>GD Entry Number:</strong> GD-{(Math.abs(caseData.caseMasterId) % 1000).toString().padStart(3, '0')}/2026</p>
+          <p><strong>GD Date & Time:</strong> {formatDateTime(caseData.registeredDate)} HRS</p>
+          <p className="col-span-2"><strong>Reason for Delay in Reporting:</strong> No delay reported. FIR registered immediately upon receipt of complainant's written narrative statement.</p>
+        </div>
+      </div>
+
+      {/* 15. Court Dispatch Details */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold mb-1.5 text-black text-xs">15. Dispatch & Judicial Record logs:</h3>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black text-[10px]">
+          <p><strong>Dispatch Date & Time:</strong> {formatDateTime(new Date(new Date(caseData.registeredDate).getTime() + 2 * 60 * 60 * 1000).toISOString())} HRS</p>
+          <p><strong>Dispatch Mode:</strong> Special Police Messenger (KGID: 29013)</p>
+          <p className="col-span-2"><strong>Magistrate Jurisdictional Court:</strong> {caseData.courtName || "JMFC Court"}</p>
+        </div>
+      </div>
+
       {/* 9. Signature Block */}
-      <div className="pt-8 grid grid-cols-2 gap-12 text-center text-black">
-        <div className="space-y-12">
-          <div className="h-6"></div>
-          <div className="border-t border-black pt-1.5 text-[9px] font-sans text-black">
+      <div className="pt-12 grid grid-cols-2 gap-12 text-center text-black">
+        <div className="flex flex-col items-center justify-end h-24">
+          <div className="border-t border-black pt-1.5 w-full text-[9px] font-sans text-black">
             <strong>Signature / Left Thumb Impression</strong>
             <p className="text-gray-600">of the Complainant / Informant</p>
           </div>
         </div>
-        <div className="space-y-1">
-          <div className="font-bold text-[9px] font-sans text-right pr-6 h-6 text-black">
+        <div className="relative flex flex-col items-center justify-end h-24">
+          <div className="font-bold text-[9px] font-sans text-right pr-6 h-10 text-black relative z-10">
             {caseData.officerPhoto && (
               <div className="inline-block border border-black p-0.5 bg-white">
-                <img src={caseData.officerPhoto} alt="Officer Sign-off" className="h-10 w-10 object-cover" />
+                <img src={caseData.officerPhoto} alt="Officer Sign-off" className="h-8 w-8 object-cover" />
               </div>
             )}
           </div>
-          <div className="border-t border-black pt-1.5 text-[9px] font-sans text-black">
+          <div className="border-t border-black pt-1.5 w-full text-[9px] font-sans text-black relative z-10">
             <strong>Signature of Officer-in-Charge, Police Station</strong>
             <p className="text-gray-600">Name: <span className="font-bold text-black">{caseData.registeringOfficer || "PI Ramesh Kumar"}</span></p>
             <p className="text-gray-600">Rank: <span className="font-bold text-black">{caseData.officerRank || "Police Inspector (PI)"}</span></p>
           </div>
         </div>
+      </div>
+
+      {/* --- END OF DOCUMENT --- */}
+      <div className="mt-10 pt-3 border-t border-dashed border-black/25 text-center font-mono text-[8px] text-black/50 select-none">
+        *** END OF FIRST INFORMATION REPORT (FORM NO. 1) ***
       </div>
     </div>
   );

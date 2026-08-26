@@ -213,7 +213,7 @@ export function NetworkPage() {
     <div className="mx-auto w-full max-w-7xl space-y-5 pb-12">
       {/* GOOGLE MATERIAL CLEAN HEADER */}
       <PageHeader
-        section="§ 02"
+        section="02"
         eyebrow="Karnataka State Police · State Crime Records Bureau"
         title="Network & Association Atlas"
         description="Clean & intuitive link intelligence workspace."

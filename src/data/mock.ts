@@ -13,7 +13,7 @@ export type District = {
 };
 
 export const DISTRICTS: District[] = [
-  { id: 1, name: "Bengaluru City", x: 0.62, y: 0.60, population: 12300000, urbanization: 96, literacy: 88 },
+  { id: 1, name: "Bengaluru Urban", x: 0.62, y: 0.60, population: 12300000, urbanization: 96, literacy: 88 },
   { id: 2, name: "Bengaluru Rural", x: 0.58, y: 0.55, population: 990000, urbanization: 42, literacy: 78 },
   { id: 3, name: "Mysuru", x: 0.48, y: 0.72, population: 3000000, urbanization: 58, literacy: 79 },
   { id: 4, name: "Mangaluru", x: 0.22, y: 0.55, population: 2100000, urbanization: 47, literacy: 88 },
@@ -214,7 +214,7 @@ const TIME_BANDS = ["00:00–04:00", "04:00–08:00", "18:00–22:00", "22:00–
 export const OFFENDER_PREDICTIONS: Record<string, Prediction> = Object.fromEntries(
   OFFENDERS.map(o => {
     const likelyMo = o.moTags[Math.floor(rand() * o.moTags.length)] ?? "Vehicle Snatching";
-    const likelyDist = o.jurisdictions[Math.floor(rand() * o.jurisdictions.length)] ?? "Bengaluru City";
+    const likelyDist = o.jurisdictions[Math.floor(rand() * o.jurisdictions.length)] ?? "Bengaluru Urban";
     const prob = Math.min(96, Math.round(50 + o.riskScore * 0.35 + rand() * 10));
     return [o.id, {
       nextCrime: likelyMo,
@@ -303,7 +303,7 @@ export const FORECAST = Array.from({ length: 14 }, (_, i) => {
 
 // Alerts feed
 export const ALERTS = [
-  { id: 1, severity: "critical", district: "Bengaluru City", text: "Chain-snatching cluster spike +38% vs 6-mo avg", time: "12 min ago" },
+  { id: 1, severity: "critical", district: "Bengaluru Urban", text: "Chain-snatching cluster spike +38% vs 6-mo avg", time: "12 min ago" },
   { id: 2, severity: "high", district: "Mysuru", text: "Cyber fraud reports doubled in last 72h", time: "34 min ago" },
   { id: 3, severity: "high", district: "Kalaburagi", text: "Vehicle theft anomaly detected in Zone-4", time: "1 hr ago" },
   { id: 4, severity: "medium", district: "Hubballi-Dharwad", text: "NDPS seizure trend rising in student areas", time: "2 hr ago" },
@@ -378,7 +378,7 @@ export type SubArea = {
 
 // Approximate district centroids (lat, lng) — used as fallback for area coords
 export const DISTRICT_COORDS: Record<string, [number, number]> = {
-  "Bengaluru City": [12.9716, 77.5946],
+  "Bengaluru Urban": [12.9716, 77.5946],
   "Bengaluru Rural": [13.2846, 77.6947],
   "Mysuru": [12.2958, 76.6394],
   "Mangaluru": [12.9141, 74.856],
@@ -515,7 +515,7 @@ export const AREA_COORDS: Record<string, [number, number]> = {
 };
 
 export const AREA_NAMES: Record<string, string[]> = {
-  "Bengaluru City": ["Whitefield","Koramangala","Indiranagar","MG Road","Electronic City","Yelahanka","Jayanagar","HSR Layout","Malleshwaram","Marathahalli"],
+  "Bengaluru Urban": ["Whitefield","Koramangala","Indiranagar","MG Road","Electronic City","Yelahanka","Jayanagar","HSR Layout","Malleshwaram","Marathahalli"],
   "Bengaluru Rural": ["Devanahalli","Doddaballapur","Hoskote","Nelamangala"],
   "Mysuru": ["Krishnaraja","Chamundipuram","Vijayanagar","Hebbal","T. Narasipur","Nanjangud","Hunsur"],
   "Mangaluru": ["Mangaluru North","Mangaluru South","Bantwal","Puttur","Sullia","Belthangady"],

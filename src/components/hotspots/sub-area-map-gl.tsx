@@ -7,7 +7,7 @@ import karnatakaGeo from "@/data/karnataka.geojson.json";
 const MAPTILER_KEY = "vJbuGTzYMGTLnGWttx64";
 
 const NAME_ALIAS: Record<string, string> = {
-  "Bengaluru City": "Bengaluru Urban",
+  "Bengaluru Urban": "Bengaluru Urban",
   "Mangaluru": "Dakshina Kannada",
   "Hubballi-Dharwad": "Dharwad",
 };

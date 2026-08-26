@@ -10,6 +10,8 @@ import { DISTRICTS } from "@/data/mock";
 import { getCatalystSyncInfo, syncWithCatalyst } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/hooks/use-language";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -142,18 +144,12 @@ function Cartogram({
       {positioned.map(d => {
         const t = d.total / max;
         const isSelected = selectedId === d.district.id;
-        const isSpiking = d.spike > 15;
         return (
           <g
             key={d.district.id}
             onClick={() => onSelect(d.district.id)}
             style={{ cursor: "pointer" }}
           >
-            {/* connector spike bar for red-zone districts */}
-            {isSpiking && (
-              <line x1={d.cx} y1={d.cy - R - 3} x2={d.cx} y2={d.cy - R - 14 - t * 18}
-                    stroke={SIGNAL} strokeWidth="2" strokeLinecap="round" />
-            )}
             {/* hex shadow (offset black stamp) */}
             <path d={hexPath(d.cx + 2.5, d.cy + 2.5, R)} fill={INK} opacity={isSelected ? 1 : 0.85} />
             {/* hex fill */}
@@ -169,27 +165,17 @@ function Cartogram({
             )}
             {/* volume number */}
             <text x={d.cx} y={d.cy - 3} textAnchor="middle"
-                  fontFamily="Space Grotesk, sans-serif" fontSize="13" fontWeight="700"
-                  fill={t > 0.6 ? PAPER : INK}>
+              fontFamily="Space Grotesk, sans-serif" fontSize="13" fontWeight="700"
+              fill={t > 0.6 ? PAPER : INK}>
               {d.total}
             </text>
             {/* district name */}
             <text x={d.cx} y={d.cy + 10} textAnchor="middle"
-                  fontFamily="JetBrains Mono, monospace" fontSize="7.5"
-                  letterSpacing="0.05em"
-                  fill={t > 0.6 ? PAPER : INK} opacity="0.85">
+              fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+              letterSpacing="0.05em"
+              fill={t > 0.6 ? PAPER : INK} opacity="0.85">
               {d.district.name.length > 12 ? d.district.name.slice(0, 11) + "…" : d.district.name.toUpperCase()}
             </text>
-            {/* spike badge */}
-            {isSpiking && (
-              <>
-                <circle cx={d.cx + R * 0.75} cy={d.cy - R * 0.55} r="7" fill={SIGNAL} stroke={INK} strokeWidth="1" />
-                <text x={d.cx + R * 0.75} y={d.cy - R * 0.55 + 2.5} textAnchor="middle"
-                      fontFamily="JetBrains Mono, monospace" fontSize="7" fontWeight="700" fill={PAPER}>
-                  +{d.spike}
-                </text>
-              </>
-            )}
           </g>
         );
       })}
@@ -204,14 +190,6 @@ function Cartogram({
           <text x="0" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED}>LOW</text>
           <text x="132" y="20" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={MUTED} textAnchor="end">HIGH</text>
         </g>
-      </g>
-
-      {/* red-zone key */}
-      <g transform={`translate(${W - 160} ${H - 32})`}>
-        <line x1="0" y1="4" x2="12" y2="4" stroke={SIGNAL} strokeWidth="2" />
-        <text x="18" y="7" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={INK} letterSpacing="0.16em">
-          SPIKE  &gt; 15%  (RED-ZONE)
-        </text>
       </g>
     </svg>
   );
@@ -235,14 +213,14 @@ function DistrictRadial({ districtId }: { districtId: number }) {
     <svg viewBox={`0 0 ${S} ${S}`} className="w-full max-w-[240px]">
       {[0.33, 0.66, 1].map(t => (
         <circle key={t} cx={cx} cy={cy} r={rIn + (rOut - rIn) * t}
-                fill="none" stroke={RULE} strokeDasharray="1 3" />
+          fill="none" stroke={RULE} strokeDasharray="1 3" />
       ))}
       {[0, 6, 12, 18].map(h => {
         const a = (h / 24) * Math.PI * 2 - Math.PI / 2;
         return (
           <text key={h} x={cx + Math.cos(a) * (rOut + 12)} y={cy + Math.sin(a) * (rOut + 12)}
-                fontSize="9" fontFamily="JetBrains Mono, monospace"
-                fill={INK} textAnchor="middle" dominantBaseline="middle" opacity="0.6">
+            fontSize="9" fontFamily="JetBrains Mono, monospace"
+            fill={INK} textAnchor="middle" dominantBaseline="middle" opacity="0.6">
             {String(h).padStart(2, "0")}
           </text>
         );
@@ -270,32 +248,49 @@ function DistrictRadial({ districtId }: { districtId: number }) {
 function Sparkline({ values, color, w = 100, h = 28 }: { values: number[]; color: string; w?: number; h?: number }) {
   const min = Math.min(...values), max = Math.max(...values), r = max - min || 1;
   const step = w / (values.length - 1);
-  const pts = values.map((v, i) => `${i * step},${h - ((v - min) / r) * (h - 4) - 2}`);
+  
+  const points = values.map((v, i) => ({
+    x: i * step,
+    y: h - ((v - min) / r) * (h - 6) - 3
+  }));
+  
+  const linePath = `M ${points.map(p => `${p.x},${p.y}`).join(" L ")}`;
+  const areaPath = `${linePath} L ${w},${h} L 0,${h} Z`;
+  const gradId = `spark-grad-${Math.floor(Math.random() * 100000)}`;
+  const lastPt = points[points.length - 1] || { x: w, y: h / 2 };
+
   return (
-    <svg width={w} height={h}>
-      <path d={`M ${pts.join(" L ")}`} fill="none" stroke={color} strokeWidth="1.5" />
-      <circle cx={(values.length - 1) * step} cy={h - ((values[values.length - 1] - min) / r) * (h - 4) - 2} r="2.2" fill={color} />
+    <svg width={w} height={h} className="overflow-visible">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradId})`} />
+      <path d={linePath} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lastPt.x} cy={lastPt.y} r="2.5" fill={color} />
     </svg>
   );
 }
 
 function KPI({
-  code, label, value, delta, up, series, tone = "ink",
+  label, value, delta, up, series, tone = "ink",
 }: {
-  code: string; label: string; value: string | number; delta: string; up: boolean;
+  label: string; value: string | number; delta: string; up: boolean;
   series: number[]; tone?: "ink" | "signal";
 }) {
   const color = tone === "signal" ? SIGNAL : INK;
   return (
-    <div className="bento-card bento-card-hover p-4">
-      <div className="flex items-start justify-between gap-2 border-b border-ink/15 pb-2">
-        <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">§{code} · {label}</span>
+    <div className="bento-card bento-card-hover p-4 md:p-5">
+      <div className="flex items-center justify-between gap-2 border-b border-ink/15 pb-2.5">
+        <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">{label}</span>
         <span className={`inline-flex items-center gap-0.5 font-mono text-[10px] font-bold ${up ? "text-signal" : "text-success"}`}>
           {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
           {delta}
         </span>
       </div>
-      <div className="mt-3 flex items-end justify-between gap-3">
+      <div className="mt-4 flex items-end justify-between gap-3">
         <p className="font-display text-[34px] leading-none font-bold tracking-tight" style={{ color }}>
           {value}
         </p>
@@ -318,14 +313,23 @@ function Overview() {
     headDist: HEAD_DIST,
   } = useDb();
 
+  const { language, t } = useLanguage();
+
   const [selectedId, setSelectedId] = useState<number>(() => DISTRICT_STATS[0]?.district.id ?? 1);
   const [isSyncing, setIsSyncing] = useState(false);
   const syncInfo = getCatalystSyncInfo();
 
   const handleManualSync = async () => {
     setIsSyncing(true);
-    await syncWithCatalyst();
-    setTimeout(() => setIsSyncing(false), 500);
+    const toastId = toast.loading("Syncing database with Zoho/Catalyst...");
+    try {
+      await syncWithCatalyst();
+      toast.success("Database synced successfully!", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Sync failed: ${err.message}`, { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const selected = DISTRICT_STATS.find(d => d.district.id === selectedId) || DISTRICT_STATS[0] || {
@@ -337,78 +341,72 @@ function Overview() {
   const heinousSharePct = Math.round((heinousCount / (totalLiveFIRs || 1)) * 100);
 
   const firs14 = DAILY_TREND.slice(-14).map(d => d.firs);
-  const hein14 = DAILY_TREND.slice(-14).map(d => d.heinous);
+  const hein14 = DAILY_TREND.slice(-14).map(d => Math.round((d.heinous / (d.firs || 1)) * 100));
   const arr14 = DAILY_TREND.slice(-14).map(d => d.arrests);
-  const cs14 = DAILY_TREND.slice(-14).map((d, i) => Math.round(d.arrests * 0.6 + i * 0.4));
+  const cs14 = DAILY_TREND.slice(-14).map((d, i) => Math.round(d.firs * 0.35 + Math.sin(i) * 2));
   const clearance = Math.round((KPIS.chargeSheeted / (totalLiveFIRs || 1)) * 100);
   const critical = ALERTS.filter(a => a.severity === "critical" || a.severity === "high").length;
   const date = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="space-y-5">
-      {/* ───────── MASTHEAD ───────── */}
-      <header className="border-y-4 border-ink py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/20 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-            </span>
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] font-bold text-ink flex items-center gap-1.5">
-              <Database className="h-3.5 w-3.5 text-signal" />
-              Crime Intelligence Database
-            </span>
+      {/* ───────── MASTHEAD & TICKER GROUP ───────── */}
+      <div className="border-y-4 border-ink">
+        <header className="py-4">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-ink/20 pb-3">
+            <button
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 rounded border border-ink/30 bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-colors"
+            >
+              <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
+              {isSyncing ? t("syncing") : t("syncConsole")}
+            </button>
           </div>
 
-          <button
-            onClick={handleManualSync}
-            disabled={isSyncing}
-            className="inline-flex items-center gap-1.5 rounded border border-ink/30 bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-colors"
-          >
-            <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
-            {isSyncing ? "Syncing Zoho Tables..." : "Sync Live Console"}
-          </button>
-        </div>
+          <h1 className="mt-3 font-editorial text-[46px] md:text-[64px] leading-[0.95] tracking-tight text-ink">
+            {language === "kn" ? (
+              <>ಕರ್ನಾಟಕ <em className="text-signal">ಅಪರಾಧ</em> ದೈನಿಕ.</>
+            ) : (
+              <>The Karnataka <em className="text-signal">Crime</em> Daily.</>
+            )}
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            {t("mastheadSub")} · {KPIS.activeDistricts} {t("activeDistricts")} · {HEAD_DIST.length} {t("crimeHeads")} ·
+            {t("rolling30Days")} · {t("realtimeAnomaly")}. <span className="font-editorial italic text-ink">{t("tagline")}</span>
+          </p>
+        </header>
 
-        <h1 className="mt-3 font-editorial text-[46px] md:text-[64px] leading-[0.95] tracking-tight text-ink">
-          The Karnataka <em className="text-signal">Crime</em> Daily.
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Strategic intelligence brief · {KPIS.activeDistricts} districts · {HEAD_DIST.length} crime heads ·
-          rolling 30-day window · real-time anomaly channel. <span className="font-editorial italic text-ink">Read the state, then the street.</span>
-        </p>
-
-      </header>
-
-      {/* ───────── TICKER ───────── */}
-      <div className="relative overflow-hidden border-y border-ink bg-ink">
-        <div className="flex whitespace-nowrap ticker-scroll py-2">
-          {[...ALERTS, ...ALERTS].map((a, i) => (
-            <span key={i} className="mx-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-paper">
-              <span className={`h-1.5 w-1.5 rounded-full ${a.severity === "critical" ? "bg-signal" : a.severity === "high" ? "bg-warning" : "bg-paper/60"}`} />
-              <span className="text-paper/60">{a.severity}</span>
-              <span className="text-signal">◆</span>
-              <span>{a.district}</span>
-              <span className="text-paper/50">—</span>
-              <span>{a.text}</span>
-            </span>
-          ))}
+        {/* ───────── TICKER ───────── */}
+        <div className="relative overflow-hidden border-t border-ink bg-ink">
+          <div className="flex whitespace-nowrap ticker-scroll py-2">
+            {[...ALERTS, ...ALERTS].map((a, i) => (
+              <span key={i} className="mx-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-paper">
+                <span className={`h-1.5 w-1.5 rounded-full ${a.severity === "critical" ? "bg-signal" : a.severity === "high" ? "bg-warning" : "bg-paper/60"}`} />
+                <span className="text-paper/60">{a.severity}</span>
+                <span className="text-signal">◆</span>
+                <span>{a.district}</span>
+                <span className="text-paper/50">—</span>
+                <span>{a.text}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ───────── KPI ROW ───────── */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Link to="/cases" className="block text-inherit hover:no-underline">
-          <KPI code="A1" label="Total FIRs" value={KPIS.totalFIRs} delta="+6.4%" up series={firs14} />
+          <KPI label={t("totalFirs")} value={KPIS.totalFIRs} delta="+6.4%" up series={firs14} />
         </Link>
         <Link to="/cases" search={{ gravity: "Heinous" } as any} className="block text-inherit hover:no-underline">
-          <KPI code="A2" label="Heinous Share" value={`${KPIS.heinousPct}%`} delta="-2.1%" up={false} series={hein14} tone="signal" />
+          <KPI label={t("heinousShare")} value={`${KPIS.heinousPct}%`} delta="-2.1%" up={false} series={hein14} tone="signal" />
         </Link>
         <Link to="/cases" className="block text-inherit hover:no-underline">
-          <KPI code="A3" label="Arrests" value={KPIS.arrests} delta="+11.8%" up={false} series={arr14} />
+          <KPI label={t("arrests")} value={KPIS.arrests} delta="+11.8%" up={false} series={arr14} />
         </Link>
         <Link to="/cases" search={{ status: "Charge Sheeted" } as any} className="block text-inherit hover:no-underline">
-          <KPI code="A4" label="Charge-sheeted" value={KPIS.chargeSheeted} delta="+4.2%" up={false} series={cs14} />
+          <KPI label={t("chargeSheeted")} value={KPIS.chargeSheeted} delta="+4.2%" up={false} series={cs14} />
         </Link>
       </div>
 
@@ -438,19 +436,19 @@ function Overview() {
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">CRITICAL THREAT ZONE</p>
               <p className="font-display text-base font-bold text-signal truncate">
-                {[...DISTRICT_STATS].sort((a,b) => b.riskScore - a.riskScore)[0]?.district.name || "None"}
+                {[...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.district.name || "None"}
               </p>
               <p className="text-[10px] text-muted-foreground">
-                Threat index at <span className="font-mono text-signal font-bold">{[...DISTRICT_STATS].sort((a,b) => b.riskScore - a.riskScore)[0]?.riskScore || 0}/100</span>
+                Threat index at <span className="font-mono text-signal font-bold">{[...DISTRICT_STATS].sort((a, b) => b.riskScore - a.riskScore)[0]?.riskScore || 0}/100</span>
               </p>
             </div>
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">MAX RATE ACCELERATION</p>
               <p className="font-display text-base font-bold text-ink truncate">
-                {[...DISTRICT_STATS].sort((a,b) => b.spike - a.spike)[0]?.district.name || "None"}
+                {[...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.district.name || "None"}
               </p>
               <p className="text-[10px] text-muted-foreground font-mono">
-                Volume delta: <span className="text-emerald-600 font-bold">+{[...DISTRICT_STATS].sort((a,b) => b.spike - a.spike)[0]?.spike || 0}%</span> vs baseline
+                Volume delta: <span className="text-emerald-600 font-bold">+{[...DISTRICT_STATS].sort((a, b) => b.spike - a.spike)[0]?.spike || 0}%</span> vs baseline
               </p>
             </div>
             <div className="rounded-md border border-ink/10 bg-surface-2 p-3 space-y-1">
@@ -505,7 +503,7 @@ function Overview() {
             </div>
 
             <Link to="/hotspots"
-                  className="mt-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.24em] text-ink hover:text-signal">
+              className="mt-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.24em] text-ink hover:text-signal">
               Drill into hotspots → </Link>
           </div>
 
@@ -541,7 +539,7 @@ function Overview() {
         {/* TREND */}
         <div className="bento-card p-5 lg:col-span-3">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">§B1 · Temporal</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B1 · Temporal</span>
             <h3 className="mt-1 font-editorial text-2xl leading-none">30-Day Registration Trend</h3>
           </div>
           <TrendChart />
@@ -550,7 +548,7 @@ function Overview() {
         {/* TAXONOMY */}
         <div className="bento-card p-5 lg:col-span-2">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">§B2 · Taxonomy</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B2 · Taxonomy</span>
             <h3 className="mt-1 font-editorial text-2xl leading-none">By Crime Head</h3>
           </div>
           <TaxonomyList />
@@ -559,7 +557,7 @@ function Overview() {
         {/* CLEARANCE */}
         <div className="bento-card p-5 lg:col-span-1 flex flex-col">
           <div className="border-b-2 border-ink pb-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">§B3 · Outcome</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">B3 · Outcome</span>
             <h3 className="mt-1 font-editorial text-xl leading-none">Clearance</h3>
           </div>
           <div className="flex flex-1 flex-col items-center justify-center">
@@ -567,8 +565,8 @@ function Overview() {
               <svg viewBox="0 0 120 120" className="w-32 h-32">
                 <circle cx="60" cy="60" r="52" fill="none" stroke={RULE} strokeWidth="10" />
                 <circle cx="60" cy="60" r="52" fill="none" stroke={SIGNAL} strokeWidth="10"
-                        strokeDasharray={`${(clearance / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
-                        strokeLinecap="butt" transform="rotate(-90 60 60)" />
+                  strokeDasharray={`${(clearance / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
+                  strokeLinecap="butt" transform="rotate(-90 60 60)" />
                 <text x="60" y="66" textAnchor="middle" fontFamily="Space Grotesk, sans-serif" fontSize="26" fontWeight="700" fill={INK}>
                   {clearance}%
                 </text>
@@ -588,7 +586,7 @@ function Overview() {
       <div className="bento-card p-5">
         <div className="border-b-2 border-ink pb-2 mb-4 flex items-center justify-between">
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">§C1 · Live Registry Feed</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">C1 · Live Registry Feed</span>
             <h3 className="mt-1 font-editorial text-2xl leading-none">Recent FIR Filings & Profile Registry</h3>
           </div>
           <span className="font-mono text-xs text-muted-foreground">Showing last 4 cases</span>
@@ -606,8 +604,18 @@ function Overview() {
                   </div>
                   <h4 className="font-bold text-sm text-ink mt-2.5 truncate">{c.crimeHead.name}</h4>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.policeStation}, {c.district.name}</p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${c.status === 'Charge Sheeted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-ink/5 text-ink/70'}`}>
+                      {c.status}
+                    </span>
+                    {c.status === 'Charge Sheeted' && c.chargesheetNo && (
+                      <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-200">
+                        {c.chargesheetNo}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                
+
                 <div className="space-y-2 pt-2.5 border-t border-ink/10 text-xs">
                   {/* Police Officer */}
                   <div className="flex items-center gap-2">
@@ -664,15 +672,6 @@ function Overview() {
           )}
         </div>
       </div>
-
-      {/* ───────── COLOPHON ───────── */}
-      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t-2 border-ink pt-3 font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground">
-        <span>KSP · SCRB Intel Console · v0.2</span>
-        <span className="font-editorial not-italic text-ink normal-case tracking-normal text-sm">
-          — All the data that's fit to police.
-        </span>
-        <span>Auto-refresh · 60s</span>
-      </footer>
     </div>
   );
 }
@@ -698,7 +697,7 @@ function TrendChart() {
       </defs>
       {[0.25, 0.5, 0.75, 1].map(t => (
         <line key={t} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + t * inner.h} y2={PAD.t + t * inner.h}
-              stroke={RULE} strokeDasharray="2 3" />
+          stroke={RULE} strokeDasharray="2 3" />
       ))}
       <path d={areaPath} fill="url(#hatch)" />
       <path d={`M ${linePts}`} fill="none" stroke={INK} strokeWidth="2" />
@@ -711,7 +710,7 @@ function TrendChart() {
       })}
       {/* end marker */}
       <circle cx={xAt(DAILY_TREND.length - 1)} cy={yAt(DAILY_TREND[DAILY_TREND.length - 1].firs)}
-              r="4" fill={SIGNAL} stroke={INK} strokeWidth="1.5" />
+        r="4" fill={SIGNAL} stroke={INK} strokeWidth="1.5" />
       {/* y ticks */}
       <text x={PAD.l - 4} y={PAD.t + 8} textAnchor="end" fontFamily="JetBrains Mono, monospace" fontSize="9" fill={MUTED}>{max}</text>
       <text x={PAD.l - 4} y={PAD.t + inner.h} textAnchor="end" fontFamily="JetBrains Mono, monospace" fontSize="9" fill={MUTED}>0</text>

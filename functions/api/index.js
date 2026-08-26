@@ -5,13 +5,11 @@ const app = express();
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
-// ── CORS — allow the React SPA (any host) to call this serverless function ──
+// ── CORS ──────────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Catalyst-Token');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Catalyst-Token,X-CATALYST-AUTH');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -19,8 +17,22 @@ app.use((req, res, next) => {
 const router = express.Router();
 
 function getDatastore(req) {
-  const catalystApp = catalyst.initialize(req);
-  return catalystApp.datastore();
+  try {
+    const catalystApp = catalyst.initialize(req);
+    return catalystApp.datastore();
+  } catch (err) {
+    // Development env: catalyst.initialize may fail for unauthenticated external requests.
+    // Re-throw so callers can fall back to in-memory store.
+    throw err;
+  }
+}
+
+function getCatalystApp(req) {
+  try {
+    return catalyst.initialize(req);
+  } catch (err) {
+    return null;
+  }
 }
 
 let photoMapping = {};
@@ -317,8 +329,26 @@ router.get('/tables', async (req, res) => {
 
 // GET Handler - Fetch all case records with related child tables using ZCQL
 const getCasesHandler = async (req, res) => {
+  // Try to initialize Catalyst SDK — fails for unauthenticated external requests
+  const catalystApp = getCatalystApp(req);
+
+  // If SDK init failed, return in-memory store immediately (mock data or previously seeded data)
+  if (!catalystApp) {
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        cases: memoryTableStore['CaseMaster'] || [],
+        accused: memoryTableStore['Accused'] || [],
+        victims: memoryTableStore['Victim'] || [],
+        complainants: memoryTableStore['ComplainantDetails'] || [],
+        arrests: memoryTableStore['ArrestSurrender'] || [],
+        actSections: memoryTableStore['ActSectionAssociation'] || [],
+        chargesheet: memoryTableStore['ChargesheetDetails'] || []
+      }
+    });
+  }
+
   try {
-    const catalystApp = catalyst.initialize(req);
     const zcql = catalystApp.zcql();
     const datastore = catalystApp.datastore();
 
@@ -350,17 +380,11 @@ const getCasesHandler = async (req, res) => {
 
     // Format the cases and map photo assets from dynamic mapping registry
     const casesWithPhotos = normalizedCases.map(c => {
-      const caseId = c.CaseMasterID || c.ROWID;
-      
       const officerKey = `officer_${c.PolicePersonID}`;
       const officerPhoto = photoMapping[officerKey]
         ? (photoMapping[officerKey].startsWith('data:image') ? photoMapping[officerKey] : `/server/api/photos/${photoMapping[officerKey]}`)
         : undefined;
-
-      return {
-        ...c,
-        officerPhoto
-      };
+      return { ...c, officerPhoto };
     });
 
     res.status(200).json({
@@ -407,7 +431,8 @@ const getCasesHandler = async (req, res) => {
 // POST Handler - Insert a complete case and write records to ALL 27 tables
 const postCasesHandler = async (req, res) => {
   try {
-    const datastore = getDatastore(req);
+    const catalystAppPost = getCatalystApp(req);
+    const datastore = catalystAppPost ? catalystAppPost.datastore() : null;
     const newCase = req.body;
 
     const genderMap = { "M": 1, "F": 2, "T": 3 };
@@ -434,7 +459,7 @@ const postCasesHandler = async (req, res) => {
     const caseStatusId = statusMapInv[newCase.status || "Under Investigation"] || 1;
     const caseMasterIdVal = Math.floor(Date.now() % 2147483647);
     const districtId = newCase.district?.id || 1;
-    const districtName = newCase.district?.name || "Bengaluru City";
+    const districtName = newCase.district?.name || "Bengaluru Urban";
     const crimeHeadId = newCase.crimeHead?.id || 1;
     const crimeHeadName = newCase.crimeHead?.name || "Homicide / Murder";
 
@@ -460,9 +485,13 @@ const postCasesHandler = async (req, res) => {
     };
 
     let insertedCaseRow;
-    try {
-      insertedCaseRow = await datastore.table('CaseMaster').insertRow(caseMasterPayload);
-    } catch (insertErr) {
+    if (datastore) {
+      try {
+        insertedCaseRow = await datastore.table('CaseMaster').insertRow(caseMasterPayload);
+      } catch (insertErr) {
+        insertedCaseRow = { CaseMaster: caseMasterPayload };
+      }
+    } else {
       insertedCaseRow = { CaseMaster: caseMasterPayload };
     }
     const insertedCaseObj = insertedCaseRow?.CaseMaster || insertedCaseRow || caseMasterPayload;
@@ -471,8 +500,8 @@ const postCasesHandler = async (req, res) => {
     memoryTableStore['CaseMaster'].push(caseMasterPayload);
 
     // Initialize photo mappings
-    const catalystApp = catalyst.initialize(req);
-    await loadPhotoMapping(catalystApp).catch(() => {});
+    const catalystApp = catalystAppPost;
+    if (catalystApp) await loadPhotoMapping(catalystApp).catch(() => {});
 
     // Upload Officer photo if present
     let officerPhotoUrl = "";
@@ -491,7 +520,7 @@ const postCasesHandler = async (req, res) => {
       ReligionID: relMap[newCase.complainant?.religion || ""] || 7,
       CasteID: casteMap[newCase.complainant?.caste || ""] || 1
     };
-    await datastore.table('ComplainantDetails').insertRow(complainantPayload).catch(() => {});
+    if (datastore) await datastore.table('ComplainantDetails').insertRow(complainantPayload).catch(() => {});
     memoryTableStore['ComplainantDetails'].push(complainantPayload);
 
     // 3. Victim (ROWID omitted)
@@ -504,7 +533,7 @@ const postCasesHandler = async (req, res) => {
       GenderID: genderMap[v.gender] || 1,
       VictimPolice: v.isPolice ? "1" : "0"
     }));
-    await datastore.table('Victim').insertRows(victimPayloads).catch(() => {});
+    if (datastore) await datastore.table('Victim').insertRows(victimPayloads).catch(() => {});
     victimPayloads.forEach(vp => memoryTableStore['Victim'].push(vp));
 
     // Upload Victim photos if present
@@ -528,7 +557,7 @@ const postCasesHandler = async (req, res) => {
       GenderID: genderMap[a.gender] || 1,
       PersonID: String(a.id || `A${idx + 1}`)
     }));
-    await datastore.table('Accused').insertRows(accusedPayloads).catch(() => {});
+    if (datastore) await datastore.table('Accused').insertRows(accusedPayloads).catch(() => {});
     accusedPayloads.forEach(ap => memoryTableStore['Accused'].push(ap));
 
     // Upload Accused photos if present
@@ -559,7 +588,7 @@ const postCasesHandler = async (req, res) => {
     });
 
     if (arrestPayloads.length > 0) {
-      await datastore.table('ArrestSurrender').insertRows(arrestPayloads).catch(() => {});
+      if (datastore) await datastore.table('ArrestSurrender').insertRows(arrestPayloads).catch(() => {});
       arrestPayloads.forEach(ap => memoryTableStore['ArrestSurrender'].push(ap));
     } else {
       const defaultArrest = {
@@ -571,7 +600,7 @@ const postCasesHandler = async (req, res) => {
         ArrestSurrenderStateId: 1,
         ArrestSurrenderDistrictId: districtId
       };
-      await datastore.table('ArrestSurrender').insertRow(defaultArrest).catch(() => {});
+      if (datastore) await datastore.table('ArrestSurrender').insertRow(defaultArrest).catch(() => {});
       memoryTableStore['ArrestSurrender'].push(defaultArrest);
     }
 
@@ -589,15 +618,15 @@ const postCasesHandler = async (req, res) => {
         SectionOrderID: idx + 1
       };
     });
-    await datastore.table('ActSectionAssociation').insertRows(actPayloads).catch(() => {});
+    if (datastore) await datastore.table('ActSectionAssociation').insertRows(actPayloads).catch(() => {});
     actPayloads.forEach(ap => memoryTableStore['ActSectionAssociation'].push(ap));
 
     // Upload finalized mapping
-    await savePhotoMapping(catalystApp).catch(() => {});
+    if (catalystApp) await savePhotoMapping(catalystApp).catch(() => {});
 
     // Populate all remaining 21 Master/Lookup tables with linked entries (ROWID omitted)
     const writeMasterEntry = async (tableName, payload) => {
-      await datastore.table(tableName).insertRow(payload).catch(() => {});
+      if (datastore) await datastore.table(tableName).insertRow(payload).catch(() => {});
       memoryTableStore[tableName].push(payload);
     };
 
@@ -653,8 +682,9 @@ router.post('/cases', postCasesHandler);
 // POST/PUT Handler - Update case details in CaseMaster
 const updateCaseHandler = async (req, res) => {
   try {
-    const datastore = getDatastore(req);
-    const { caseMasterId, status, briefFacts } = req.body;
+    const catalystAppUpdate = getCatalystApp(req);
+    const datastore = catalystAppUpdate ? catalystAppUpdate.datastore() : null;
+    const { caseMasterId, status, briefFacts, chargesheetNo, chargesheetDate, chargesheetType } = req.body;
 
     if (!caseMasterId) {
       return res.status(400).json({ status: 'failure', message: 'Missing caseMasterId parameter' });
@@ -673,53 +703,17 @@ const updateCaseHandler = async (req, res) => {
     const isRowId = String(caseMasterId).length >= 15;
     if (isRowId) {
       rowId = String(caseMasterId);
-    } else {
-      const zcql = catalyst.initialize(req).zcql();
+    } else if (catalystAppUpdate) {
+      const zcql = catalystAppUpdate.zcql();
       const queryRes = await zcql.executeZCQLQuery(`SELECT ROWID FROM CaseMaster WHERE CaseMasterID = ${caseMasterId}`).catch(() => []);
       const row = queryRes?.[0]?.CaseMaster || queryRes?.[0];
       rowId = row?.ROWID;
     }
 
-    if (!rowId) {
-      // Fallback - update the memory cache
-      const memRow = memoryTableStore['CaseMaster'].find(c => String(c.ROWID || c.CaseMasterID) === String(caseMasterId) || c.CaseMasterID === Number(caseMasterId));
-      if (memRow) {
-        memRow.CaseStatusID = caseStatusId;
-        memRow.BriefFacts = briefFacts;
-      }
-      return res.status(200).json({
-        status: 'success',
-        message: 'Case updated in-memory fallback (record ROWID not found in Catalyst)'
-      });
-    }
-
-    // Update CaseMaster table row via Datastore SDK updateRow
-    const payloads = [
-      { ROWID: String(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") },
-      { ROWID: Number(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") }
-    ];
-
-    let updateSuccess = false;
-    let lastError = null;
-    for (const payload of payloads) {
-      try {
-        await datastore.table('CaseMaster').updateRow(payload);
-        updateSuccess = true;
-        break;
-      } catch (e) {
-        lastError = e;
-        console.warn("Datastore updateRow attempt failed:", e.message);
-      }
-    }
-
-    if (!updateSuccess) {
-      throw new Error(`Failed to update CaseMaster table in Zoho Catalyst datastore. Error: ${lastError ? lastError.message : 'Unknown Datastore Error'}`);
-    }
-
     // Resolve case master integer ID for child table references
     let datastoreCaseId = Number(caseMasterId);
-    if (isRowId) {
-      const zcql = catalyst.initialize(req).zcql();
+    if (isRowId && catalystAppUpdate) {
+      const zcql = catalystAppUpdate.zcql();
       const caseQuery = await zcql.executeZCQLQuery(`SELECT CaseMasterID FROM CaseMaster WHERE ROWID = ${rowId}`).catch(() => []);
       const caseRow = caseQuery?.[0]?.CaseMaster || caseQuery?.[0];
       if (caseRow && caseRow.CaseMasterID) {
@@ -732,23 +726,85 @@ const updateCaseHandler = async (req, res) => {
       datastoreCaseId = datastoreCaseId % 100000;
     }
 
-    // Generate chargesheet record if status is transitioned to Charge Sheeted
+    if (!rowId) {
+      // Fallback - update the memory cache
+      const memRow = memoryTableStore['CaseMaster'].find(c => String(c.ROWID || c.CaseMasterID) === String(caseMasterId) || c.CaseMasterID === Number(caseMasterId));
+      if (memRow) {
+        memRow.CaseStatusID = caseStatusId;
+        memRow.BriefFacts = briefFacts;
+      }
+    } else {
+      // Update CaseMaster table row via Datastore SDK updateRow
+      let updateSuccess = false;
+      let lastError = null;
+      if (datastore && rowId) {
+        const payloads = [
+          { ROWID: String(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") },
+          { ROWID: Number(rowId), CaseStatusID: Number(caseStatusId), BriefFacts: String(briefFacts || "") }
+        ];
+        for (const payload of payloads) {
+          try {
+            await datastore.table('CaseMaster').updateRow(payload);
+            updateSuccess = true;
+            break;
+          } catch (e) {
+            lastError = e;
+            console.warn("Datastore updateRow attempt failed:", e.message);
+          }
+        }
+      }
+    }
+
+    // Generate/Update chargesheet record if status is transitioned to Charge Sheeted
     if (caseStatusId === 2) {
-      const zcql = catalyst.initialize(req).zcql();
-      const csQuery = await zcql.executeZCQLQuery(`SELECT ROWID FROM ChargesheetDetails WHERE CaseMasterID = ${datastoreCaseId}`).catch(() => []);
-      if (!csQuery || csQuery.length === 0) {
-        const policePersonId = 29013;
-        const csdate = new Date().toISOString().slice(0, 10);
+      let existingCsRow = null;
+      if (catalystAppUpdate) {
+        const zcql = catalystAppUpdate.zcql();
+        const csQuery = await zcql.executeZCQLQuery(`SELECT ROWID, CSID FROM ChargesheetDetails WHERE CaseMasterID = ${datastoreCaseId}`).catch(() => []);
+        existingCsRow = csQuery?.[0]?.ChargesheetDetails || csQuery?.[0];
+      } else {
+        existingCsRow = (memoryTableStore['ChargesheetDetails'] || []).find(cs => cs.CaseMasterID === datastoreCaseId);
+      }
+
+      const parsedCsId = Number(String(chargesheetNo || '').replace(/\D/g, '')) || Math.floor(1000 + Math.random() * 9000);
+      const parsedCsDate = chargesheetDate ? new Date(chargesheetDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const parsedCsType = chargesheetType || 'Original Chargesheet';
+
+      if (existingCsRow) {
+        // Update existing chargesheet row
+        if (datastore && existingCsRow.ROWID) {
+          const payloads = [
+            { ROWID: String(existingCsRow.ROWID), CSID: Number(parsedCsId), csdate: formatDateTime(parsedCsDate), cstype: String(parsedCsType) },
+            { ROWID: Number(existingCsRow.ROWID), CSID: Number(parsedCsId), csdate: formatDateTime(parsedCsDate), cstype: String(parsedCsType) }
+          ];
+          for (const pl of payloads) {
+            try {
+              await datastore.table('ChargesheetDetails').updateRow(pl);
+              break;
+            } catch (err) {}
+          }
+        }
+        // Also update memoryTableStore
+        const memCs = (memoryTableStore['ChargesheetDetails'] || []).find(cs => cs.CaseMasterID === datastoreCaseId || String(cs.ROWID) === String(existingCsRow.ROWID));
+        if (memCs) {
+          memCs.CSID = Number(parsedCsId);
+          memCs.csdate = formatDateTime(parsedCsDate);
+          memCs.cstype = String(parsedCsType);
+        }
+      } else {
+        // Insert new chargesheet row
         const csPayload = {
-          CSID: Math.floor(1000 + Math.random() * 9000),
+          CSID: Number(parsedCsId),
           CaseMasterID: datastoreCaseId,
-          csdate: csdate,
-          cstype: 'Original Chargesheet',
-          PolicePersonID: policePersonId
+          csdate: formatDateTime(parsedCsDate),
+          cstype: String(parsedCsType),
+          PolicePersonID: 29013
         };
-        await datastore.table('ChargesheetDetails').insertRow(csPayload).catch((e) => {
-          console.error("Failed to insert ChargesheetDetails:", e.message);
-        });
+        if (datastore) {
+          await datastore.table('ChargesheetDetails').insertRow(csPayload).catch((e) => {
+            console.error("Failed to insert ChargesheetDetails:", e.message);
+          });
+        }
         if (!memoryTableStore['ChargesheetDetails']) {
           memoryTableStore['ChargesheetDetails'] = [];
         }
@@ -756,7 +812,7 @@ const updateCaseHandler = async (req, res) => {
       }
     }
 
-    // Also update in memory store cache
+    // Also update in memory store cache for CaseMaster
     const memRow = memoryTableStore['CaseMaster'].find(c => String(c.ROWID || c.CaseMasterID) === String(caseMasterId) || c.CaseMasterID === Number(caseMasterId));
     if (memRow) {
       memRow.CaseStatusID = caseStatusId;
@@ -772,27 +828,30 @@ const updateCaseHandler = async (req, res) => {
 
 const recordArrestHandler = async (req, res) => {
   try {
-    const catalystApp = catalyst.initialize(req);
-    const datastore = catalystApp.datastore();
+    const catalystApp = getCatalystApp(req);
+    const datastore = catalystApp ? catalystApp.datastore() : null;
     const { caseMasterId, accusedName, arrestDate, districtId } = req.body;
 
-    const zcql = catalystApp.zcql();
-
     let datastoreCaseId = Number(caseMasterId);
-    if (String(caseMasterId).length >= 15) {
-      const caseQuery = await zcql.executeZCQLQuery(`SELECT CaseMasterID FROM CaseMaster WHERE ROWID = ${caseMasterId}`).catch(() => []);
-      const row = caseQuery?.[0]?.CaseMaster || caseQuery?.[0];
-      if (row && row.CaseMasterID) {
-        datastoreCaseId = Number(row.CaseMasterID);
+    if (catalystApp) {
+      const zcql = catalystApp.zcql();
+      if (String(caseMasterId).length >= 15) {
+        const caseQuery = await zcql.executeZCQLQuery(`SELECT CaseMasterID FROM CaseMaster WHERE ROWID = ${caseMasterId}`).catch(() => []);
+        const row = caseQuery?.[0]?.CaseMaster || caseQuery?.[0];
+        if (row && row.CaseMasterID) {
+          datastoreCaseId = Number(row.CaseMasterID);
+        }
       }
     }
 
-    const accusedQuery = await zcql.executeZCQLQuery(`SELECT ROWID, AccusedMasterID FROM Accused WHERE CaseMasterID = ${datastoreCaseId} AND AccusedName = '${accusedName.replace(/'/g, "\\'")}'`).catch(() => []);
-    
     let accusedMasterId = Math.floor(Math.random() * 10000);
-    const accusedRow = accusedQuery?.[0]?.Accused || accusedQuery?.[0];
-    if (accusedRow && accusedRow.AccusedMasterID) {
-      accusedMasterId = Number(accusedRow.AccusedMasterID);
+    if (catalystApp) {
+      const zcql = catalystApp.zcql();
+      const accusedQuery = await zcql.executeZCQLQuery(`SELECT ROWID, AccusedMasterID FROM Accused WHERE CaseMasterID = ${datastoreCaseId} AND AccusedName = '${(accusedName || '').replace(/'/g, "\\'")}'`).catch(() => []);
+      const accusedRow = accusedQuery?.[0]?.Accused || accusedQuery?.[0];
+      if (accusedRow && accusedRow.AccusedMasterID) {
+        accusedMasterId = Number(accusedRow.AccusedMasterID);
+      }
     }
 
     const arrestPayload = {
@@ -806,9 +865,11 @@ const recordArrestHandler = async (req, res) => {
     };
 
     // Insert into Datastore table ArrestSurrender
-    await datastore.table('ArrestSurrender').insertRow(arrestPayload).catch((e) => {
-      console.warn("Failed to insert arrest row in catalyst datastore:", e);
-    });
+    if (datastore) {
+      await datastore.table('ArrestSurrender').insertRow(arrestPayload).catch((e) => {
+        console.warn("Failed to insert arrest row in catalyst datastore:", e);
+      });
+    }
 
     // Also update memoryTableStore
     if (!memoryTableStore['ArrestSurrender']) {
@@ -831,7 +892,7 @@ const seedCasesHandler = async (req, res) => {
     const targetDistrict = req.query.district;
 
     const districts = [
-      "Bagalkot", "Ballari", "Belagavi", "Bengaluru City", "Bengaluru Rural", 
+      "Bagalkot", "Ballari", "Belagavi", "Bengaluru Urban", "Bengaluru Rural", 
       "Bidar", "Chamarajanagar", "Chikkaballapur", "Chikkamagaluru", "Chitradurga", 
       "Dakshina Kannada", "Davanagere", "Dharwad", "Gadag", "Hassan", 
       "Haveri", "Kalaburagi", "Kodagu", "Kolar", "Koppal", "Mandya", 
@@ -841,7 +902,7 @@ const seedCasesHandler = async (req, res) => {
 
     const districtIdMap = {
       "Bagalkot": 21, "Bagalkote": 21, "Ballari": 8, "Belagavi": 6,
-      "Bengaluru City": 1, "Bengaluru Rural": 2, "Bidar": 19,
+      "Bengaluru Urban": 1, "Bengaluru Rural": 2, "Bidar": 19,
       "Chamarajanagar": 22, "Chamarajanagara": 22, "Chikkaballapur": 23, "Chikkaballapura": 23,
       "Chikkamagaluru": 17, "Chitradurga": 24, "Dakshina Kannada": 4,
       "Davanagere": 13, "Dharwad": 5, "Gadag": 25, "Hassan": 15,

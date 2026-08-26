@@ -78,7 +78,7 @@ function OffendersPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
-        section="§ 04"
+        section="04"
         eyebrow="Watchlist & Network Profiles"
         title="Repeat Offender Tracker"
         description="Individuals linked to multiple FIRs — Modus Operandi mapping, syndicate link analysis and risk triggers."
@@ -580,7 +580,7 @@ function PredictionPanel({ offender, cases }: { offender: any; cases: any[] }) {
       const dist = c.district.name;
       districtCounts[dist] = (districtCounts[dist] || 0) + 1;
     });
-    let likelyDistrict = offender.jurisdictions[0] || "Bengaluru City";
+    let likelyDistrict = offender.jurisdictions[0] || "Bengaluru Urban";
     let maxDistCount = 0;
     Object.entries(districtCounts).forEach(([dist, count]) => {
       if (count > maxDistCount) {
