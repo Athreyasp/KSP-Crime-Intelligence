@@ -354,29 +354,27 @@ function Overview() {
     <div className="space-y-5">
       {/* ───────── MASTHEAD & TICKER GROUP ───────── */}
       <div className="border-y-4 border-ink">
-        <header className="py-4">
-          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-ink/20 pb-3">
+        <header className="py-6 flex flex-col items-center text-center space-y-2.5">
+          <h1 className="font-editorial text-[44px] md:text-[58px] leading-[0.95] tracking-tight text-ink">
+            {language === "kn" ? (
+              <>ಕರ್ನಾಟಕ <em className="text-signal font-serif">ಅಪರಾಧ</em> ದೈನಿಕ.</>
+            ) : (
+              <>The Karnataka <em className="text-signal font-serif">Crime</em> Daily.</>
+            )}
+          </h1>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest font-display">
+            {t("Karnataka State Police · Strategic Crime Intelligence Console")}
+          </p>
+          <div className="pt-1">
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 rounded border border-ink/30 bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-colors"
+              className="inline-flex items-center gap-1.5 rounded border border-ink/35 bg-paper px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-all duration-150 shadow-sm"
             >
               <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
               {isSyncing ? t("syncing") : t("syncConsole")}
             </button>
           </div>
-
-          <h1 className="mt-3 font-editorial text-[46px] md:text-[64px] leading-[0.95] tracking-tight text-ink">
-            {language === "kn" ? (
-              <>ಕರ್ನಾಟಕ <em className="text-signal">ಅಪರಾಧ</em> ದೈನಿಕ.</>
-            ) : (
-              <>The Karnataka <em className="text-signal">Crime</em> Daily.</>
-            )}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            {t("mastheadSub")} · {KPIS.activeDistricts} {t("activeDistricts")} · {HEAD_DIST.length} {t("crimeHeads")} ·
-            {t("rolling30Days")} · {t("realtimeAnomaly")}. <span className="font-editorial italic text-ink">{t("tagline")}</span>
-          </p>
         </header>
 
         {/* ───────── TICKER ───────── */}

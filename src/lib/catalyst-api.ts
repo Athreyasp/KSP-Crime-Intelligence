@@ -1,4 +1,4 @@
-import { CASES, DISTRICTS, CRIME_HEADS, type Case, type District } from "@/data/mock";
+import { CASES, DISTRICTS, CRIME_HEADS, type Case, type District, DISTRICT_COORDS, AREA_COORDS, AREA_NAMES } from "@/data/mock";
 
 // In development, Vite proxies /server → Catalyst (see vite.config.ts).
 // In production (any external host), set VITE_API_BASE to your full
@@ -217,6 +217,25 @@ export async function fetchLiveCases(): Promise<Case[]> {
       const chargesheetDate = primaryChargesheet ? String(primaryChargesheet.csdate || "").slice(0, 10) : (status === "Charge Sheeted" ? regDate : undefined);
       const chargesheetType = primaryChargesheet ? primaryChargesheet.cstype : (status === "Charge Sheeted" ? "Original Chargesheet" : undefined);
 
+      let lat = Number(row.latitude || row.Latitude);
+      let lng = Number(row.longitude || row.Longitude);
+
+      const center = DISTRICT_COORDS[district.name] ?? [15.0, 76.5];
+      const isMissing = !lat || !lng || lat === 0 || lng === 0;
+      const isDrifted = !isMissing && (Math.abs(lat - center[0]) > 1.2 || Math.abs(lng - center[1]) > 1.2);
+
+      if (isMissing || isDrifted) {
+        const subAreas = AREA_NAMES[district.name] ?? [`${district.name} Central`, `${district.name} North`, `${district.name} South`];
+        const areaIndex = (Number(caseMasterId) || index) % subAreas.length;
+        const areaName = subAreas[areaIndex];
+        const areaCoord = AREA_COORDS[areaName] ?? [
+          center[0] + (((index * 13) % 100) / 100 - 0.5) * 0.18,
+          center[1] + (((index * 17) % 100) / 100 - 0.5) * 0.22
+        ];
+        lat = areaCoord[0];
+        lng = areaCoord[1];
+      }
+
       return {
         caseMasterId,
         crimeNo,
@@ -235,8 +254,8 @@ export async function fetchLiveCases(): Promise<Case[]> {
         complainant,
         victims,
         accused,
-        latitude: Number(row.latitude || row.Latitude || 12.9716),
-        longitude: Number(row.longitude || row.Longitude || 77.5946),
+        latitude: lat,
+        longitude: lng,
         officerPhoto: row.officerPhoto || "",
         chargesheetNo,
         chargesheetDate,

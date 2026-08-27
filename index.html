@@ -10,21 +10,33 @@
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
   </head>
   <body>
     <div id="root"></div>
     <script src="https://static.zohocdn.com/catalyst/web/v2/catalystWebJS.js"></script>
     <script>
       // Initialize Catalyst Web SDK — handles auth session automatically
+      // Use a deferred promise so the SDK script has time to define the global
       window.__catalystReady = new Promise(function(resolve) {
-        try {
-          // Initialize catalyst app without forcing authentication redirect
-          var app = catalyst.init();
-          resolve(app);
-        } catch(e) {
-          console.warn("Catalyst SDK init skipped (likely local dev):", e.message);
-          resolve(null);
+        function tryInit() {
+          try {
+            if (typeof catalyst !== "undefined") {
+              var app = catalyst.init();
+              resolve(app);
+            } else {
+              resolve(null);
+            }
+          } catch(e) {
+            console.warn("Catalyst SDK init skipped (likely local dev):", e.message);
+            resolve(null);
+          }
+        }
+        // Wait until DOM is ready to ensure SDK script has executed
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", tryInit);
+        } else {
+          tryInit();
         }
       });
     </script>

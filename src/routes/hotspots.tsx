@@ -18,6 +18,7 @@ import { computeSubAreas, computeMicroSpots } from "@/lib/db";
 import karnatakaMap from "@/data/karnataka-map.json";
 import { StateMapGL } from "@/components/hotspots/state-map-gl";
 import { SubAreaMapGL } from "@/components/hotspots/sub-area-map-gl";
+import { MicroSpotMapGL } from "@/components/hotspots/micro-spot-map-gl";
 
 const NAME_ALIAS: Record<string, string> = {
   "Bengaluru Urban": "Bangalore",
@@ -204,8 +205,21 @@ async function svgToPngDataUrl(svg: SVGSVGElement, scale = 2): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 function Hotspots() {
-  const { cases: allCases, districtStats: DISTRICT_STATS, hourly: HOURLY } = useDb();
+  const { cases: allCases, districtStats: DISTRICT_STATS, hourly: HOURLY, offenders: allOffenders = [] } = useDb();
+  const { t } = useLanguage();
   const [hour, setHour] = useState<number[]>([0, 23]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -222,7 +236,8 @@ function Hotspots() {
 
   useEffect(() => {
     if (hasProcessedParam) return;
-    const params = new URLSearchParams(window.location.search);
+    const searchString = window.location.search || (window.location.hash.includes("?") ? window.location.hash.split("?")[1] : "");
+    const params = new URLSearchParams(searchString);
     const districtQuery = params.get("district");
     if (districtQuery && DISTRICT_STATS.length > 0) {
       const queryLower = districtQuery.toLowerCase();
@@ -236,7 +251,7 @@ function Hotspots() {
         setSelectedId(match.district.id);
         setViewMode("district");
         setHasProcessedParam(true);
-        const newUrl = window.location.pathname;
+        const newUrl = window.location.pathname + window.location.hash.split("?")[0];
         window.history.replaceState({}, document.title, newUrl);
       }
     }
@@ -374,6 +389,22 @@ function Hotspots() {
   const maxMicroFirs = Math.max(...microSpots.map(m => m.firs), 1);
   const [selectedMicroId, setSelectedMicroId] = useState<string | null>(null);
   const selectedMicro = microSpots.find(m => m.id === selectedMicroId) ?? null;
+
+  const areaCases = useMemo(() => {
+    if (!selectedArea) return [];
+    return allCases.filter(c => {
+      if (!c.latitude || !c.longitude) return false;
+      const dist = haversineDistance(c.latitude, c.longitude, selectedArea.lat, selectedArea.lng);
+      return dist <= 3.5;
+    });
+  }, [allCases, selectedArea]);
+
+  const localOffenders = useMemo(() => {
+    if (!selectedArea || !allOffenders) return [];
+    return allOffenders
+      .filter(o => o.jurisdictions.includes(selected.district.name))
+      .slice(0, 3);
+  }, [allOffenders, selected, selectedArea]);
 
   const openDistrict = (districtId: number) => {
     setSelectedId(districtId);
@@ -588,7 +619,7 @@ function Hotspots() {
                   selectedId={selected.district.id}
                   hoveredId={hoveredId}
                   onHover={(id) => setHoveredId(id)}
-                  onSelect={(id) => setSelectedId(id)}
+                  onSelect={(id) => openDistrict(id)}
                   lowT={lowT}
                   highT={highT}
                 />
@@ -607,10 +638,9 @@ function Hotspots() {
                 />
 
               ) : viewMode === "area" && selectedArea ? (
-                <AreaMap
+                <MicroSpotMapGL
                   area={selectedArea}
-                  spots={microSpots}
-                  maxFirs={maxMicroFirs}
+                  cases={allCases}
                   selectedSpotId={selectedMicroId}
                   onSelectSpot={setSelectedMicroId}
                   lowT={lowT}
@@ -810,17 +840,86 @@ function Hotspots() {
           <CardContent className="flex-1 space-y-3 pt-3 overflow-y-auto pr-1">
             {viewMode === "area" && selectedArea ? (
               <div className="space-y-4">
+                {/* Module A: Stats */}
                 <div className="grid grid-cols-2 gap-2.5">
-                  <Stat label="FIRs" value={selectedArea.firs} />
-                  <Stat label="Spike" value={`${selectedArea.spike > 0 ? "+" : ""}${selectedArea.spike}%`} accent={selectedArea.spike > 15 ? "alert" : undefined} />
+                  <Stat label={t("FIRs")} value={selectedArea.firs} />
+                  <Stat label={t("Spike")} value={`${selectedArea.spike > 0 ? "+" : ""}${selectedArea.spike}%`} accent={selectedArea.spike > 15 ? "alert" : undefined} />
                 </div>
-                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-1">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Top Crime MO</p>
-                  <p className="text-xs font-semibold text-foreground">{selectedArea.topCrime}</p>
+
+                {/* Module B: AI PCR Directives */}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-800 font-bold">
+                    <ShieldAlert className="h-4 w-4" />
+                    <span>{t("Patrol Dispatch Directive")}</span>
+                  </div>
+                  <div className="text-[11px] leading-relaxed text-blue-700 font-medium">
+                    {selectedArea.spike > 15 ? (
+                      <span>⚠️ <strong>{t("CRITICAL SPIKE DETECTED:")}</strong> {t("Position PCR Van #3 at main junction from")} {selectedArea.peakHours}. {t("Increase foot beats targeting")} {t(selectedArea.topCrime)}.</span>
+                    ) : (
+                      <span>⚡ <strong>{t("ROUTINE INSTRUCTIONS:")}</strong> {t("Establish static patrol point at")} {t(selectedArea.name)} {t("during peak hours:")} {selectedArea.peakHours}. {t("Monitor for suspicious activity matching")} {t(selectedArea.topCrime)}.</span>
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-md border border-border bg-surface-2 p-3 space-y-1">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Peak Active Window</p>
-                  <p className="font-mono text-xs font-semibold text-signal">{selectedArea.peakHours}</p>
+
+                {/* Module C: Interactive Geographic Case Log */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-foreground">
+                    <span>{t("Geographic Case Log")} ({areaCases.length})</span>
+                  </div>
+                  <div className="max-h-[190px] overflow-y-auto border border-border/60 rounded-xl divide-y divide-border/40 bg-white">
+                    {areaCases.map(c => {
+                      const isSelected = selectedMicroId === String(c.caseMasterId);
+                      return (
+                        <div
+                          key={c.caseMasterId}
+                          onClick={() => setSelectedMicroId(isSelected ? null : String(c.caseMasterId))}
+                          className={`p-2 text-[11px] transition-colors cursor-pointer ${isSelected ? "bg-blue-50/80 border-l-2 border-blue-600" : "hover:bg-slate-50"}`}
+                        >
+                          <div className="flex items-center justify-between font-mono font-bold text-[#0f172a]">
+                            <span>{c.crimeNo}</span>
+                            <span className="text-[9px] text-muted-foreground font-normal">{new Date(c.registeredDate).toLocaleDateString("en-IN")}</span>
+                          </div>
+                          <div className="font-semibold text-slate-700 mt-0.5">{t(c.crimeHead.name)}</div>
+                          <div className="text-[10px] text-slate-500 mt-1 line-clamp-1">{c.briefFacts}</div>
+                        </div>
+                      );
+                    })}
+                    {areaCases.length === 0 && (
+                      <div className="p-4 text-center text-xs text-muted-foreground bg-slate-50/50">
+                        {t("No cases registered in this exact precinct.")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Module D: Repeat Offender Watchlist */}
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-foreground">{t("Repeat Offender Watchlist")}</div>
+                  <div className="space-y-1.5">
+                    {localOffenders.map(o => (
+                      <div key={o.id} className="flex items-center justify-between p-2 rounded-xl border border-border/60 bg-slate-50/50">
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-full bg-blue-100/70 border border-blue-200 flex items-center justify-center text-[10px] font-bold text-blue-700 uppercase shrink-0">
+                            {o.name.slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-[#0f172a]">{o.name}</div>
+                            <div className="text-[9px] text-muted-foreground leading-tight">{o.moTags.slice(0, 2).map(tg => t(tg)).join(", ")}</div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${o.riskScore > 75 ? "bg-red-50 text-red-600 border border-red-100" : "bg-amber-50 text-amber-600 border border-amber-100"}`}>
+                            {o.riskScore}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {localOffenders.length === 0 && (
+                      <div className="p-3 text-center text-xs text-muted-foreground bg-slate-50/50 rounded-xl">
+                        {t("No known repeat offenders registered in this district.")}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1168,8 +1267,8 @@ function StateMapSVG({
               d={geo.d}
               fill={fill}
               fillOpacity={isSel ? 0.95 : isHov ? 0.85 : rawTotal > 0 ? 0.72 : 0.45}
-              stroke={isSel ? "#0284c7" : isHov ? "#38bdf8" : "oklch(0.42 0.04 250)"}
-              strokeWidth={isSel ? 2.8 : isHov ? 2.2 : 0.9}
+              stroke={isSel ? "#1e40af" : isHov ? "#3b82f6" : "#64748b"}
+              strokeWidth={isSel ? 2.2 : isHov ? 1.6 : 0.95}
               strokeLinejoin="round"
               strokeLinecap="round"
               filter={isSel ? "url(#glow-selected-svg)" : undefined}
@@ -1351,83 +1450,7 @@ function DistrictMap({
   );
 }
 
-function AreaMap({
-  area,
-  spots,
-  maxFirs,
-  selectedSpotId,
-  onSelectSpot,
-  lowT,
-  highT,
-}: {
-  area: SubArea;
-  spots: MicroSpot[];
-  maxFirs: number;
-  selectedSpotId: string | null;
-  onSelectSpot: (id: string | null) => void;
-  lowT: number;
-  highT: number;
-}) {
-  const { t } = useLanguage();
-  // Simple stylized street grid inside a rounded rect representing the sub-area
-  const W = 100;
-  const H = 80;
-  const streets = [15, 30, 45, 60, 75, 90];
-  const avenues = [15, 30, 45, 60, 75];
 
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
-      {/* base */}
-      <rect x={2} y={2} width={W - 4} height={H - 4} rx={3} fill="oklch(0.96 0.01 250)" stroke="oklch(0.45 0.03 250)" strokeWidth={0.4} />
-      {/* street grid */}
-      {streets.map(x => (
-        <line key={`v${x}`} x1={x} y1={4} x2={x} y2={H - 4} stroke="oklch(0.82 0.01 250)" strokeWidth={0.25} />
-      ))}
-      {avenues.map(y => (
-        <line key={`h${y}`} x1={4} y1={y} x2={W - 4} y2={y} stroke="oklch(0.82 0.01 250)" strokeWidth={0.25} />
-      ))}
-      {/* label */}
-      <text x={W / 2} y={9} textAnchor="middle" fontSize={3.2} fill="oklch(0.35 0.02 250)" fontFamily="Inter" fontWeight={600}>
-        {t(area.name)}
-      </text>
-
-      {/* hotspot points */}
-      {spots.map(s => {
-        const heat = s.firs / maxFirs;
-        const cx = 4 + s.x * (W - 8);
-        const cy = 12 + s.y * (H - 16);
-        const r = 1.6 + heat * 3.2;
-        const active = selectedSpotId === s.id;
-        const color = heatColor(heat, lowT, highT);
-        return (
-          <g key={s.id} style={{ cursor: "pointer" }} onClick={() => onSelectSpot(active ? null : s.id)}>
-            {s.spike > 15 && (
-              <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.35}>
-                <animate attributeName="r" from={r} to={r * 2.4} dur="1.8s" repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.6" to="0" dur="1.8s" repeatCount="indefinite" />
-              </circle>
-            )}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={r}
-              fill={color}
-              stroke={active ? "oklch(0.3 0.15 250)" : "oklch(0.98 0 0)"}
-              strokeWidth={active ? 0.6 : 0.3}
-            >
-              <title>{t(s.name)} · {s.firs} {t("FIRs")} · {t(s.topCrime)} · {t(s.peakHours)}</title>
-            </circle>
-            {active && (
-              <text x={cx} y={cy - r - 1.2} textAnchor="middle" fontSize={2.6} fill="oklch(0.2 0.02 250)" fontFamily="Inter" fontWeight={600} pointerEvents="none">
-                {t(s.name)}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: "alert" | "success" | "warning" }) {
   const cls = accent === "alert" ? "text-alert" : accent === "success" ? "text-success" : accent === "warning" ? "text-warning" : "text-foreground";

@@ -59,6 +59,7 @@ export const translations = {
     // General Layout / Header
     "The Karnataka Crime Daily.": "ಕರ್ನಾಟಕ ಅಪರಾಧ ದೈನಿಕ.",
     "Strategic intelligence brief": "ಕಾರ್ಯತಂತ್ರದ ಬುದ್ಧಿಮತ್ತೆ ಸಂಕ್ಷಿಪ್ತ ಮಾಹಿತಿ",
+    "Karnataka State Police · Strategic Crime Intelligence Console": "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ · ಕಾರ್ಯತಂತ್ರದ ಅಪರಾಧ ಬುದ್ಧಿಮತ್ತೆ ಕನ್ಸೋಲ್",
     "districts": "ಜಿಲ್ಲೆಗಳು",
     "crime heads": "ಅಪರಾಧ ವಿಭಾಗಗಳು",
     "rolling 30-day window": "ಚಲಿಸುವ 30-ದಿನಗಳ ಅವಧಿ",

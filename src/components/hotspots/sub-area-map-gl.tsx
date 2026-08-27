@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+
 import type { SubArea } from "@/data/mock";
 import karnatakaGeo from "@/data/karnataka.geojson.json";
 
@@ -103,7 +104,7 @@ export function SubAreaMapGL({
       sources: {
         "osm": {
           "type": "raster",
-          "tiles": ["https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png"],
+          "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
           "tileSize": 256,
           "attribution": "&copy; OpenStreetMap &copy; CartoDB"
         }
@@ -132,7 +133,6 @@ export function SubAreaMapGL({
 
     const onLoad = () => {
       loadedRef.current = true;
-      setReady(true);
 
       const worldRing: number[][] = [
         [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
@@ -156,7 +156,7 @@ export function SubAreaMapGL({
         id: "district-outline",
         type: "line",
         source: "district-outline-src",
-        paint: { "line-color": "#1e3a8a", "line-width": 2.5 },
+        paint: { "line-color": "#3b82f6", "line-width": 1.5, "line-opacity": 0.45 },
       });
 
       map.addSource("areas", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -230,9 +230,18 @@ export function SubAreaMapGL({
         const id = (f.properties as { id?: string }).id;
         if (id) onSelectRef.current(id);
       });
+
+      setReady(true);
     };
-    if (map.isStyleLoaded()) onLoad();
-    else map.on("load", onLoad);
+    // Use style.load (fires when style spec is processed, not waiting for all tiles)
+    // This is the correct hook for adding custom sources/layers in production.
+    if (map.isStyleLoaded()) {
+      onLoad();
+    } else {
+      map.once("style.load", onLoad);
+      // Secondary fallback: full load event (tiles + style)
+      map.once("load", onLoad);
+    }
 
     const handleResize = () => {
       const m = mapRef.current;
@@ -258,7 +267,7 @@ export function SubAreaMapGL({
     const map = mapRef.current;
     const apply = () => {
       const m = mapRef.current;
-      if (!m || !loadedRef.current) return;
+      if (!m || !ready) return;
 
       const outlineSrc = m.getSource("district-outline-src") as maplibregl.GeoJSONSource | undefined;
       const maskSrc = m.getSource("district-mask") as maplibregl.GeoJSONSource | undefined;
@@ -296,14 +305,14 @@ export function SubAreaMapGL({
       }
     };
 
-    if (map && loadedRef.current) apply();
+    if (map && ready) apply();
     else if (map) map.once("load", apply);
-  }, [districtFeature, districtRings, districtBbox]);
+  }, [districtFeature, districtRings, districtBbox, ready]);
 
   // Update marker data whenever inputs change
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !loadedRef.current) return;
+    if (!map || !ready) return;
     const src = map.getSource("areas") as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
 
@@ -332,12 +341,46 @@ export function SubAreaMapGL({
     });
 
     src.setData({ type: "FeatureCollection", features });
-  }, [areas, maxAreaFirs, selectedAreaId, filtersActive, matchesFilters, lowT, highT, spikeThreshold]);
+  }, [areas, maxAreaFirs, selectedAreaId, filtersActive, matchesFilters, lowT, highT, spikeThreshold, ready]);
 
 
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+
+      {/* Custom zoom controls */}
+      {ready && (
+        <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
+          <button
+            id="sub-map-zoom-in"
+            onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
+            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-sm font-bold"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <button
+            id="sub-map-zoom-out"
+            onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
+            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-sm font-bold"
+            title="Zoom out"
+          >
+            −
+          </button>
+          <button
+            id="sub-map-reset"
+            onClick={() => {
+              const m = mapRef.current;
+              if (m && districtBbox) m.fitBounds(districtBbox, { padding: 40, duration: 400, maxZoom: 12 });
+            }}
+            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-xs"
+            title="Reset view"
+          >
+            ⊙
+          </button>
+        </div>
+      )}
+
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface-2/60 backdrop-blur-sm pointer-events-none">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

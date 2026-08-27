@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl, { type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+
 import karnatakaGeo from "@/data/karnataka.geojson.json";
 
 const MAPTILER_KEY = "vJbuGTzYMGTLnGWttx64";
@@ -51,7 +52,7 @@ export function StateMapGL({
       sources: {
         "osm": {
           "type": "raster",
-          "tiles": ["https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png"],
+          "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
           "tileSize": 256,
           "attribution": "&copy; OpenStreetMap &copy; CartoDB"
         }
@@ -97,7 +98,6 @@ export function StateMapGL({
 
     const onLoad = () => {
       loadedRef.current = true;
-      setReady(true);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const geo: any = JSON.parse(JSON.stringify(karnatakaGeo));
 
@@ -263,9 +263,16 @@ export function StateMapGL({
         const id = (f.properties as { districtId?: number }).districtId;
         if (typeof id === "number" && id > 0) onSelectRef.current(id);
       });
+
+      setReady(true);
     };
-    if (map.isStyleLoaded()) onLoad();
-    else map.on("load", onLoad);
+    // Use style.load (fires when style spec is processed, not waiting for all tiles)
+    if (map.isStyleLoaded()) {
+      onLoad();
+    } else {
+      map.once("style.load", onLoad);
+      map.once("load", onLoad); // Secondary fallback
+    }
 
     const handleResize = () => {
       const m = mapRef.current;
@@ -310,21 +317,21 @@ export function StateMapGL({
     map.setPaintProperty("ka-outline", "line-color", [
       "case",
       ["==", ["get", "districtId"], selectedId ?? -999],
-      "#1e3a8a",
-      "#334155",
+      "#1e40af",
+      "#64748b",
     ]);
     map.setPaintProperty("ka-outline", "line-width", [
       "case",
       ["==", ["get", "districtId"], selectedId ?? -999],
-      2.2,
-      0.8,
+      2.0,
+      0.95,
     ]);
   }, [lowT, highT, selectedId]);
 
   // Update map source data dynamically when districtStats or maxTotal changes
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !loadedRef.current) return;
+    if (!map || !ready) return;
     
     const source = map.getSource("ka-districts") as maplibregl.GeoJSONSource;
     if (!source) return;
@@ -355,7 +362,7 @@ export function StateMapGL({
     }
 
     source.setData(geo);
-  }, [districtStats, maxTotal]);
+  }, [districtStats, maxTotal, ready]);
 
   return (
     <>

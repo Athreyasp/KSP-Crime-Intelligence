@@ -46,7 +46,7 @@
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --font-display: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-serif: "Playfair Display", "Instrument Serif", Georgia, ui-serif, serif;
   --font-sans: "Inter", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -147,7 +147,7 @@
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }
 
-@utility font-editorial { font-family: var(--font-display); font-feature-settings: "ss01"; }
+@utility font-editorial { font-family: var(--font-serif); font-feature-settings: "ss01"; }
 
 @utility pulse-alert { animation: pulseAlert 1.8s ease-out infinite; }
 @keyframes pulseAlert {
