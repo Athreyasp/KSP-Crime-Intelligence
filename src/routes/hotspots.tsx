@@ -16,7 +16,7 @@ import { useDb } from "@/hooks/use-db";
 import { useLanguage } from "@/hooks/use-language";
 import { computeSubAreas, computeMicroSpots } from "@/lib/db";
 import karnatakaMap from "@/data/karnataka-map.json";
-import { StateMapGL } from "@/components/hotspots/state-map-gl";
+import { StateMapLeaflet } from "@/components/hotspots/state-map-leaflet";
 import { SubAreaMapGL } from "@/components/hotspots/sub-area-map-gl";
 import { MicroSpotMapGL } from "@/components/hotspots/micro-spot-map-gl";
 
@@ -610,9 +610,9 @@ function Hotspots() {
               </div>
             )}
 
-            <div ref={mapWrapRef} className="relative aspect-[5/4] rounded-md border border-border bg-surface-2 grid-bg overflow-hidden">
+            <div ref={mapWrapRef} className="relative aspect-[5/4] rounded-md border border-border bg-white grid-bg overflow-hidden z-0">
               {viewMode === "state" ? (
-                <StateMapSVG
+                <StateMapLeaflet
                   districtStats={filteredDistrictStats}
                   minTotal={filteredMinTotal}
                   maxTotal={filteredMaxTotal}
@@ -1211,7 +1211,6 @@ const SVG_NAME_ALIAS: Record<string, string> = {
   "Chamarajanagara": "Chamrajnagar",
   "Mysuru": "Mysore",
   "Bagalkote": "Bagalkot",
-  "Vijayanagara": "Bellary",
 };
 const toGeoSVG = (n: string) => SVG_NAME_ALIAS[n] ?? n;
 

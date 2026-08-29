@@ -61,6 +61,26 @@ async function savePhotoMapping(catalystApp) {
   console.log('Photo mappings are stored transactionally in PhotoAttachment datastore table.');
 }
 
+// Helper to look up folder by name or fallback to the exact ID from user console
+async function getFolderByNameOrId(filestore, targetName) {
+  try {
+    const folders = await filestore.getFolderDetails();
+    if (folders && Array.isArray(folders)) {
+      const found = folders.find(f => 
+        (f.folder_name && f.folder_name.toLowerCase() === targetName.toLowerCase()) ||
+        (f.folderName && f.folderName.toLowerCase() === targetName.toLowerCase())
+      );
+      if (found) {
+        const id = found.id || found.folder_id || found.folderId;
+        if (id) return filestore.folder(id);
+      }
+    }
+  } catch (err) {
+    console.log('Failed to query folder details, using fallback ID:', err.message);
+  }
+  return filestore.folder('50989000000172007');
+}
+
 // Upload a file to Zoho Catalyst cloud storage (Stratus or File Store)
 async function uploadToCloud(catalystApp, tempFilePath, fileName) {
   const fs = require('fs');
@@ -83,7 +103,7 @@ async function uploadToCloud(catalystApp, tempFilePath, fileName) {
   try {
     if (typeof catalystApp.filestore === 'function') {
       const filestore = catalystApp.filestore();
-      const folder = filestore.folder('photos');
+      const folder = await getFolderByNameOrId(filestore, 'photos');
       const fileObj = await folder.uploadFile({
         code: fs.createReadStream(tempFilePath),
         name: fileName
@@ -117,7 +137,7 @@ async function downloadFromCloud(catalystApp, fileId) {
   try {
     if (typeof catalystApp.filestore === 'function') {
       const filestore = catalystApp.filestore();
-      const folder = filestore.folder('photos');
+      const folder = await getFolderByNameOrId(filestore, 'photos');
       const fileStream = await folder.downloadFile(fileId);
       if (fileStream) return fileStream;
     }
@@ -161,7 +181,7 @@ async function uploadPhoto(catalystApp, base64Str, keyName, caseMasterId) {
       EntityType: String(entityType),
       EntityID: String(entityID),
       FileID: String(fileId),
-      AccessURL: `/server/api/photos/${fileId}`
+      AccessURL: `/server/api/cases?photo=${fileId}`
     };
     
     const datastore = catalystApp.datastore();
@@ -176,7 +196,7 @@ async function uploadPhoto(catalystApp, base64Str, keyName, caseMasterId) {
     // Update local registry mapping
     photoMapping[keyName] = fileId;
     
-    return `/server/api/photos/${fileId}`;
+    return `/server/api/cases?photo=${fileId}`;
   } catch (err) {
     console.error(`Zoho upload failed for ${keyName}, saving base64 inline:`, err);
     // Save base64 in in-memory mapping as fallback
@@ -267,7 +287,11 @@ router.get('/photos/:fileId', async (req, res) => {
     const fileStream = await downloadFromCloud(catalystApp, fileId);
     
     res.setHeader('Content-Type', 'image/jpeg');
-    fileStream.pipe(res);
+    if (fileStream && typeof fileStream.pipe === 'function') {
+      fileStream.pipe(res);
+    } else {
+      res.send(fileStream);
+    }
   } catch (err) {
     // Check fallback
     const fallbackData = photoMapping[req.params.fileId];
@@ -332,6 +356,36 @@ const getCasesHandler = async (req, res) => {
   // Try to initialize Catalyst SDK — fails for unauthenticated external requests
   const catalystApp = getCatalystApp(req);
 
+  // Intercept photo download requests to bypass API Gateway path restrictions
+  if (req.query && req.query.photo) {
+    try {
+      const fileId = req.query.photo;
+      // If it is a base64 string, parse and send directly
+      if (fileId.startsWith('data:image') || fileId.length > 500) {
+        const matches = fileId.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const type = matches[1];
+          const buffer = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', `image/${type}`);
+          return res.send(buffer);
+        }
+        return res.status(404).send('Invalid image data');
+      }
+      
+      const fileStream = await downloadFromCloud(catalystApp || getCatalystApp(req), fileId);
+      res.setHeader('Content-Type', 'image/jpeg');
+      if (fileStream && typeof fileStream.pipe === 'function') {
+        fileStream.pipe(res);
+      } else {
+        res.send(fileStream);
+      }
+      return;
+    } catch (err) {
+      console.error('Failed to download photo via query param:', err.message);
+      return res.status(404).send('Not Found');
+    }
+  }
+
   // If SDK init failed, return in-memory store immediately (mock data or previously seeded data)
   if (!catalystApp) {
     return res.status(200).json({
@@ -382,7 +436,7 @@ const getCasesHandler = async (req, res) => {
     const casesWithPhotos = normalizedCases.map(c => {
       const officerKey = `officer_${c.PolicePersonID}`;
       const officerPhoto = photoMapping[officerKey]
-        ? (photoMapping[officerKey].startsWith('data:image') ? photoMapping[officerKey] : `/server/api/photos/${photoMapping[officerKey]}`)
+        ? (photoMapping[officerKey].startsWith('data:image') ? photoMapping[officerKey] : `/server/api/cases?photo=${photoMapping[officerKey]}`)
         : undefined;
       return { ...c, officerPhoto };
     });
@@ -394,14 +448,14 @@ const getCasesHandler = async (req, res) => {
         accused: accusedRows.map(a => {
           const key = `accused_${a.AccusedMasterID}`;
           const photo = photoMapping[key]
-            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/photos/${photoMapping[key]}`)
+            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/cases?photo=${photoMapping[key]}`)
             : undefined;
           return { ...a, photo };
         }),
         victims: victimRows.map(v => {
           const key = `victim_${v.VictimMasterID}`;
           const photo = photoMapping[key]
-            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/photos/${photoMapping[key]}`)
+            ? (photoMapping[key].startsWith('data:image') ? photoMapping[key] : `/server/api/cases?photo=${photoMapping[key]}`)
             : undefined;
           return { ...v, photo };
         }),
@@ -1073,8 +1127,8 @@ const deleteCasesHandler = async (req, res) => {
     photoMapping = {};
     if (photoMappingFileId) {
       const filestore = catalystApp.filestore();
-      const bucket = filestore.bucket('photos');
-      await bucket.deleteFile(photoMappingFileId).catch(() => {});
+      const folder = await getFolderByNameOrId(filestore, 'photos');
+      await folder.deleteFile(photoMappingFileId).catch(() => {});
       photoMappingFileId = null;
     }
 

@@ -91,9 +91,9 @@ export async function fetchLiveCases(): Promise<Case[]> {
     });
 
     return (cases || []).map((row: any, index: number) => {
-      const caseMasterId = Number(row.ROWID || row.CaseMasterID || index + 1000);
+      const caseMasterId = Number(row.CaseMasterID || row.ROWID || index + 1000);
       const crimeNo = String(row.CrimeNo || `KA-${String(index + 1).padStart(4, "0")}-2026`);
-      const key = String(row.ROWID || row.CaseMasterID);
+      const key = String(row.CaseMasterID || row.ROWID);
       const mappedChildData = caseMasterMap.get(key) || { accused: [], victims: [], complainants: [], arrests: [], actSections: [], chargesheet: [] };
 
       // District resolution

@@ -54,6 +54,7 @@
     "framer-motion": "^12.42.2",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
     "maplibre-gl": "^5.24.0",
     "react": "^19.2.0",
@@ -73,6 +74,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@types/d3-force": "^3.0.10",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

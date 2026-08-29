@@ -43,7 +43,12 @@ export const crimeHeadTranslations: Record<string, string> = {
 };
 
 export const translations = {
-  en: {} as Record<string, string>,
+  en: {
+    "totalFirs": "Total FIRs",
+    "heinousShare": "Heinous Share",
+    "arrests": "Arrests",
+    "chargeSheeted": "Charge Sheeted",
+  } as Record<string, string>,
   kn: {
     // Navigation / Sidebar
     "Overview": "ಅವಲೋಕನ",
@@ -55,6 +60,7 @@ export const translations = {
     "Cases": "ಪ್ರಕರಣಗಳು",
     "New FIR": "ಹೊಸ ಎಫ್‌ಐಆರ್",
     "Navigation Registry": "ನಾವಿಗೇಷನ್ ರಿಜಿಸ್ಟ್ರಿ",
+    "Logout": "ಲಾಗ್‌ಔಟ್",
 
     // General Layout / Header
     "The Karnataka Crime Daily.": "ಕರ್ನಾಟಕ ಅಪರಾಧ ದೈನಿಕ.",
@@ -73,10 +79,10 @@ export const translations = {
     "SCRB · SECURE SYSTEM": "ಎಸ್‌ಸಿಆರ್‌ಬಿ · ಸುರಕ್ಷಿತ ವ್ಯವಸ್ಥೆ",
 
     // KPI Rows
-    "Total FIRs": "ಒಟ್ಟು ಎಫ್‌ಐಆರ್‌ಗಳು",
-    "Heinous Share": "ಹೇಯ ಕೃತ್ಯಗಳ ಪಾಲು",
-    "Arrests": "ಬಂಧನಗಳು",
-    "Charge-sheeted": "ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ ಸಲ್ಲಿಕೆ",
+    "totalFirs": "ಒಟ್ಟು ಎಫ್‌ಐಆರ್‌ಗಳು",
+    "heinousShare": "ಹೇಯ ಕೃತ್ಯಗಳ ಪಾಲು",
+    "arrests": "ಬಂಧನಗಳು",
+    "chargeSheeted": "ದೋಷಾರೋಪಣೆ ಪಟ್ಟಿ ಸಲ್ಲಿಕೆ",
 
     // Overview Page
     "Spatial Cartogram": "ಪ್ರಾದೇಶಿಕ ಕಾರ್ಟೋಗ್ರಾಮ್",
@@ -237,7 +243,6 @@ export const translations = {
     "New FIR Submission": "ಹೊಸ ಎಫ್‌ಐಆರ್ ಸಲ್ಲಿಕೆ",
     "Submit new crime records to the state database": "ರಾಜ್ಯ ಡೇಟಾಬೇಸ್‌ಗೆ ಹೊಸ ಅಪರಾಧ ದಾಖಲೆಯನ್ನು ಸಲ್ಲಿಸಿ",
     "Crime Number": "ಅಪರಾಧ ಸಂಖ್ಯೆ",
-    "Target Accused": "ಮುಖ್ಯ ಆರೋಪಿ",
     "Brief Facts of the Case": "ಪ್ರಕರಣದ ಸಂಕ್ಷಿಪ್ತ ವಿವರಣೆ",
     "Submit FIR": "ಎಫ್‌ಐಆರ್ ಸಲ್ಲಿಸಿ",
     "Incident Date & Hour": "ಘಟನೆ ನಡೆದ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ",
@@ -263,7 +268,11 @@ export const translations = {
 export type Language = "en" | "kn";
 
 export function translateText(text: string, lang: Language): string {
-  if (lang === "kn") {
+  if (lang === "en") {
+    if (translations.en[text as keyof typeof translations.en]) {
+      return translations.en[text as keyof typeof translations.en];
+    }
+  } else if (lang === "kn") {
     // Exact match in general dictionary
     if (translations.kn[text as keyof typeof translations.kn]) {
       return translations.kn[text as keyof typeof translations.kn];

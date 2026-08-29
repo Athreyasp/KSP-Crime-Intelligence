@@ -133,6 +133,10 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -299,4 +303,48 @@ iframe.goog-te-banner-frame {
   50% {
     transform: scaleY(1.2);
   }
+}
+
+/* Leaflet UI polish & watermark/outline removals */
+.leaflet-container {
+  background: transparent !important;
+  outline: none !important;
+}
+.leaflet-interactive {
+  outline: none !important;
+}
+
+/* Bot chatbot icon animations */
+@keyframes bot-eye-blink {
+  0%, 90%, 100% {
+    opacity: 1;
+  }
+  93%, 97% {
+    opacity: 0.1;
+  }
+}
+.animate-bot-blink {
+  animation: bot-eye-blink 4s infinite;
+}
+
+@keyframes bot-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.animate-bot-float {
+  animation: bot-float 2.5s ease-in-out infinite;
+}
+
+@keyframes bot-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+.group:hover .animate-bot-wobble {
+  animation: bot-wobble 0.6s ease-in-out infinite;
+  transform-origin: center;
 }

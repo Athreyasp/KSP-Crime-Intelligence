@@ -398,7 +398,7 @@ export function NetworkPage() {
 
           {/* FLOATING DOSSIER DRAWER ON CLICK */}
           {selectedNode && (
-            <div className="absolute top-3 right-3 bottom-3 z-20 w-80 bg-white border border-[#dadce0] rounded-2xl p-4 shadow-xl flex flex-col overflow-y-auto space-y-4 text-xs">
+            <div className="absolute top-3 right-3 bottom-3 left-3 sm:left-auto z-20 w-auto sm:w-80 bg-white border border-[#dadce0] rounded-2xl p-4 shadow-xl flex flex-col overflow-y-auto space-y-4 text-xs">
               
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: TYPE_META[selectedNode.type].bg, color: TYPE_META[selectedNode.type].color }}>

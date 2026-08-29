@@ -16,8 +16,8 @@ export const DISTRICTS: District[] = [
   { id: 1, name: "Bengaluru Urban", x: 0.62, y: 0.60, population: 12300000, urbanization: 96, literacy: 88 },
   { id: 2, name: "Bengaluru Rural", x: 0.58, y: 0.55, population: 990000, urbanization: 42, literacy: 78 },
   { id: 3, name: "Mysuru", x: 0.48, y: 0.72, population: 3000000, urbanization: 58, literacy: 79 },
-  { id: 4, name: "Mangaluru", x: 0.22, y: 0.55, population: 2100000, urbanization: 47, literacy: 88 },
-  { id: 5, name: "Hubballi-Dharwad", x: 0.32, y: 0.30, population: 1850000, urbanization: 56, literacy: 80 },
+  { id: 4, name: "Dakshina Kannada", x: 0.22, y: 0.55, population: 2100000, urbanization: 47, literacy: 88 },
+  { id: 5, name: "Dharwad", x: 0.32, y: 0.30, population: 1850000, urbanization: 56, literacy: 80 },
   { id: 6, name: "Belagavi", x: 0.28, y: 0.18, population: 4780000, urbanization: 30, literacy: 73 },
   { id: 7, name: "Kalaburagi", x: 0.62, y: 0.14, population: 2560000, urbanization: 32, literacy: 65 },
   { id: 8, name: "Ballari", x: 0.55, y: 0.30, population: 2450000, urbanization: 38, literacy: 68 },
@@ -110,8 +110,8 @@ export type Case = {
     relation?: string;
     address?: string;
   };
-  victims: { name: string; age: number; gender: string; isPolice?: boolean; photo?: string }[];
-  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string; photo?: string }[];
+  victims: { name: string; age: number; gender: string; isPolice?: boolean; photo?: string; phone?: string }[];
+  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string; photo?: string; phone?: string; vehicleUsed?: boolean; vehicleNo?: string }[];
   latitude: number;
   longitude: number;
   incidentToDate?: string;
@@ -122,6 +122,7 @@ export type Case = {
   chargesheetNo?: string;
   chargesheetDate?: string;
   chargesheetType?: string;
+  occurrencePlace?: string;
 };
 
 const OCCUPATIONS = ["Farmer", "Shopkeeper", "IT Employee", "Student", "Homemaker", "Auto Driver", "Govt Employee", "Businessperson"];
@@ -306,7 +307,7 @@ export const ALERTS = [
   { id: 1, severity: "critical", district: "Bengaluru Urban", text: "Chain-snatching cluster spike +38% vs 6-mo avg", time: "12 min ago" },
   { id: 2, severity: "high", district: "Mysuru", text: "Cyber fraud reports doubled in last 72h", time: "34 min ago" },
   { id: 3, severity: "high", district: "Kalaburagi", text: "Vehicle theft anomaly detected in Zone-4", time: "1 hr ago" },
-  { id: 4, severity: "medium", district: "Hubballi-Dharwad", text: "NDPS seizure trend rising in student areas", time: "2 hr ago" },
+  { id: 4, severity: "medium", district: "Dharwad", text: "NDPS seizure trend rising in student areas", time: "2 hr ago" },
   { id: 5, severity: "medium", district: "Belagavi", text: "Unusual late-night burglary pattern flagged", time: "3 hr ago" },
   { id: 6, severity: "low", district: "Udupi", text: "Public order incidents above weekly baseline", time: "5 hr ago" },
 ];
@@ -381,11 +382,12 @@ export const DISTRICT_COORDS: Record<string, [number, number]> = {
   "Bengaluru Urban": [12.9716, 77.5946],
   "Bengaluru Rural": [13.2846, 77.6947],
   "Mysuru": [12.2958, 76.6394],
-  "Mangaluru": [12.9141, 74.856],
-  "Hubballi-Dharwad": [15.3647, 75.124],
+  "Dakshina Kannada": [12.9141, 74.856],
+  "Dharwad": [15.3647, 75.124],
   "Belagavi": [15.8497, 74.4977],
   "Kalaburagi": [17.3297, 76.8343],
   "Ballari": [15.1394, 76.9214],
+  "Vijayanagara": [15.2689, 76.3909],
   "Vijayapura": [16.8302, 75.71],
   "Tumakuru": [13.3409, 77.101],
   "Shivamogga": [13.9299, 75.5681],
@@ -411,6 +413,9 @@ export const AREA_COORDS: Record<string, [number, number]> = {
   "HSR Layout": [12.9116, 77.6473],
   "Malleshwaram": [13.0035, 77.5647],
   "Marathahalli": [12.9591, 77.6974],
+  "Peenya": [13.0284, 77.5195],
+  "Yeshwanthpur": [13.0250, 77.5462],
+  "Rajajinagar": [12.9882, 77.5548],
   "Devanahalli": [13.2437, 77.7126],
   "Doddaballapur": [13.2957, 77.5378],
   "Hoskote": [13.0707, 77.7982],
@@ -450,6 +455,10 @@ export const AREA_COORDS: Record<string, [number, number]> = {
   "Sandur": [15.0838, 76.5474],
   "Siruguppa": [15.6299, 76.8964],
   "Kudligi": [14.9057, 76.3919],
+  "Harapanahalli": [14.5126, 75.9868],
+  "Kotturu": [14.8214, 76.2201],
+  "Huvina Hadagali": [15.0211, 75.9555],
+  "Hagaribommanahalli": [15.0991, 76.1952],
   "Vijayapura City": [16.8302, 75.71],
   "Indi": [17.176, 75.9494],
   "Sindagi": [16.9101, 76.2317],
@@ -515,14 +524,15 @@ export const AREA_COORDS: Record<string, [number, number]> = {
 };
 
 export const AREA_NAMES: Record<string, string[]> = {
-  "Bengaluru Urban": ["Whitefield","Koramangala","Indiranagar","MG Road","Electronic City","Yelahanka","Jayanagar","HSR Layout","Malleshwaram","Marathahalli"],
+  "Bengaluru Urban": ["Whitefield","Koramangala","Indiranagar","MG Road","Electronic City","Yelahanka","Jayanagar","HSR Layout","Malleshwaram","Marathahalli","Peenya","Yeshwanthpur","Rajajinagar"],
   "Bengaluru Rural": ["Devanahalli","Doddaballapur","Hoskote","Nelamangala"],
   "Mysuru": ["Krishnaraja","Chamundipuram","Vijayanagar","Hebbal","T. Narasipur","Nanjangud","Hunsur"],
-  "Mangaluru": ["Mangaluru North","Mangaluru South","Bantwal","Puttur","Sullia","Belthangady"],
-  "Hubballi-Dharwad": ["Hubballi Central","Hubballi East","Dharwad City","Navanagar","Kalghatgi"],
+  "Dakshina Kannada": ["Mangaluru North","Mangaluru South","Bantwal","Puttur","Sullia","Belthangady"],
+  "Dharwad": ["Hubballi Central","Hubballi East","Dharwad City","Navanagar","Kalghatgi"],
   "Belagavi": ["Belagavi City","Khanapur","Bailhongal","Chikkodi","Athani","Ramdurg"],
   "Kalaburagi": ["Kalaburagi City","Afzalpur","Chincholi","Sedam","Aland","Jevargi"],
-  "Ballari": ["Ballari City","Hosapete","Sandur","Siruguppa","Kudligi"],
+  "Ballari": ["Ballari City", "Sandur", "Siruguppa"],
+  "Vijayanagara": ["Hosapete", "Kudligi", "Harapanahalli", "Kotturu", "Huvina Hadagali", "Hagaribommanahalli"],
   "Vijayapura": ["Vijayapura City","Indi","Sindagi","Basavana Bagevadi","Muddebihal"],
   "Tumakuru": ["Tumakuru City","Tiptur","Sira","Kunigal","Madhugiri","Chiknayakanhalli"],
   "Shivamogga": ["Shivamogga City","Sagar","Bhadravati","Shikaripur","Thirthahalli","Hosanagara"],

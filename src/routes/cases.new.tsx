@@ -1,5 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { useDb } from "@/hooks/use-db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -94,6 +97,7 @@ function PhotoUploadWidget({
 }
 
 function NewCasePage() {
+  const { offenders = [], cases: allCases = [] } = useDb();
   const navigate = useNavigate();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,6 +121,15 @@ function NewCasePage() {
   const [complainantPhone, setComplainantPhone] = useState("+91 98765 43210");
   const [complainantAddress, setComplainantAddress] = useState("MG Road, Bengaluru");
   const [complainantRelation, setComplainantRelation] = useState("Self (Victim)");
+  const [compLat, setCompLat] = useState("12.9716");
+  const [compLng, setCompLng] = useState("77.5946");
+  const compMapContainerRef = useRef<HTMLDivElement | null>(null);
+  const compMapRef = useRef<maplibregl.Map | null>(null);
+  const compMarkerRef = useRef<maplibregl.Marker | null>(null);
+
+  const occMapContainerRef = useRef<HTMLDivElement | null>(null);
+  const occMapRef = useRef<maplibregl.Map | null>(null);
+  const occMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   // ==========================================
   // SECTION 2: POLICE DETAILS
@@ -219,6 +232,297 @@ function NewCasePage() {
     const serial = String(currentCount + 1).padStart(5, "0");
     return `${catCode}${distCode}${stationCode}${year}${serial}`;
   };
+
+  // Geocode Complainant Residential Address
+  const geocodeComplainantAddress = async () => {
+    if (!complainantAddress) return;
+    const query = encodeURIComponent(`${complainantAddress}, Bengaluru, Karnataka, India`);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+        headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const firstResult = data[0];
+          const parsedLat = Number(firstResult.lat);
+          const parsedLon = Number(firstResult.lon);
+          if (!isNaN(parsedLat) && !isNaN(parsedLon)) {
+            const newLat = parsedLat.toFixed(4);
+            const newLng = parsedLon.toFixed(4);
+            setCompLat(newLat);
+            setCompLng(newLng);
+            
+            // Move map camera and update marker
+            if (compMapRef.current) {
+              compMapRef.current.panTo([parsedLon, parsedLat]);
+            }
+            if (compMarkerRef.current) {
+              compMarkerRef.current.setLngLat([parsedLon, parsedLat]);
+            }
+            toast.success("Map centered to address location.");
+          }
+        } else {
+          toast.error("Address location not found on map.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error fetching map coordinates.");
+    }
+  };
+
+  // Complainant Address Map Initialization
+  useEffect(() => {
+    if (step !== 1 || !compMapContainerRef.current) {
+      if (compMapRef.current) {
+        compMapRef.current.remove();
+        compMapRef.current = null;
+        compMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (compMapRef.current) return; // already initialized
+
+    const initialLng = Number(compLng) || 77.5946;
+    const initialLat = Number(compLat) || 12.9716;
+
+    const mapStyle = {
+      version: 8 as const,
+      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      sources: {
+        "osm": {
+          "type": "raster" as const,
+          "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          "tileSize": 256,
+          "attribution": "&copy; OpenStreetMap"
+        }
+      },
+      layers: [
+        {
+          "id": "osm-tiles",
+          "type": "raster" as const,
+          "source": "osm",
+          "minzoom": 0,
+          "maxzoom": 19
+        }
+      ]
+    };
+
+    const map = new maplibregl.Map({
+      container: compMapContainerRef.current,
+      style: mapStyle,
+      center: [initialLng, initialLat],
+      zoom: 13,
+      attributionControl: false
+    });
+    compMapRef.current = map;
+
+    // Custom pulsing pin element
+    const el = document.createElement("div");
+    el.className = "custom-rapido-pin";
+    el.innerHTML = `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; height: 32px; width: 32px; background: rgba(37, 99, 235, 0.25); border-radius: 50%; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: absolute; height: 16px; width: 16px; background: #2563eb; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center;">
+          <div style="height: 6px; width: 6px; background: white; border-radius: 50%;"></div>
+        </div>
+      </div>
+    `;
+
+    const marker = new maplibregl.Marker({ element: el, draggable: true })
+      .setLngLat([initialLng, initialLat])
+      .addTo(map);
+    compMarkerRef.current = marker;
+
+    marker.on("dragend", async () => {
+      const lngLat = marker.getLngLat();
+      const newLat = lngLat.lat.toFixed(4);
+      const newLng = lngLat.lng.toFixed(4);
+      setCompLat(newLat);
+      setCompLng(newLng);
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+          headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.display_name) {
+            setComplainantAddress(data.display_name);
+            toast.success("Residential Address updated from map pin!");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    map.on("click", async (e) => {
+      const newLat = e.lngLat.lat.toFixed(4);
+      const newLng = e.lngLat.lng.toFixed(4);
+      setCompLat(newLat);
+      setCompLng(newLng);
+      marker.setLngLat(e.lngLat);
+      map.panTo(e.lngLat);
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+          headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.display_name) {
+            setComplainantAddress(data.display_name);
+            toast.success("Residential Address updated from map click!");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    return () => {
+      if (compMapRef.current) {
+        compMapRef.current.remove();
+        compMapRef.current = null;
+        compMarkerRef.current = null;
+      }
+    };
+  }, [step]);
+
+  // Occurrence Location Map Initialization
+  useEffect(() => {
+    if (step !== 3 || !occMapContainerRef.current) {
+      if (occMapRef.current) {
+        occMapRef.current.remove();
+        occMapRef.current = null;
+        occMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (occMapRef.current) return; // already initialized
+
+    const initialLng = Number(lng) || 77.5946;
+    const initialLat = Number(lat) || 12.9716;
+
+    const mapStyle = {
+      version: 8 as const,
+      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      sources: {
+        "osm": {
+          "type": "raster" as const,
+          "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          "tileSize": 256,
+          "attribution": "&copy; OpenStreetMap"
+        }
+      },
+      layers: [
+        {
+          "id": "osm-tiles",
+          "type": "raster" as const,
+          "source": "osm",
+          "minzoom": 0,
+          "maxzoom": 19
+        }
+      ]
+    };
+
+    const map = new maplibregl.Map({
+      container: occMapContainerRef.current,
+      style: mapStyle,
+      center: [initialLng, initialLat],
+      zoom: 13,
+      attributionControl: false
+    });
+    occMapRef.current = map;
+
+    // Custom pulsing pin element
+    const el = document.createElement("div");
+    el.className = "custom-rapido-pin";
+    el.innerHTML = `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; height: 32px; width: 32px; background: rgba(217, 48, 37, 0.25); border-radius: 50%; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: absolute; height: 16px; width: 16px; background: #d93025; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center;">
+          <div style="height: 6px; width: 6px; background: white; border-radius: 50%;"></div>
+        </div>
+      </div>
+    `;
+
+    const marker = new maplibregl.Marker({ element: el, draggable: true })
+      .setLngLat([initialLng, initialLat])
+      .addTo(map);
+    occMarkerRef.current = marker;
+
+    marker.on("dragend", async () => {
+      const lngLat = marker.getLngLat();
+      const newLat = lngLat.lat.toFixed(4);
+      const newLng = lngLat.lng.toFixed(4);
+      setLat(newLat);
+      setLng(newLng);
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+          headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.display_name) {
+            setOccurrencePlace(data.display_name);
+            toast.success("Occurrence Location updated from map pin!");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    map.on("click", async (e) => {
+      const newLat = e.lngLat.lat.toFixed(4);
+      const newLng = e.lngLat.lng.toFixed(4);
+      setLat(newLat);
+      setLng(newLng);
+      marker.setLngLat(e.lngLat);
+      map.panTo(e.lngLat);
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+          headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.display_name) {
+            setOccurrencePlace(data.display_name);
+            toast.success("Occurrence Location updated from map click!");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    return () => {
+      if (occMapRef.current) {
+        occMapRef.current.remove();
+        occMapRef.current = null;
+        occMarkerRef.current = null;
+      }
+    };
+  }, [step]);
+
+  // Update map pin when lat/lng are changed via occurrencePlace geocoding
+  useEffect(() => {
+    if (occMapRef.current && occMarkerRef.current) {
+      const parsedLat = Number(lat);
+      const parsedLng = Number(lng);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+        occMarkerRef.current.setLngLat([parsedLng, parsedLat]);
+        occMapRef.current.panTo([parsedLng, parsedLat]);
+      }
+    }
+  }, [lat, lng]);
 
   const handleClearDb = async () => {
     if (confirm("Are you sure you want to delete all case records? This will clear both local storage and cloud Data Store.")) {
@@ -393,10 +697,10 @@ function NewCasePage() {
       setShowReviewModal(false);
       setIsSubmitting(false);
 
-      // Toast Notification indicating Data updated across all 27 tables in the database
-      toast.success(`FIR #${crimeNo} stored in all 27 Zoho Console tables! Data reflected instantly.`, {
-        duration: 6000,
-        description: `Reflected in CaseMaster, Accused, Victim, ComplainantDetails, ArrestSurrender, ActSectionAssociation, & 21 Master tables at ${policeStation}, ${selectedDistrict.name}.`,
+      // Toast Notification indicating Data updated across database
+      toast.success(`FIR #${crimeNo} Registered Successfully! Database updated.`, {
+        duration: 5000,
+        description: `Crime Head: ${selectedCrimeHead.name} | Accused: ${accused.map(a => a.name).join(", ") || "Unknown"} | Location: ${occurrencePlace}`,
       });
 
       // Redirect to the live cases directory
@@ -416,14 +720,7 @@ function NewCasePage() {
         section="08"
         eyebrow="Karnataka State Police · Record Entry"
         title="New FIR Registration"
-        description="Official FIR Form No. 1 entry. Populates all 27 database tables in your Zoho Console instantly."
-        actions={
-          <div className="flex gap-2">
-            <Button onClick={handleClearDb} variant="destructive" className="h-8 text-xs">
-              <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear Database
-            </Button>
-          </div>
-        }
+        description="Official FIR Form No. 1 entry. Coordinates are synced directly with the Live Crime Hotspots tracking system."
       />
 
       <div className="rounded-2xl border border-border bg-surface-1 p-5 shadow-sm">
@@ -536,7 +833,81 @@ function NewCasePage() {
               </div>
               <div className="md:col-span-3 flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address *</label>
-                <Input value={complainantAddress} onChange={e => setComplainantAddress(e.target.value)} className="bg-surface-2 border-border" required />
+                <div className="flex gap-2">
+                  <Input 
+                    value={complainantAddress} 
+                    onChange={e => setComplainantAddress(e.target.value)} 
+                    className="bg-surface-2 border-border flex-1 text-sm font-sans" 
+                    required 
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={geocodeComplainantAddress} 
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-mono text-[10px] uppercase tracking-wider font-extrabold px-4 h-10 border-2 border-slate-900 rounded-sm shadow-[2px_2px_0_0_#202124] active:scale-95 transition-all cursor-pointer shrink-0"
+                  >
+                    <MapPin className="h-4 w-4 mr-1 shrink-0" /> Locate
+                  </Button>
+                </div>
+              </div>
+
+              {/* Uber / Rapido Style Live Map Selector Widget */}
+              <div className="md:col-span-4 flex flex-col gap-1.5">
+                <label className="text-[9px] uppercase tracking-widest text-[#5f6368] font-bold">📍 INTERACTIVE RESIDENTIAL SELECTOR</label>
+                <div className="relative border-2 border-slate-900 rounded-sm overflow-hidden h-[240px] shadow-[4px_4px_0_0_#202124]">
+                  {/* Floating Coordinates Card */}
+                  <div className="absolute top-3 left-3 z-10 bg-white/95 border-2 border-slate-900 px-3 py-1.5 rounded-xs shadow-md font-sans pointer-events-none flex items-center gap-2 max-w-[280px]">
+                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[7.5px] uppercase font-bold tracking-widest text-[#5f6368] leading-none">📍 Pinned Coordinates</p>
+                      <p className="text-[10px] font-black text-slate-800 font-mono tracking-wider mt-0.5">{compLat}, {compLng}</p>
+                    </div>
+                  </div>
+
+                  {/* GPS Locator Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            const newLat = position.coords.latitude.toFixed(4);
+                            const newLng = position.coords.longitude.toFixed(4);
+                            setCompLat(newLat);
+                            setCompLng(newLng);
+                            if (compMapRef.current) compMapRef.current.panTo([Number(newLng), Number(newLat)]);
+                            if (compMarkerRef.current) compMarkerRef.current.setLngLat([Number(newLng), Number(newLat)]);
+                            
+                            // Reverse geocode GPS location
+                            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+                              headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+                            })
+                              .then(res => res.json())
+                              .then(data => {
+                                if (data && data.display_name) {
+                                  setComplainantAddress(data.display_name);
+                                  toast.success("Residential Address synced with GPS coordinates!");
+                                }
+                              });
+                          },
+                          () => {
+                            toast.error("Geolocation request denied or timed out.");
+                          }
+                        );
+                      } else {
+                        toast.error("Geolocation not supported by browser.");
+                      }
+                    }}
+                    className="absolute bottom-3 right-3 z-10 bg-white border-2 border-slate-900 p-1.5 rounded-xs shadow-md hover:bg-slate-50 cursor-pointer active:scale-95 transition-all text-xs font-bold leading-none"
+                    title="GPS Locate"
+                  >
+                    🧭 GPS
+                  </button>
+
+                  <div ref={compMapContainerRef} className="w-full h-full bg-slate-100" />
+                </div>
+                <p className="text-[8px] text-[#5f6368] font-bold uppercase tracking-wider italic">
+                  * Drag the location pin or double-click the map to auto-update residential address.
+                </p>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Relation to Incident *</label>
@@ -704,6 +1075,66 @@ function NewCasePage() {
                 </div>
               </div>
 
+              {/* Occurrence Location Map Selector */}
+              <div className="md:col-span-3 flex flex-col gap-1.5">
+                <label className="text-[9px] uppercase tracking-widest text-[#5f6368] font-bold">📍 INTERACTIVE OCCURRENCE SELECTOR (HOTSPOT GEOLOCATION MAP)</label>
+                <div className="relative border-2 border-slate-900 rounded-sm overflow-hidden h-[240px] shadow-[4px_4px_0_0_#202124]">
+                  {/* Floating Coordinates Card */}
+                  <div className="absolute top-3 left-3 z-10 bg-white/95 border-2 border-slate-900 px-3 py-1.5 rounded-xs shadow-md font-sans pointer-events-none flex items-center gap-2 max-w-[280px]">
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#d93025] animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[7.5px] uppercase font-bold tracking-widest text-[#5f6368] leading-none">🔴 Incident Hotspot</p>
+                      <p className="text-[10px] font-black text-slate-800 font-mono tracking-wider mt-0.5">{lat}, {lng}</p>
+                    </div>
+                  </div>
+
+                  {/* GPS Locator Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            const newLat = position.coords.latitude.toFixed(4);
+                            const newLng = position.coords.longitude.toFixed(4);
+                            setLat(newLat);
+                            setLng(newLng);
+                            if (occMapRef.current) occMapRef.current.panTo([Number(newLng), Number(newLat)]);
+                            if (occMarkerRef.current) occMarkerRef.current.setLngLat([Number(newLng), Number(newLat)]);
+                            
+                            // Reverse geocode GPS location
+                            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+                              headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
+                            })
+                              .then(res => res.json())
+                              .then(data => {
+                                if (data && data.display_name) {
+                                  setOccurrencePlace(data.display_name);
+                                  toast.success("Occurrence Location synced with GPS!");
+                                }
+                              });
+                          },
+                          () => {
+                            toast.error("Geolocation request denied or timed out.");
+                          }
+                        );
+                      } else {
+                        toast.error("Geolocation not supported by browser.");
+                      }
+                    }}
+                    className="absolute bottom-3 right-3 z-10 bg-white border-2 border-slate-900 p-1.5 rounded-xs shadow-md hover:bg-slate-50 cursor-pointer active:scale-95 transition-all text-xs font-bold leading-none"
+                    title="GPS Locate"
+                  >
+                    🧭 GPS
+                  </button>
+
+                  <div ref={occMapContainerRef} className="w-full h-full bg-slate-100" />
+                </div>
+                <p className="text-[8px] text-[#5f6368] font-bold uppercase tracking-wider italic">
+                  * Drag this pin or double-click to set the exact crime scene location. It will automatically pinpoint on the Hotspots maps once submitted!
+                </p>
+              </div>
+
               {/* Act & Section Association Sub-block */}
               <div className="md:col-span-3 rounded-md bg-surface-2 border border-border/50 p-3.5 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
@@ -815,40 +1246,118 @@ function NewCasePage() {
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
                 {accused.map((acc, idx) => (
-                  <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
-                    <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Accused {idx + 1} Name *</label>
-                      <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                  <div key={idx} className="space-y-3.5 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
+                    <div className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
+                      <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Accused {idx + 1} Name *</label>
+                        <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                      </div>
+                      <div className="w-20 flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                        <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                      </div>
+                      <div className="w-24 flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                        <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                          <option value="M">Male</option>
+                          <option value="F">Female</option>
+                          <option value="T">Transgender</option>
+                        </select>
+                      </div>
+                      <PhotoUploadWidget
+                        label="Mugshot"
+                        value={acc.photo}
+                        onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
+                      />
+                      <div className="w-36 flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
+                        <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
+                          <option value="0">Wanted / At Large</option>
+                          <option value="1">Arrested / In Custody</option>
+                        </select>
+                      </div>
+                      {accused.length > 1 && (
+                        <Button type="button" onClick={() => handleRemoveAccused(idx)} variant="destructive" className="h-9 px-3 shrink-0">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-                    <div className="w-20 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
-                      <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
-                    </div>
-                    <div className="w-24 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
-                      <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
-                        <option value="T">Transgender</option>
-                      </select>
-                    </div>
-                    <PhotoUploadWidget
-                      label="Mugshot"
-                      value={acc.photo}
-                      onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
-                    />
-                    <div className="w-36 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
-                      <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
-                        <option value="0">Wanted / At Large</option>
-                        <option value="1">Arrested / In Custody</option>
-                      </select>
-                    </div>
-                    {accused.length > 1 && (
-                      <Button type="button" onClick={() => handleRemoveAccused(idx)} variant="destructive" className="h-9 px-3">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+
+                    {/* Behavioral DNA preview if offender is found in the database */}
+                    {(() => {
+                      const offenderMatch = offenders.find(o => o.name.toLowerCase() === acc.name.toLowerCase());
+                      if (!offenderMatch) return null;
+                      
+                      const associatesCount = allCases.filter(c => c.accused.some(a => a.name.toLowerCase().includes(acc.name.toLowerCase()))).length;
+                      const mobility = Math.min(100, (offenderMatch.jurisdictions?.length || 1) * 33);
+                      
+                      return (
+                        <div className="w-full mt-2 p-4 bg-emerald-50/60 border-2 border-emerald-300 rounded-xl space-y-3.5 animate-in slide-in-from-top-2 duration-200 font-sans text-ink">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2 w-2 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                              <span className="text-[9.5px] font-black text-emerald-800 uppercase tracking-widest font-mono">REPEAT CRIMINAL PROFILE MATCHED (BEHAVIORAL DNA)</span>
+                            </div>
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-sm border border-emerald-800 shadow-[1px_1px_0_0_#065f46]">
+                              PROFILE SYNCED
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* DNA Stats */}
+                            <div className="space-y-2">
+                              <p className="text-[8.5px] uppercase tracking-wider text-emerald-800/80 font-extrabold font-mono">BEHAVIORAL DNA SCORECARD</p>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-1 font-sans">
+                                {[
+                                  { label: "Mobility Range", score: Math.max(25, mobility) },
+                                  { label: "Violence Severity", score: offenderMatch.riskScore > 75 ? 85 : 45 },
+                                  { label: "Property Crime Focus", score: 80 },
+                                  { label: "Night Operations", score: 85 },
+                                  { label: "Syndicate Links", score: Math.min(100, associatesCount * 25) },
+                                  { label: "MO Consistency", score: 90 },
+                                ].map(m => (
+                                  <div key={m.label} className="space-y-1">
+                                    <div className="flex justify-between text-[9.5px] font-bold text-slate-700 leading-none">
+                                      <span>{m.label}</span>
+                                      <span>{m.score}%</span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden border border-slate-300/35">
+                                      <div 
+                                        className="h-full bg-emerald-600 rounded-full transition-all duration-700" 
+                                        style={{ width: `${m.score}%` }} 
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Threat watches */}
+                            <div className="p-3 bg-white/70 border-2 border-emerald-300 rounded-lg flex flex-col justify-between shadow-sm">
+                              <div>
+                                <p className="text-[8px] uppercase tracking-widest text-[#5f6368] font-bold">Predictive Recidivism Forecast</p>
+                                <div className="flex items-baseline gap-1.5 mt-1">
+                                  <span className="text-xs font-black text-[#d93025] uppercase tracking-wider font-mono">
+                                    {offenderMatch.riskScore > 75 ? "CRITICAL WATCH" : "HIGH THREAT"}
+                                  </span>
+                                  <span className="text-[9.5px] text-slate-500 font-bold font-mono">({offenderMatch.riskScore}% Probability)</span>
+                                </div>
+                                <p className="text-[10px] text-slate-700 leading-relaxed mt-1.5 font-medium">
+                                  Suspect has logged repeat property offences in {offenderMatch.jurisdictions?.join(", ") || "Bengaluru East"}. Aligned Modus Operandi matches historical night burglaries.
+                                </p>
+                              </div>
+                              <div className="mt-2.5 pt-2 border-t border-emerald-100 flex items-center justify-between text-[8px] font-mono text-emerald-800/80 font-bold leading-none">
+                                <span>🧬 dossier ID: KSP-OFF-{offenderMatch.id}</span>
+                                <span>PROFILE AUTO-POPULATED</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </CardContent>

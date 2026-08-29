@@ -100,7 +100,7 @@ export function SubAreaMapGL({
     if (!containerRef.current || mapRef.current) return;
     const style: StyleSpecification = {
       version: 8,
-      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      glyphs: `https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=${MAPTILER_KEY}`,
       sources: {
         "osm": {
           "type": "raster",
@@ -125,11 +125,20 @@ export function SubAreaMapGL({
       style,
       center: [76.5, 15.0],
       zoom: 8,
+      minZoom: 6.0,
+      maxZoom: 15.0,
       attributionControl: { compact: true },
+      scrollZoom: true,
+      boxZoom: true,
+      doubleClickZoom: true,
+      dragRotate: false,
+      dragPan: true,
+      touchZoomRotate: true,
+      keyboard: true,
     });
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new maplibregl.FullscreenControl({ container: containerRef.current!.parentElement ?? containerRef.current! }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     const onLoad = () => {
       loadedRef.current = true;
@@ -137,71 +146,87 @@ export function SubAreaMapGL({
       const worldRing: number[][] = [
         [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
       ];
-      map.addSource("district-mask", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [worldRing] } },
-      });
-      map.addLayer({
-        id: "district-mask-fill",
-        type: "fill",
-        source: "district-mask",
-        paint: { "fill-color": "#f8fafc", "fill-opacity": 0.85 },
-      });
+      if (!map.getSource("district-mask")) {
+        map.addSource("district-mask", {
+          type: "geojson",
+          data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [worldRing] } },
+        });
+      }
+      if (!map.getLayer("district-mask-fill")) {
+        map.addLayer({
+          id: "district-mask-fill",
+          type: "fill",
+          source: "district-mask",
+          paint: { "fill-color": "#f8fafc", "fill-opacity": 0.85 },
+        });
+      }
 
-      map.addSource("district-outline-src", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-      map.addLayer({
-        id: "district-outline",
-        type: "line",
-        source: "district-outline-src",
-        paint: { "line-color": "#3b82f6", "line-width": 1.5, "line-opacity": 0.45 },
-      });
+      if (!map.getSource("district-outline-src")) {
+        map.addSource("district-outline-src", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+      }
+      if (!map.getLayer("district-outline")) {
+        map.addLayer({
+          id: "district-outline",
+          type: "line",
+          source: "district-outline-src",
+          paint: { "line-color": "#ffffff", "line-width": 2.0, "line-opacity": 0.9 },
+        });
+      }
 
-      map.addSource("areas", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({
-        id: "areas-pulse",
-        type: "circle",
-        source: "areas",
-        filter: ["get", "pulse"],
-        paint: {
-          "circle-radius": ["+", ["get", "radius"], 8],
-          "circle-color": "#dc2626",
-          "circle-opacity": 0.25,
-          "circle-blur": 0.5,
-        },
-      });
-      map.addLayer({
-        id: "areas-circles",
-        type: "circle",
-        source: "areas",
-        paint: {
-          "circle-radius": ["get", "radius"],
-          "circle-color": ["get", "color"],
-          "circle-opacity": ["get", "opacity"],
-          "circle-stroke-color": ["case", ["get", "selected"], "#1e3a8a", "#ffffff"],
-          "circle-stroke-width": ["case", ["get", "selected"], 3, 1.5],
-        },
-      });
-      map.addLayer({
-        id: "areas-labels",
-        type: "symbol",
-        source: "areas",
-        layout: {
-          "text-field": ["get", "name"],
-          "text-size": 11,
-          "text-font": ["Open Sans Regular", "Arial Unicode MS"],
-          "text-offset": [0, 1.2],
-          "text-anchor": "top",
-          "text-allow-overlap": false,
-        },
-        paint: {
-          "text-color": "#0f172a",
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 1.4,
-        },
-      });
+      if (!map.getSource("areas")) {
+        map.addSource("areas", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      }
+      if (!map.getLayer("areas-pulse")) {
+        map.addLayer({
+          id: "areas-pulse",
+          type: "circle",
+          source: "areas",
+          filter: ["get", "pulse"],
+          paint: {
+            "circle-radius": ["+", ["get", "radius"], 8],
+            "circle-color": "#dc2626",
+            "circle-opacity": 0.25,
+            "circle-blur": 0.5,
+          },
+        });
+      }
+      if (!map.getLayer("areas-circles")) {
+        map.addLayer({
+          id: "areas-circles",
+          type: "circle",
+          source: "areas",
+          paint: {
+            "circle-radius": ["get", "radius"],
+            "circle-color": ["get", "color"],
+            "circle-opacity": ["get", "opacity"],
+            "circle-stroke-color": ["case", ["get", "selected"], "#1e3a8a", "#ffffff"],
+            "circle-stroke-width": ["case", ["get", "selected"], 3, 1.5],
+          },
+        });
+      }
+      if (!map.getLayer("areas-labels")) {
+        map.addLayer({
+          id: "areas-labels",
+          type: "symbol",
+          source: "areas",
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 11,
+            "text-font": ["Open Sans Regular"],
+            "text-offset": [0, 1.2],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+          },
+          paint: {
+            "text-color": "#0f172a",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.4,
+          },
+        });
+      }
 
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
       map.on("mouseenter", "areas-circles", () => (map.getCanvas().style.cursor = "pointer"));
@@ -347,40 +372,6 @@ export function SubAreaMapGL({
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 h-full w-full" />
-
-      {/* Custom zoom controls */}
-      {ready && (
-        <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
-          <button
-            id="sub-map-zoom-in"
-            onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
-            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-sm font-bold"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <button
-            id="sub-map-zoom-out"
-            onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
-            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-sm font-bold"
-            title="Zoom out"
-          >
-            −
-          </button>
-          <button
-            id="sub-map-reset"
-            onClick={() => {
-              const m = mapRef.current;
-              if (m && districtBbox) m.fitBounds(districtBbox, { padding: 40, duration: 400, maxZoom: 12 });
-            }}
-            className="w-8 h-8 rounded-md bg-surface-2/90 backdrop-blur border border-border/60 text-foreground hover:bg-primary/20 hover:border-primary/60 transition-all flex items-center justify-center shadow-md text-xs"
-            title="Reset view"
-          >
-            ⊙
-          </button>
-        </div>
-      )}
-
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface-2/60 backdrop-blur-sm pointer-events-none">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

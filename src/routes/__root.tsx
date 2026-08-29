@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts,
+  Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts, useLocation,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -11,6 +11,8 @@ import { Topbar } from "@/components/topbar";
 import { LanguageProvider } from "@/hooks/use-language";
 import { Toaster } from "@/components/ui/sonner";
 import { CopilotDrawer } from "@/components/copilot-drawer";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { Login } from "@/components/login";
 
 function NotFoundComponent() {
   return (
@@ -110,22 +112,44 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <SidebarProvider>
-          <div className="flex min-h-screen w-full bg-background text-foreground">
-            <AppSidebar />
-            <div className="flex-1 flex flex-col min-w-0">
-              <Topbar />
-              <main className="flex-1 p-4 md:p-6">
-                <Outlet />
-              </main>
-            </div>
-          </div>
-          {/* Google Translate Hidden Element */}
-          <div id="google_translate_element" style={{ display: "none" }} className="hidden" />
-          <Toaster />
-          <CopilotDrawer />
-        </SidebarProvider>
+        <AuthProvider>
+          <RootLayout />
+        </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>
+  );
+}
+
+function RootLayout() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Login />
+        <Toaster />
+      </>
+    );
+  }
+
+  const isNewFirPage = location.pathname === "/cases/new";
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background text-foreground">
+        <AppSidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <Topbar />
+          <main className="flex-1 p-4 md:p-6">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+      {/* Google Translate Hidden Element */}
+      <div id="google_translate_element" style={{ display: "none" }} className="hidden" />
+      <Toaster />
+      {!isNewFirPage && <CopilotDrawer />}
+    </SidebarProvider>
   );
 }

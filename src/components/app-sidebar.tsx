@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus
+  LayoutDashboard, MapPin, Network, UserSearch, Brain, LineChart, FolderSearch, Shield, Plus, LogOut
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarHeader, SidebarFooter, useSidebar,
@@ -9,6 +9,9 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+
+import kspLogo from "@/assets/karnataka-police-logo.png";
 
 type NavItem = { 
   title: string; 
@@ -33,6 +36,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { t } = useLanguage();
+  const { logout } = useAuth();
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
     if (url === "/cases") return pathname.startsWith("/cases") && !pathname.startsWith("/cases/new");
@@ -57,8 +61,8 @@ export function AppSidebar() {
           collapsed && "flex-col gap-2 px-0 pt-4"
         )}>
           <div className="relative">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper border-2 border-ink shadow-sm">
-              <Shield className="h-4 w-4 text-signal" strokeWidth={2.5} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper border-2 border-ink overflow-hidden shadow-sm">
+              <img src={kspLogo} alt="KSP Logo" className="h-7 w-7 object-contain" />
             </div>
           </div>
           {!collapsed && (
@@ -148,33 +152,51 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Classified stamp footer */}
-      <SidebarFooter className="p-0 bg-paper border-t border-ink/15">
+      <SidebarFooter className="p-0 bg-paper border-t border-ink/15 space-y-2 pb-4">
         {!collapsed ? (
-          <div className="m-3 rounded-lg border border-ink/15 bg-surface-2 p-3 shadow-inner space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-signal font-bold">
-                SECURE CONSOLE
-              </span>
+          <>
+            <div className="m-3 mb-1 rounded-lg border border-ink/15 bg-surface-2 p-3 shadow-inner space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-signal font-bold">
+                  SECURE CONSOLE
+                </span>
+              </div>
+              <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
+                <span className="text-[9px] text-ink/50 uppercase tracking-wider">Feed Sync</span>
+                <span className="tabular-nums font-bold text-emerald-600">ONLINE</span>
+              </div>
+              <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
+                <span className="text-[9px] text-ink/50 uppercase tracking-wider">Telemetry</span>
+                <span className="tabular-nums text-ink/80">↻ {stamp}</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
-              <span className="text-[9px] text-ink/50 uppercase tracking-wider">Feed Sync</span>
-              <span className="tabular-nums font-bold text-emerald-600">ONLINE</span>
+            <div className="px-3">
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-ink/70 hover:text-signal hover:bg-red-500/5 border border-transparent hover:border-red-500/20 transition-all duration-300 group cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 text-ink/50 group-hover:text-signal transition-colors duration-300" />
+                <span className="truncate tracking-wide">{t("Logout") || "Logout"}</span>
+              </button>
             </div>
-            <div className="flex items-center justify-between font-mono text-[9.5px] text-ink/70">
-              <span className="text-[9px] text-ink/50 uppercase tracking-wider">Telemetry</span>
-              <span className="tabular-nums text-ink/80">↻ {stamp}</span>
-            </div>
-          </div>
+          </>
         ) : (
-          <div className="flex justify-center py-4">
+          <div className="flex flex-col items-center gap-4 py-4">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
+            <button
+              onClick={logout}
+              title="Logout"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-ink/15 hover:border-red-500/30 text-ink/70 hover:text-signal hover:bg-red-500/10 transition-all duration-300 cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         )}
       </SidebarFooter>

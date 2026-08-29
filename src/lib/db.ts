@@ -41,9 +41,14 @@ export function getStoredCases(): Case[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          normalize(parsed);
-          loadedCases = parsed;
-          return loadedCases;
+          const hasBigIntId = parsed.some(c => c && c.caseMasterId > 2147483647);
+          if (hasBigIntId) {
+            localStorage.removeItem(STORAGE_KEY);
+          } else {
+            normalize(parsed);
+            loadedCases = parsed;
+            return loadedCases;
+          }
         }
       }
     } catch (e) {}
@@ -109,14 +114,18 @@ export async function addCase(c: Omit<Case, "caseMasterId">): Promise<Case> {
           const localAcc = x.accused.find(la => la.name === liveAcc.name);
           return {
             ...liveAcc,
-            photo: liveAcc.photo || (localAcc ? localAcc.photo : "")
+            photo: liveAcc.photo || (localAcc ? localAcc.photo : ""),
+            phone: liveAcc.phone || (localAcc ? localAcc.phone : ""),
+            vehicleUsed: liveAcc.vehicleUsed !== undefined ? liveAcc.vehicleUsed : (localAcc ? localAcc.vehicleUsed : false),
+            vehicleNo: liveAcc.vehicleNo || (localAcc ? localAcc.vehicleNo : "")
           };
         });
         const mergedVictims = liveCreated.victims.map(liveVic => {
           const localVic = x.victims.find(lv => lv.name === liveVic.name);
           return {
             ...liveVic,
-            photo: liveVic.photo || (localVic ? localVic.photo : "")
+            photo: liveVic.photo || (localVic ? localVic.photo : ""),
+            phone: liveVic.phone || (localVic ? localVic.phone : "")
           };
         });
         return {
@@ -234,7 +243,10 @@ export async function syncWithCatalyst() {
           const localAcc = localCase.accused.find(la => la.name === liveAcc.name);
           return {
             ...liveAcc,
-            photo: liveAcc.photo || (localAcc ? localAcc.photo : "")
+            photo: liveAcc.photo || (localAcc ? localAcc.photo : ""),
+            phone: liveAcc.phone || (localAcc ? localAcc.phone : ""),
+            vehicleUsed: liveAcc.vehicleUsed !== undefined ? liveAcc.vehicleUsed : (localAcc ? localAcc.vehicleUsed : false),
+            vehicleNo: liveAcc.vehicleNo || (localAcc ? localAcc.vehicleNo : "")
           };
         });
 
@@ -242,7 +254,8 @@ export async function syncWithCatalyst() {
           const localVic = localCase.victims.find(lv => lv.name === liveVic.name);
           return {
             ...liveVic,
-            photo: liveVic.photo || (localVic ? localVic.photo : "")
+            photo: liveVic.photo || (localVic ? localVic.photo : ""),
+            phone: liveVic.phone || (localVic ? localVic.phone : "")
           };
         });
 
@@ -598,8 +611,9 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       addEdge({ source: accusedNodeId, target: caseNodeId, relation: "co-accused", weight: 2 });
 
       // Add vehicle connection for select suspects
-      if ((cIdx + aIdx) % 2 === 0) {
-        const plate = VEHICLE_PLATES[(cIdx + aIdx) % VEHICLE_PLATES.length];
+      const hasRealVehicle = a.vehicleUsed && a.vehicleNo;
+      if (hasRealVehicle || (cIdx + aIdx) % 2 === 0) {
+        const plate = (hasRealVehicle ? a.vehicleNo : VEHICLE_PLATES[(cIdx + aIdx) % VEHICLE_PLATES.length]) || "";
         const vehId = `VEH-${plate.replace(/[^A-Z0-9]/g, "")}`;
         addNode({
           id: vehId,
@@ -612,8 +626,9 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       }
 
       // Add phone connection for select suspects
-      if ((cIdx + aIdx) % 3 === 0) {
-        const num = PHONE_NUMBERS[(cIdx + aIdx) % PHONE_NUMBERS.length];
+      const hasRealPhone = a.phone;
+      if (hasRealPhone || (cIdx + aIdx) % 3 === 0) {
+        const num = (hasRealPhone ? a.phone : PHONE_NUMBERS[(cIdx + aIdx) % PHONE_NUMBERS.length]) || "";
         const phId = `PH-${num.replace(/[^0-9]/g, "")}`;
         addNode({
           id: phId,
@@ -632,6 +647,69 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
   return { nodes, edges, clusters };
 }
 
+function summarizeCaseDescription(crimeHead: string, briefFacts: string): string {
+  if (!briefFacts) return "No details provided";
+  const text = briefFacts.toLowerCase();
+  
+  // 1. Cyber Crimes
+  if (crimeHead.includes("Cyber")) {
+    if (text.includes("otp") || text.includes("verification code")) return "OTP fraud leads to unauthorized bank debit";
+    if (text.includes("phishing") || text.includes("email") || text.includes("link")) return "Phishing link credential compromise reported";
+    if (text.includes("whatsapp") || text.includes("telegram")) return "Part-time job task scam alert";
+    if (text.includes("crypto") || text.includes("bitcoin")) return "Crypto investment portal fraud detected";
+    if (text.includes("credit card") || text.includes("debit card")) return "Credit card credential theft reported";
+    return "Cyber intrusion / online financial fraud reported";
+  }
+  
+  // 2. Crimes Against Body
+  if (crimeHead.includes("Body") || crimeHead.includes("Murder") || crimeHead.includes("Assault")) {
+    if (text.includes("murder") || text.includes("killed") || text.includes("homicide")) return "Homicide investigation initiated";
+    if (text.includes("assault") || text.includes("beat") || text.includes("attacked")) return "Physical assault and public brawl reported";
+    if (text.includes("kidnap") || text.includes("abduct")) return "Abduction alert; search grid active";
+    if (text.includes("accident") || text.includes("collision") || text.includes("hit and run")) return "Motor vehicle collision incident";
+    return "Violent physical altercation reported";
+  }
+  
+  // 3. Crimes Against Property
+  if (crimeHead.includes("Property") || crimeHead.includes("Theft") || crimeHead.includes("Robbery") || crimeHead.includes("Burglary")) {
+    if (text.includes("chain") || text.includes("snatched")) return "Chain-snatching incident by motor riders";
+    if (text.includes("house") || text.includes("burglary") || text.includes("broken")) return "House break-in; valuables reported missing";
+    if (text.includes("car") || text.includes("bike") || text.includes("vehicle")) return "Vehicle theft from residential block";
+    if (text.includes("shop") || text.includes("market") || text.includes("cash")) return "Commercial establishment robbery";
+    return "Property theft investigation active";
+  }
+
+  // 4. Narcotics
+  if (crimeHead.includes("Narcotics") || text.includes("drug") || text.includes("ganja") || text.includes("contraband")) {
+    if (text.includes("ganja") || text.includes("marijuana") || text.includes("weed")) return "Contraband seizure; ganja peddler detained";
+    if (text.includes("cocaine") || text.includes("mdma") || text.includes("pills")) return "Synthetic drug commercial stash busted";
+    return "Narcotics search and seizure raid";
+  }
+
+  // 5. Economic Offences
+  if (crimeHead.includes("Economic") || text.includes("cheated") || text.includes("lakh") || text.includes("crore")) {
+    if (text.includes("land") || text.includes("property") || text.includes("document")) return "Real estate document forgery scam";
+    if (text.includes("job") || text.includes("employment")) return "Overseas job placement racket busted";
+    if (text.includes("investment") || text.includes("scheme")) return "Ponzi scheme financial fraud probe";
+    return "High-value financial scam under investigation";
+  }
+  
+  // 6. Crimes Against Women
+  if (crimeHead.includes("Women") || text.includes("harassment") || text.includes("stalking")) {
+    if (text.includes("harassment") || text.includes("harassed")) return "Harassment registry complaint filed";
+    if (text.includes("stalking") || text.includes("stalked")) return "Stalking incident in public transit";
+    return "Domestic grievance / harassment report";
+  }
+
+  // Fallback: clean sentence-based trimmer that cuts at the nearest word boundary
+  const cleanFacts = briefFacts.replace(/[*#]/g, "").trim();
+  if (cleanFacts.length <= 50) return cleanFacts;
+  
+  const slice = cleanFacts.slice(0, 48);
+  const lastSpace = slice.lastIndexOf(" ");
+  return lastSpace > 20 ? `${cleanFacts.slice(0, lastSpace)}...` : `${slice}...`;
+}
+
 export function computeAlerts(cases: Case[]) {
   // Generate alerts dynamically from cases
   if (cases.length === 0) return [];
@@ -643,11 +721,13 @@ export function computeAlerts(cases: Case[]) {
     else if (i % 3 === 0) severity = "high";
     else if (i % 2 === 0) severity = "medium";
     
+    const summaryText = summarizeCaseDescription(c.crimeHead.name, c.briefFacts);
+    
     return {
       id: i + 1,
       severity,
       district: c.district.name,
-      text: `${c.crimeHead.name}: ${c.briefFacts.slice(0, 45)}...`,
+      text: `${c.crimeHead.name}: ${summaryText}`,
       time: "Just now"
     };
   });

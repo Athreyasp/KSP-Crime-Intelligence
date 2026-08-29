@@ -353,7 +353,18 @@ function Overview() {
   return (
     <div className="space-y-5">
       {/* ───────── MASTHEAD & TICKER GROUP ───────── */}
-      <div className="border-y-4 border-ink">
+      <div className="relative border-y-4 border-ink">
+        {/* Sync Console button — top-right corner */}
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-1.5 rounded border border-ink/35 bg-paper px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-all duration-150 shadow-sm"
+          >
+            <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
+            {isSyncing ? t("syncing") : t("syncConsole")}
+          </button>
+        </div>
         <header className="py-6 flex flex-col items-center text-center space-y-2.5">
           <h1 className="font-editorial text-[44px] md:text-[58px] leading-[0.95] tracking-tight text-ink">
             {language === "kn" ? (
@@ -365,16 +376,6 @@ function Overview() {
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest font-display">
             {t("Karnataka State Police · Strategic Crime Intelligence Console")}
           </p>
-          <div className="pt-1">
-            <button
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 rounded border border-ink/35 bg-paper px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] font-bold text-ink hover:bg-ink hover:text-paper transition-all duration-150 shadow-sm"
-            >
-              <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-signal" : ""}`} />
-              {isSyncing ? t("syncing") : t("syncConsole")}
-            </button>
-          </div>
         </header>
 
         {/* ───────── TICKER ───────── */}
@@ -395,7 +396,7 @@ function Overview() {
       </div>
 
       {/* ───────── KPI ROW ───────── */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link to="/cases" className="block text-inherit hover:no-underline">
           <KPI label={t("totalFirs")} value={KPIS.totalFIRs} delta="+6.4%" up series={firs14} />
         </Link>

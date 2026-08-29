@@ -245,6 +245,9 @@ export function Topbar() {
 
         {/* Main bar — editorial masthead */}
         <div className="flex h-14 items-center gap-3 px-3">
+          {/* Sidebar Trigger on mobile */}
+          <SidebarTrigger className="h-9 w-9 border-2 border-ink rounded-sm bg-paper text-ink hover:bg-surface-2 md:hidden shrink-0 flex items-center justify-center" />
+
           {/* Route crumb — big serif kicker */}
           <div className="hidden md:flex items-baseline gap-2.5">
             <span className="font-editorial text-xl italic leading-none text-ink">
@@ -366,6 +369,8 @@ export function Topbar() {
               </div>
             )}
           </div>
+
+
         </div>
       </header>
 

@@ -101,7 +101,7 @@ export function MicroSpotMapGL({
 
     const style: StyleSpecification = {
       version: 8,
-      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      glyphs: `https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=${'vJbuGTzYMGTLnGWttx64'}`,
       sources: {
         "osm": {
           "type": "raster",
@@ -126,9 +126,19 @@ export function MicroSpotMapGL({
       style,
       center: center,
       zoom: 14.5,
+      minZoom: 8.0,
+      maxZoom: 18.0,
       attributionControl: { compact: true },
+      scrollZoom: true,
+      boxZoom: true,
+      doubleClickZoom: true,
+      dragRotate: false,
+      dragPan: true,
+      touchZoomRotate: true,
+      keyboard: true,
     });
     mapRef.current = map;
+    map.addControl(new maplibregl.FullscreenControl({ container: containerRef.current!.parentElement ?? containerRef.current! }), "top-right");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     const onLoad = () => {
@@ -136,82 +146,96 @@ export function MicroSpotMapGL({
 
       // Add Sub-Area Circular Range Boundary Source & Layers
       const circleGeoJSON = createGeoJSONCircle(center, 3.0);
-      map.addSource("precinct-boundary", {
-        type: "geojson",
-        data: circleGeoJSON
-      });
+      if (!map.getSource("precinct-boundary")) {
+        map.addSource("precinct-boundary", {
+          type: "geojson",
+          data: circleGeoJSON
+        });
+      }
 
-      map.addLayer({
-        id: "precinct-boundary-fill",
-        type: "fill",
-        source: "precinct-boundary",
-        paint: {
-          "fill-color": "#0b57d0",
-          "fill-opacity": 0.05
-        }
-      });
+      if (!map.getLayer("precinct-boundary-fill")) {
+        map.addLayer({
+          id: "precinct-boundary-fill",
+          type: "fill",
+          source: "precinct-boundary",
+          paint: {
+            "fill-color": "#0b57d0",
+            "fill-opacity": 0.05
+          }
+        });
+      }
 
-      map.addLayer({
-        id: "precinct-boundary-stroke",
-        type: "line",
-        source: "precinct-boundary",
-        paint: {
-          "line-color": "#3b82f6",
-          "line-width": 1.2,
-          "line-opacity": 0.35,
-          "line-dasharray": [4, 4]
-        }
-      });
+      if (!map.getLayer("precinct-boundary-stroke")) {
+        map.addLayer({
+          id: "precinct-boundary-stroke",
+          type: "line",
+          source: "precinct-boundary",
+          paint: {
+            "line-color": "#1e40af",
+            "line-width": 1.8,
+            "line-opacity": 0.6,
+            "line-dasharray": [5, 3]
+          }
+        });
+      }
 
       // Add Cases GeoJSON Source & Layers
-      map.addSource("case-points", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] }
-      });
+      if (!map.getSource("case-points")) {
+        map.addSource("case-points", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] }
+        });
+      }
 
-      map.addLayer({
-        id: "case-markers-glow",
-        type: "circle",
-        source: "case-points",
-        paint: {
-          "circle-radius": 14,
-          "circle-color": ["get", "color"],
-          "circle-opacity": 0.15,
-          "circle-blur": 0.4
-        }
-      });
+      if (!map.getLayer("case-markers-glow")) {
+        map.addLayer({
+          id: "case-markers-glow",
+          type: "circle",
+          source: "case-points",
+          paint: {
+            "circle-radius": 14,
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.15,
+            "circle-blur": 0.4
+          }
+        });
+      }
 
-      map.addLayer({
-        id: "case-markers",
-        type: "circle",
-        source: "case-points",
-        paint: {
-          "circle-radius": ["case", ["get", "selected"], 9, 6.5],
-          "circle-color": ["get", "color"],
-          "circle-opacity": ["case", ["get", "selected"], 0.95, 0.75],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": ["case", ["get", "selected"], 2.5, 1.5]
-        }
-      });
+      if (!map.getLayer("case-markers")) {
+        map.addLayer({
+          id: "case-markers",
+          type: "circle",
+          source: "case-points",
+          paint: {
+            "circle-radius": ["case", ["get", "selected"], 9, 6.5],
+            "circle-color": ["get", "color"],
+            "circle-opacity": ["case", ["get", "selected"], 0.95, 0.75],
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": ["case", ["get", "selected"], 2.5, 1.5]
+          }
+        });
+      }
 
-      map.addLayer({
-        id: "case-labels",
-        type: "symbol",
-        source: "case-points",
-        layout: {
-          "text-field": ["get", "crimeNo"],
-          "text-size": 9.5,
-          "text-font": ["Open Sans Regular", "Arial Unicode MS"],
-          "text-offset": [0, -1.3],
-          "text-anchor": "bottom",
-          "text-allow-overlap": false
-        },
-        paint: {
-          "text-color": "#202124",
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 1.6
-        }
-      });
+      if (!map.getLayer("case-labels")) {
+        map.addLayer({
+          id: "case-labels",
+          type: "symbol",
+          source: "case-points",
+          layout: {
+            "text-field": ["get", "crimeNo"],
+            "text-size": 9.5,
+            "text-font": ["Open Sans Regular"],
+            "text-offset": [0, -1.3],
+            "text-anchor": "bottom",
+            "text-allow-overlap": false
+          },
+          paint: {
+            "text-color": "#202124",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.6
+          }
+        });
+      }
 
       // Setup Popups for Interactive Hovering
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });

@@ -5,11 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStoredCases, updateCaseDetails, recordAccusedArrest } from "@/lib/db";
 import { DISTRICTS } from "@/data/mock";
+import kspLogo from "@/assets/karnataka-police-logo.png";
 import {
   ArrowLeft, MapPin, Calendar, Gavel, User, Users, Shield, ShieldAlert,
   Landmark, Clock, FileText, Scale, Printer, Download, CheckCircle2, AlertTriangle, ArrowRight, Edit3, Fingerprint
 } from "lucide-react";
 import { toast } from "sonner";
+import { districtTranslations, crimeHeadTranslations, translations } from "@/lib/translations";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +51,7 @@ function CaseDetail() {
   const cases = getStoredCases();
   const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
   const [activeTab, setActiveTab] = useState<"overview" | "legal" | "complainant" | "accused" | "logs">("overview");
+  const [printLang, setPrintLang] = useState<"en" | "kn" | "bilingual">("bilingual");
 
   // Edit case dossier state variables
   const [showEditModal, setShowEditModal] = useState(false);
@@ -418,6 +421,7 @@ function CaseDetail() {
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-xs text-[#202124] truncate">{v.name}</p>
                     <p className="text-[10px] text-[#5f6368]">{v.age} yrs · {v.gender} · {v.injuryStatus}</p>
+                    {v.phone && <p className="text-[10px] text-[#0b57d0] font-semibold mt-0.5">📞 {v.phone}</p>}
                   </div>
                 </div>
               ))}
@@ -453,7 +457,13 @@ function CaseDetail() {
                         </h4>
                         <p className="text-xs text-[#5f6368] mt-0.5">
                           Age: <strong>{a.age} Years</strong> · Gender: <strong>{a.gender}</strong>
+                          {a.phone && <> · Phone: <strong>{a.phone}</strong></>}
                         </p>
+                        {a.vehicleUsed && a.vehicleNo && (
+                          <p className="text-xs text-amber-600 font-semibold mt-1.5 flex items-center gap-1">
+                            🚗 Vehicle Used: <span className="font-mono bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] text-amber-800">{a.vehicleNo}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -544,18 +554,43 @@ function CaseDetail() {
           {/* Interactive Document Preview (Clipboard Board) */}
           <div className="md:col-span-2">
             <div className="bg-[#202124] p-6 rounded-2xl border border-black flex flex-col gap-4 shadow-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <span className="font-mono text-xs text-white/70 font-semibold uppercase tracking-wider flex items-center gap-1.5">
                   <Printer className="h-4 w-4 text-[#38bdf8]" /> Official CCTNS Document Preview
                 </span>
-                <Button onClick={handlePrint} className="bg-[#38bdf8] hover:bg-[#0ea5e9] text-[#202124] font-bold flex items-center gap-1.5 h-8 text-xs rounded-full px-4 shadow">
-                  <Printer className="h-3.5 w-3.5" /> Print FIR Copy
-                </Button>
+                
+                {/* Language Toggles and Print Button */}
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-[#2a2b2e] rounded-full p-0.5 border border-[#dadce0]/10 text-xs">
+                    <button 
+                      onClick={() => setPrintLang('en')}
+                      className={`px-3 py-1 rounded-full font-bold transition-all ${printLang === 'en' ? 'bg-[#38bdf8] text-[#202124]' : 'text-white/60 hover:text-white'}`}
+                    >
+                      English (EN)
+                    </button>
+                    <button 
+                      onClick={() => setPrintLang('kn')}
+                      className={`px-3 py-1 rounded-full font-bold transition-all ${printLang === 'kn' ? 'bg-[#38bdf8] text-[#202124]' : 'text-white/60 hover:text-white'}`}
+                    >
+                      ಕನ್ನಡ (KN)
+                    </button>
+                    <button 
+                      onClick={() => setPrintLang('bilingual')}
+                      className={`px-3 py-1 rounded-full font-bold transition-all ${printLang === 'bilingual' ? 'bg-[#38bdf8] text-[#202124]' : 'text-white/60 hover:text-white'}`}
+                    >
+                      Bilingual
+                    </button>
+                  </div>
+
+                  <Button onClick={handlePrint} className="bg-[#38bdf8] hover:bg-[#0ea5e9] text-[#202124] font-bold flex items-center gap-1.5 h-8 text-xs rounded-full px-4 shadow">
+                    <Printer className="h-3.5 w-3.5" /> Print FIR Copy
+                  </Button>
+                </div>
               </div>
 
               {/* White A4 paper view preview */}
               <div className="bg-white text-black p-8 font-serif text-[11px] leading-relaxed shadow-2xl rounded border border-gray-400 select-text overflow-x-auto">
-                <PrintableFirCopy caseData={c} showOnScreen={true} />
+                <PrintableFirCopy caseData={c} showOnScreen={true} printLang={printLang} />
               </div>
             </div>
           </div>
@@ -735,12 +770,20 @@ function CaseDetail() {
       </Dialog>
     </div>
 
-    <PrintableFirCopy caseData={c} />
+    <PrintableFirCopy caseData={c} printLang={printLang} />
   </>
   );
 }
 
-function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; showOnScreen?: boolean }) {
+function PrintableFirCopy({ 
+  caseData, 
+  showOnScreen = false, 
+  printLang = "bilingual" 
+}: { 
+  caseData: any; 
+  showOnScreen?: boolean; 
+  printLang?: "en" | "kn" | "bilingual"; 
+}) {
   const formatDateTime = (val: string) => {
     if (!val) return "N/A";
     const d = new Date(val);
@@ -755,25 +798,125 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
     return d.toLocaleDateString("en-IN");
   };
 
+  const LABELS = {
+    government: { en: "GOVERNMENT OF KARNATAKA", kn: "ಕರ್ನಾಟಕ ಸರ್ಕಾರ" },
+    department: { en: "Karnataka State Police Department", kn: "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ ಇಲಾಖೆ" },
+    formTitle: { en: "First Information Report (Form No. 1)", kn: "ಪ್ರಥಮ ಮಾಹಿತಿ ವರದಿ (ನಮೂನೆ ಸಂಖ್ಯೆ 1)" },
+    actSectionSubtitle: { 
+      en: "(Recorded under Section 173 of BNSS, 2023 / Section 154 of Cr.P.C.)", 
+      kn: "(ಭಾರತೀಯ ನಾಗರಿಕ ಸುರಕ್ಷಾ ಸಂಹಿತೆ, 2023 ರ ಸೆಕ್ಷನ್ 173 / ಸಿ.ಆರ್.ಪಿ.ಸಿ. ಸೆಕ್ಷನ್ 154 ರ ಅಡಿಯಲ್ಲಿ ದಾಖಲಿಸಲಾಗಿದೆ)" 
+    },
+    district: { en: "1. District", kn: "೧. ಜಿಲ್ಲೆ" },
+    policeStation: { en: "2. Police Station", kn: "೨. ಪೊಲೀಸ್ ಠಾಣೆ" },
+    year: { en: "3. Year", kn: "೩. ವರ್ಷ" },
+    firNo: { en: "4. FIR Crime No", kn: "೪. ಎಫ್.ಐ.ಆರ್ ಸಂಖ್ಯೆ" },
+    dateTimeReport: { en: "5. Date & Time of Report Registration", kn: "೫. ವರದಿ ನೋಂದಣಿ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ" },
+    actSectionTitle: { en: "6. Act & Section Particulars:", kn: "೬. ಕಾಯ್ದೆ ಮತ್ತು ಸೆಕ್ಷನ್ ವಿವರಗಳು:" },
+    sNo: { en: "S.No", kn: "ಕ್ರ.ಸಂ." },
+    actCode: { en: "Act / Code", kn: "ಕಾಯ್ದೆ / ಕೋಡ್" },
+    sections: { en: "Sections", kn: "ಸೆಕ್ಷನ್‌ಗಳು" },
+    occurrenceOffence: { en: "7. Occurrence of Offence:", kn: "೭. ಅಪರಾಧದ ಸಂಭವಿಸುವಿಕೆ:" },
+    incidentFrom: { en: "(a) Incident From Date/Time", kn: "(ಎ) ಘಟನೆ ನಡೆದ ದಿನಾಂಕ/ಸಮಯದಿಂದ" },
+    incidentTo: { en: "(b) Incident To Date/Time", kn: "(ಬಿ) ಘಟನೆ ನಡೆದ ದಿನಾಂಕ/ಸಮಯದವರೆಗೆ" },
+    infoReceived: { en: "(c) Information Received at Police Station", kn: "(ಸಿ) ಪೊಲೀಸ್ ಠಾಣೆಗೆ ಮಾಹಿತಿ ತಲುಪಿದ ಸಮಯ" },
+    placeOccurrence: { en: "8. Place of Occurrence:", kn: "೮. ಅಪರಾಧ ನಡೆದ ಸ್ಥಳ:" },
+    distanceDirection: { en: "(a) Distance & Direction from Station", kn: "(ಎ) ಠಾಣೆಯಿಂದ ದೂರ ಮತ್ತು ದಿಕ್ಕು" },
+    physicalAddress: { en: "(b) Complete Physical Address", kn: "(ಬಿ) ಪೂರ್ಣ ವಿಳಾಸ" },
+    coords: { en: "(c) Geographic Coordinates", kn: "(ಸಿ) ಭೌಗೋಳಿಕ ನಿರ್ದೇಶಾಂಕಗಳು" },
+    complainantTitle: { en: "9. Complainant / Informant Details:", kn: "೯. ದೂರುದಾರರ / ಮಾಹಿತಿ ನೀಡಿದವರ ವಿವರಗಳು:" },
+    fullName: { en: "(a) Full Name", kn: "(ಎ) ಪೂರ್ಣ ಹೆಸರು" },
+    ageGender: { en: "(b) Age / Gender", kn: "(ಬಿ) ವಯಸ್ಸು / ಲಿಂಗ" },
+    occupation: { en: "(c) Occupation", kn: "(ಸಿ) ಉದ್ಯೋಗ" },
+    religionCaste: { en: "(d) Religion / Caste", kn: "(ಡಿ) ಧರ್ಮ / ಜಾತಿ" },
+    contactPhone: { en: "(e) Contact Phone", kn: "(ಇ) ದೂರವಾಣಿ ಸಂಖ್ಯೆ" },
+    relationToCase: { en: "(f) Relation to Case", kn: "(ಎಫ್) ಪ್ರಕರಣಕ್ಕೆ ಸಂಬಂಧ" },
+    resAddress: { en: "(g) Residential Address", kn: "(ಜಿ) ವಸತಿ ವಿಳಾಸ" },
+    accusedTitle: { en: "10. Roster of Accused Suspects:", kn: "೧೦. ಆರೋಪಿಗಳ / ಶಂಕಿತರ ವಿವರಗಳು:" },
+    accusedName: { en: "Accused Name", kn: "ಆರೋಪಿಯ ಹೆಸರು" },
+    custodyStatus: { en: "Custody Status", kn: "ಬಂಧನದ ಸ್ಥಿತಿ" },
+    warrantId: { en: "Arrest Warrant ID", kn: "ಬಂಧನದ ವಾರಂಟ್ ಐಡಿ" },
+    arrestDate: { en: "Arrest Date", kn: "ಬಂಧಿಸಿದ ದಿನಾಂಕ" },
+    victimsTitle: { en: "11. Particulars of Victims:", kn: "೧೧. ಸಂತ್ರಸ್ತರ ವಿವರಗಳು:" },
+    victimName: { en: "Victim Name", kn: "ಸಂತ್ರಸ್ತನ ಹೆಸರು" },
+    ageSex: { en: "Age / Sex", kn: "ವಯಸ್ಸು / ಲಿಂಗ" },
+    policeOfficer: { en: "Police Officer", kn: "ಪೊಲೀಸ್ ಅಧಿಕಾರಿ" },
+    injuryStatus: { en: "Injury Status", kn: "ಗಾಯದ ಸ್ಥಿತಿ" },
+    briefFactsTitle: { en: "12. Brief Facts of the Crime (BriefFacts):", kn: "೧೨. ಅಪರಾಧದ ಸಂಕ್ಷಿಪ್ತ ವಿವರಗಳು (ಸಾರಾಂಶ):" },
+    chargesheetTitle: { en: "13. Chargesheet Filing Records:", kn: "೧೩. ಚಾರ್ಜ್‌ಶೀಟ್ ಸಲ್ಲಿಕೆಯ ವಿವರಗಳು:" },
+    chargesheetNo: { en: "Chargesheet No", kn: "ಚಾರ್ಜ್‌ಶೀಟ್ ಸಂಖ್ಯೆ" },
+    filingDate: { en: "Filing Date", kn: "ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ" },
+    chargesheetType: { en: "Chargesheet Type", kn: "ಚಾರ್ಜ್‌ಶೀಟ್ ಪ್ರಕಾರ" },
+    authorityOfficer: { en: "Filing Authority Officer", kn: "ಚಾರ್ಜ್‌ಶೀಟ್ ಸಲ್ಲಿಸಿದ ಅಧಿಕಾರಿ" },
+    gdTitle: { en: "14. General Diary (GD) Entry Details & Delay Record:", kn: "೧೪. ದಿನಚರಿ (ಜಿ.ಡಿ.) ದಾಖಲೆ ಮತ್ತು ವಿಳಂಬದ ವಿವರಗಳು:" },
+    gdNo: { en: "GD Entry Number", kn: "ಜಿ.ಡಿ. ದಾಖಲೆ ಸಂಖ್ಯೆ" },
+    gdDateTime: { en: "GD Date & Time", kn: "ಜಿ.ಡಿ. ದಿನಾಂಕ ಮತ್ತು ಸಮಯ" },
+    delayReason: { en: "Reason for Delay in Reporting", kn: "ವರದಿ ಮಾಡಲು ವಿಳಂಬಕ್ಕೆ ಕಾರಣ" },
+    dispatchTitle: { en: "15. Dispatch & Judicial Record logs:", kn: "೧೫. ರವಾನೆ ಮತ್ತು ನ್ಯಾಯಾಂಗ ದಾಖಲೆ ವಿವರಗಳು:" },
+    dispatchDateTime: { en: "Dispatch Date & Time", kn: "ರವಾನೆ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ" },
+    dispatchMode: { en: "Dispatch Mode", kn: "ರವಾನೆ ವಿಧಾನ" },
+    courtName: { en: "Magistrate Jurisdictional Court", kn: "ನ್ಯಾಯಾಲಯದ ಹೆಸರು" },
+    signatureComplainant: { en: "Signature / Left Thumb Impression of Complainant / Informant", kn: "ದೂರುದಾರರ / ಮಾಹಿತಿ ನೀಡಿದವರ ಸಹಿ / ಎಡ ಹೆಬ್ಬೆರಳ ಗುರುತು" },
+    signatureOfficer: { en: "Signature of Officer-in-Charge, Police Station", kn: "ಪೊಲೀಸ್ ಠಾಣೆಯ ಪ್ರಭಾರ ಅಧಿಕಾರಿಯ ಸಹಿ" },
+    officerName: { en: "Name", kn: "ಹೆಸರು" },
+    officerRank: { en: "Rank", kn: "ಹುದ್ದೆ" },
+    noVictims: { en: "No victim records filed.", kn: "ಯಾವುದೇ ಸಂತ್ರಸ್ತರ ವಿವರ ದಾಖಲಾಗಿಲ್ಲ." },
+    noDelay: { en: "No delay reported. FIR registered immediately upon receipt of complainant's narrative.", kn: "ಯಾವುದೇ ವಿಳಂಬವಾಗಿಲ್ಲ. ದೂರುದಾರರಿಂದ ಲಿಖಿತ ದೂರು ಸ್ವೀಕರಿಸಿದ ತಕ್ಷಣ ಎಫ್.ಐ.ಆರ್ ದಾಖಲಿಸಲಾಗಿದೆ." },
+    cctnsArchive: { en: "KARNATAKA STATE POLICE\nCCTNS RECORD ARCHIVE", kn: "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್\nCCTNS ದಾಖಲೆ ಸಂಗ್ರಹಾಲಯ" },
+    endDoc: { en: "*** END OF FIRST INFORMATION REPORT (FORM NO. 1) ***", kn: "*** ಪ್ರಥಮ ಮಾಹಿತಿ ವರದಿ ಮುಕ್ತಾಯ (ನಮೂನೆ ಸಂಖ್ಯೆ ೧) ***" }
+  };
+
+  const tLabel = (key: keyof typeof LABELS, sep = " / ") => {
+    const item = LABELS[key];
+    if (!item) return "";
+    if (printLang === "en") return item.en;
+    if (printLang === "kn") return item.kn;
+    return `${item.kn}${sep}${item.en}`;
+  };
+
+  const translateVal = (val: string, type?: "district" | "gender" | "custody" | "crimeHead" | "crimeNo" | "general") => {
+    if (!val) return "N/A";
+    if (printLang === "en") return val;
+
+    let knVal = val;
+    if (type === "district") {
+      knVal = districtTranslations[val] || val;
+    } else if (type === "crimeHead") {
+      knVal = crimeHeadTranslations[val] || val;
+    } else if (type === "gender") {
+      const v = String(val).trim().toUpperCase();
+      if (v === "M" || v === "MALE") knVal = "ಪುರುಷ";
+      else if (v === "F" || v === "FEMALE") knVal = "ಮಹಿಳೆ";
+    } else if (type === "custody") {
+      const v = String(val).trim().toUpperCase();
+      if (v.includes("ARRESTED") || v.includes("CUSTODY")) knVal = "ಬಂಧಿಸಲಾಗಿದೆ / ವಶದಲ್ಲಿದ್ದಾನೆ";
+      else knVal = "ಪರಾರಿಯಾಗಿದ್ದಾನೆ / ಹುಡುಕಲಾಗುತ್ತಿದೆ";
+    } else if (type === "crimeNo") {
+      knVal = val;
+    } else {
+      knVal = (translations.kn as Record<string, string>)[val] || val;
+    }
+
+    if (printLang === "kn") return knVal;
+    return `${knVal} / ${val}`;
+  };
+
   return (
-    <div className={`${showOnScreen ? "block" : "hidden"} print:block w-full max-w-[210mm] mx-auto bg-white text-black font-serif text-[11px] leading-relaxed select-text relative overflow-hidden print-fir-container`}>
+    <div className={`${showOnScreen ? "block" : "hidden"} print:block w-full max-w-[210mm] mx-auto bg-white text-black font-serif text-[11px] leading-relaxed select-text relative overflow-hidden print-fir-container`} style={{padding: '12mm 14mm'}}>
       {/* Closed File Diagonal Cross Watermark */}
       {caseData.status === "Closed" && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-50 select-none">
-          {/* Diagonal Line 1 (Top-Left to Bottom-Right) */}
-          <div className="absolute w-[150%] h-[4px] bg-red-600/15 top-0 left-0" style={{ transform: 'rotate(43deg)', transformOrigin: 'top left' }}></div>
-          {/* Diagonal Line 2 (Top-Right to Bottom-Left) */}
-          <div className="absolute w-[150%] h-[4px] bg-red-600/15 top-0 right-0" style={{ transform: 'rotate(-43deg)', transformOrigin: 'top right' }}></div>
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-10 select-none" style={{ mixBlendMode: 'multiply' }}>
+          <div className="absolute w-[150%] h-[2px] bg-red-500/10 top-0 left-0" style={{ transform: 'rotate(43deg)', transformOrigin: 'top left' }}></div>
+          <div className="absolute w-[150%] h-[2px] bg-red-500/10 top-0 right-0" style={{ transform: 'rotate(-43deg)', transformOrigin: 'top right' }}></div>
           
-          {/* Central Bold Banner */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="border-[8px] border-red-600/30 rounded-2xl px-10 py-5 bg-white/90 shadow-2xl flex flex-col items-center justify-center" style={{ transform: 'rotate(-25deg)' }}>
-              <span className="text-7xl font-black tracking-widest text-red-600/45 uppercase font-sans">CLOSED FILE</span>
-              <span className="text-lg font-bold tracking-wider text-red-600/45 uppercase font-sans mt-1">CASE RESOLVED & COMPLETED</span>
+            <div className="border-4 border-dashed border-red-500/25 rounded-2xl px-10 py-5 flex flex-col items-center justify-center" style={{ transform: 'rotate(-20deg)' }}>
+              <span className="text-7xl font-black tracking-widest text-red-500/15 uppercase font-sans">CLOSED FILE</span>
+              <span className="text-sm font-bold tracking-wider text-red-500/20 uppercase font-sans mt-2">CASE RESOLVED & COMPLETED</span>
             </div>
           </div>
         </div>
       )}
+
       {/* Print Page Styles Override */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
@@ -794,7 +937,6 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
           font-weight: bold !important;
         }
 
-        .print-fir-container p,
         .print-fir-container td,
         .print-fir-container th,
         .print-fir-container span,
@@ -822,8 +964,8 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
           }
           .print-fir-container {
             font-family: 'EB Garamond', serif !important;
+            padding: 0 !important;
           }
-          .print-fir-container p,
           .print-fir-container td,
           .print-fir-container th,
           .print-fir-container span,
@@ -842,55 +984,68 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
         }
       `}} />
 
-      {/* Background Watermark */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 select-none flex items-center justify-center opacity-[0.03] print:opacity-[0.03]">
-        <span className="text-[52px] font-black text-black tracking-[0.2em] uppercase rotate-[-30deg] font-sans text-center leading-normal">
-          KARNATAKA STATE POLICE<br />CCTNS RECORD ARCHIVE
-        </span>
+      {/* Official Karnataka State Police Logo Watermark */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 select-none flex items-center justify-center">
+        <img
+          src={kspLogo}
+          alt=""
+          aria-hidden="true"
+          className="w-[420px] h-[420px] object-contain opacity-[0.055] print:opacity-[0.055]"
+          style={{ filter: 'grayscale(100%) contrast(1.2)' }}
+        />
       </div>
 
-      {/* CCTNS Barcode Label (Absolute Positioned top-left) */}
-      <div className="absolute top-4 left-8 flex flex-col items-start gap-0.5 select-none pointer-events-none text-black">
-        <svg className="w-36 h-5" viewBox="0 0 160 20">
-          <rect x="0" y="0" width="3" height="20" fill="black" />
-          <rect x="5" y="0" width="1" height="20" fill="black" />
-          <rect x="8" y="0" width="4" height="20" fill="black" />
-          <rect x="14" y="0" width="1" height="20" fill="black" />
-          <rect x="17" y="0" width="3" height="20" fill="black" />
-          <rect x="22" y="0" width="5" height="20" fill="black" />
-          <rect x="29" y="0" width="1" height="20" fill="black" />
-          <rect x="32" y="0" width="3" height="20" fill="black" />
-          <rect x="37" y="0" width="1" height="20" fill="black" />
-          <rect x="40" y="0" width="4" height="20" fill="black" />
-          <rect x="46" y="0" width="1" height="20" fill="black" />
-          <rect x="49" y="0" width="5" height="20" fill="black" />
-          <rect x="56" y="0" width="3" height="20" fill="black" />
-          <rect x="61" y="0" width="1" height="20" fill="black" />
-          <rect x="64" y="0" width="4" height="20" fill="black" />
-          <rect x="70" y="0" width="3" height="20" fill="black" />
-          <rect x="75" y="0" width="1" height="20" fill="black" />
-          <rect x="78" y="0" width="4" height="20" fill="black" />
-          <rect x="84" y="0" width="5" height="20" fill="black" />
-          <rect x="91" y="0" width="1" height="20" fill="black" />
-          <rect x="94" y="0" width="3" height="20" fill="black" />
-          <rect x="99" y="0" width="1" height="20" fill="black" />
-          <rect x="102" y="0" width="4" height="20" fill="black" />
-          <rect x="108" y="0" width="3" height="20" fill="black" />
-          <rect x="113" y="0" width="5" height="20" fill="black" />
-          <rect x="120" y="0" width="1" height="20" fill="black" />
-          <rect x="123" y="0" width="4" height="20" fill="black" />
-          <rect x="129" y="0" width="3" height="20" fill="black" />
-          <rect x="134" y="0" width="1" height="20" fill="black" />
-          <rect x="137" y="0" width="5" height="20" fill="black" />
-          <rect x="144" y="0" width="3" height="20" fill="black" />
-          <rect x="149" y="0" width="3" height="20" fill="black" />
-        </svg>
-        <span className="font-mono text-[5px] text-gray-500 font-bold">*CCTNS-{caseData.crimeNo.replace(/[^a-zA-Z0-9]/g, '')}*</span>
-      </div>
+      {/* ===== FIR DOCUMENT HEADER ===== */}
 
-      {/* Verification QR Code (Absolute Positioned for A4 page, styled to look official) */}
-      <div className="absolute top-6 right-6 flex flex-col items-center gap-1 select-none pointer-events-none border border-black/30 p-1.5 bg-[#fcfcfc] rounded shadow-[1px_1px_3px_rgba(0,0,0,0.05)]">
-        <div className="bg-white p-0.5 border border-black/10">
+      {/* Top Meta Strip: Barcode (left) | CCTNS label (center) | QR Code (right) */}
+      <div className="flex items-start justify-between border-b border-black pb-2 mb-3">
+        {/* Barcode */}
+        <div className="flex flex-col items-start gap-0.5 select-none">
+          <svg className="w-32 h-4" viewBox="0 0 160 20">
+            <rect x="0" y="0" width="3" height="20" fill="black" />
+            <rect x="5" y="0" width="1" height="20" fill="black" />
+            <rect x="8" y="0" width="4" height="20" fill="black" />
+            <rect x="14" y="0" width="1" height="20" fill="black" />
+            <rect x="17" y="0" width="3" height="20" fill="black" />
+            <rect x="22" y="0" width="5" height="20" fill="black" />
+            <rect x="29" y="0" width="1" height="20" fill="black" />
+            <rect x="32" y="0" width="3" height="20" fill="black" />
+            <rect x="37" y="0" width="1" height="20" fill="black" />
+            <rect x="40" y="0" width="4" height="20" fill="black" />
+            <rect x="46" y="0" width="1" height="20" fill="black" />
+            <rect x="49" y="0" width="5" height="20" fill="black" />
+            <rect x="56" y="0" width="3" height="20" fill="black" />
+            <rect x="61" y="0" width="1" height="20" fill="black" />
+            <rect x="64" y="0" width="4" height="20" fill="black" />
+            <rect x="70" y="0" width="3" height="20" fill="black" />
+            <rect x="75" y="0" width="1" height="20" fill="black" />
+            <rect x="78" y="0" width="4" height="20" fill="black" />
+            <rect x="84" y="0" width="5" height="20" fill="black" />
+            <rect x="91" y="0" width="1" height="20" fill="black" />
+            <rect x="94" y="0" width="3" height="20" fill="black" />
+            <rect x="99" y="0" width="1" height="20" fill="black" />
+            <rect x="102" y="0" width="4" height="20" fill="black" />
+            <rect x="108" y="0" width="3" height="20" fill="black" />
+            <rect x="113" y="0" width="5" height="20" fill="black" />
+            <rect x="120" y="0" width="1" height="20" fill="black" />
+            <rect x="123" y="0" width="4" height="20" fill="black" />
+            <rect x="129" y="0" width="3" height="20" fill="black" />
+            <rect x="134" y="0" width="1" height="20" fill="black" />
+            <rect x="137" y="0" width="5" height="20" fill="black" />
+            <rect x="144" y="0" width="3" height="20" fill="black" />
+            <rect x="149" y="0" width="3" height="20" fill="black" />
+          </svg>
+          <span className="font-mono text-[6px] text-gray-500">CCTNS-{caseData.crimeNo.replace(/[^a-zA-Z0-9]/g, '')}</span>
+        </div>
+
+        {/* Center CCTNS labels */}
+        <div className="flex flex-col items-center text-center text-[7px] font-sans text-gray-600 gap-0.5">
+          <span className="font-bold">INTEGRATED CRIME RECORDS HUB (CCTNS CLOUD)</span>
+          <span>STATUS: <span className="font-bold text-black">SUBMITTED &amp; SIGNED</span></span>
+        </div>
+
+        {/* QR Code Block */}
+        <div className="flex flex-col items-center gap-1 select-none border border-black/30 p-1.5 bg-[#fcfcfc] rounded">
           <svg className="w-10 h-10" viewBox="0 0 100 100">
             <path d="M0,0 h30 v10 h-20 v20 h-10 z M15,15 h15 v15 h-15 z" fill="black" />
             <path d="M70,0 h30 v30 h-10 v-20 h-20 z M70,15 h15 v15 h-15 z" fill="black" />
@@ -902,61 +1057,79 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
             <rect x="35" y="55" width="10" height="10" fill="black" />
             <rect x="55" y="55" width="10" height="10" fill="black" />
           </svg>
+          <span className="font-sans text-[6px] font-bold tracking-wider text-black">KSP VERIFIED</span>
+          <span className="font-mono text-[5px] text-gray-500">SHA: {caseData.crimeNo.replace(/[^a-zA-Z]/g, '').slice(-6).toUpperCase() || 'E9A4B8'}</span>
         </div>
-        <span className="font-sans text-[6px] font-bold tracking-wider text-black">KSP VERIFIED</span>
-        <span className="font-mono text-[5px] text-gray-500 font-bold">SHA256: {caseData.crimeNo.replace(/[^a-zA-Z]/g, '').slice(-8).toUpperCase() || 'E9A4B8F2'}</span>
       </div>
 
-      {/* CCTNS Network Header Strip */}
-      <div className="flex items-center justify-between border-b border-black pb-1.5 mb-3 text-[8px] font-sans text-black pr-24 mt-8">
-        <span>CCTNS REPORT ID: KSP-2026-F-{caseData.crimeNo.replace(/[^a-zA-Z0-9]/g, '')}</span>
-        <span>INTEGRATED CRIME RECORDS HUB (CCTNS CLOUD)</span>
-        <span>STATUS: SUBMITTED & SIGNED</span>
-      </div>
-
-      {/* Embellished Seal & Header */}
-      <div className="text-center space-y-1.5 border-b-2 border-black pb-4 pr-24">
-        <div className="flex justify-center mb-1">
-          <div className="border border-black px-3 py-1 font-bold tracking-widest text-[9px] uppercase">
-            GOVERNMENT OF KARNATAKA
+      {/* Embellished Seal & Title Header */}
+      <div className="border-b-2 border-black pb-4 mb-2">
+        {/* Government of Karnataka ribbon */}
+        <div className="flex justify-center mb-2">
+          <div className="border border-black px-4 py-1 font-bold tracking-widest text-[9px] uppercase font-sans">
+            {tLabel("government")}
           </div>
         </div>
-        <h2 className="text-sm font-bold uppercase tracking-wide text-black">Karnataka State Police Department</h2>
-        <h1 className="text-base font-extrabold uppercase tracking-widest text-black">First Information Report (Form No. 1)</h1>
-        <p className="text-[9px] font-sans text-gray-500 italic">(Recorded under Section 173 of Bharatiya Nagarik Suraksha Sanhita, 2023 / Section 154 of Cr.P.C.)</p>
-      </div>
-
-      {/* Roster Information */}
-      <div className="grid grid-cols-2 gap-4 border-b border-black py-3 text-black">
-        <div>
-          <p><strong>1. District:</strong> {caseData.district.name}</p>
-          <p><strong>3. Year:</strong> {new Date(caseData.registeredDate).getFullYear()}</p>
-        </div>
-        <div>
-          <p><strong>2. Police Station:</strong> {caseData.policeStation}</p>
-          <p><strong>4. FIR Crime No:</strong> <span className="font-mono font-bold text-xs text-black">{caseData.crimeNo}</span></p>
-        </div>
-        <div className="col-span-2">
-          <p><strong>5. Date & Time of Report Registration:</strong> {formatDateTime(caseData.registeredDate)} HRS</p>
+        {/* 3-column layout: nothing | Logo + Title | nothing */}
+        <div className="flex items-center gap-4 justify-center">
+          {/* Karnataka State Police Logo */}
+          <img
+            src={kspLogo}
+            alt="Karnataka State Police Seal"
+            className="w-16 h-16 object-contain shrink-0"
+            style={{ filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.2))' }}
+          />
+          {/* Title block */}
+          <div className="text-center">
+            <h2 className="text-[13px] font-extrabold uppercase tracking-wide text-black leading-tight">{tLabel("department")}</h2>
+            <h1 className="text-[15px] font-black uppercase tracking-widest text-black leading-tight mt-0.5">{tLabel("formTitle")}</h1>
+            <p className="text-[8px] font-sans text-gray-500 italic mt-1 max-w-xs mx-auto leading-snug">{tLabel("actSectionSubtitle")}</p>
+          </div>
         </div>
       </div>
 
-      {/* 2. Acts and Sections */}
+      {/* 1-5 Roster Information Table Grid */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1.5 text-black text-xs">6. Act & Section Particulars:</h3>
-        <table className="w-full border-collapse border border-black text-left">
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("district")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.district.name, "district")}</td>
+              <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("policeStation")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.policeStation)}</td>
+            </tr>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("year")}:</td>
+              <td className="w-1/4 py-1 text-black">{new Date(caseData.registeredDate).getFullYear()}</td>
+              <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("firNo")}:</td>
+              <td className="w-1/4 py-1 font-mono font-bold text-black">{translateVal(caseData.crimeNo, "crimeNo")}</td>
+            </tr>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("dateTimeReport")}:</td>
+              <td className="col-span-3 py-1 text-black" colSpan={3}>
+                {formatDateTime(caseData.registeredDate)} HRS
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* 6. Acts and Sections Table */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("actSectionTitle")}</h3>
+        <table className="w-full border-collapse border border-black text-left text-[10px]">
           <thead>
             <tr className="bg-gray-100 border-b border-black">
-              <th className="border-r border-black p-1.5 font-bold w-12 text-center text-black">S.No</th>
-              <th className="border-r border-black p-1.5 font-bold text-black">Act / Code</th>
-              <th className="p-1.5 font-bold text-black">Sections</th>
+              <th className="border-r border-black p-1.5 font-bold w-12 text-center text-black">{tLabel("sNo")}</th>
+              <th className="border-r border-black p-1.5 font-bold text-black">{tLabel("actCode")}</th>
+              <th className="p-1.5 font-bold text-black">{tLabel("sections")}</th>
             </tr>
           </thead>
           <tbody>
             {caseData.actSections.map((sec: string, idx: number) => {
-              const parts = sec.split(' ');
+              const parts = sec.split(" ");
               const act = parts[0] || "BNS";
-              const section = parts.slice(1).join(' ') || "103";
+              const section = parts.slice(1).join(" ") || "103";
               return (
                 <tr key={idx} className="border-b border-black last:border-b-0 text-black">
                   <td className="border-r border-black p-1.5 text-center text-black">{idx + 1}</td>
@@ -969,142 +1142,231 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
         </table>
       </div>
 
-      {/* 3. Occurrence of Offence */}
-      <div className="border-b border-black py-3 space-y-1.5 text-black">
-        <h3 className="font-bold text-black text-xs">7. Occurrence of Offence:</h3>
-        <p><strong>(a) Incident From Date/Time:</strong> {formatDateTime(caseData.incidentDate)} HRS</p>
-        <p><strong>(b) Incident To Date/Time:</strong> {formatDateTime(caseData.incidentToDate || caseData.registeredDate)} HRS</p>
-        <p><strong>(c) Information Received at Police Station (Diary Entry):</strong> {formatDateTime(caseData.infoReceivedPSDate)} HRS</p>
-      </div>
-
-      {/* 4. Place of Occurrence */}
-      <div className="border-b border-black py-3 space-y-1 text-black">
-        <h3 className="font-bold text-black text-xs">8. Place of Occurrence:</h3>
-        <p><strong>(a) Distance & Direction from Station:</strong> 1.5 KM East</p>
-        <p><strong>(b) Complete Physical Address:</strong> {caseData.moTag === "Online Fraud" ? "Cyberspace / Electronic Domain" : (caseData.occurrencePlace || "Commercial Street, MG Road, Bengaluru")}</p>
-        <p><strong>(c) Geographic Coordinates:</strong> Latitude: {caseData.latitude?.toFixed(5)}° N | Longitude: {caseData.longitude?.toFixed(5)}° E</p>
-      </div>
-
-      {/* 5. Complainant Details */}
-      <div className="border-b border-black py-3 space-y-1 text-black">
-        <h3 className="font-bold text-black text-xs">9. Complainant / Informant Details:</h3>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black">
-          <p><strong>(a) Full Name:</strong> {caseData.complainant.name}</p>
-          <p><strong>(b) Age / Gender:</strong> {caseData.complainant.age} Years / {caseData.complainant.gender === "M" ? "Male" : "Female"}</p>
-          <p><strong>(c) Occupation:</strong> {caseData.complainant.occupation}</p>
-          <p><strong>(d) Religion / Caste:</strong> {caseData.complainant.religion} ({caseData.complainant.caste})</p>
-          <p><strong>(e) Contact Phone:</strong> {caseData.complainant.phone || "+91 98765 43210"}</p>
-          <p><strong>(f) Relation to Case:</strong> {caseData.complainant.relation || "Self (Victim)"}</p>
-        </div>
-        <p className="mt-1 text-black"><strong>(g) Residential Address:</strong> {caseData.complainant.address}</p>
-      </div>
-
-      {/* 6. Accused Details */}
+      {/* 7. Occurrence of Offence */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1.5 text-black text-xs">10. Roster of Accused Suspects:</h3>
+        <h3 className="font-bold text-black text-xs mb-1.5">{tLabel("occurrenceOffence")}</h3>
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("incidentFrom")}:</td>
+              <td className="py-1 text-black">{formatDateTime(caseData.incidentDate)} HRS</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("incidentTo")}:</td>
+              <td className="py-1 text-black">{formatDateTime(caseData.incidentToDate || caseData.registeredDate)} HRS</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("infoReceived")}:</td>
+              <td className="py-1 text-black">{formatDateTime(caseData.infoReceivedPSDate)} HRS</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* 8. Place of Occurrence */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold text-black text-xs mb-1.5">{tLabel("placeOccurrence")}</h3>
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("distanceDirection")}:</td>
+              <td className="py-1 text-black">1.5 KM East</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("physicalAddress")}:</td>
+              <td className="py-1 text-black">
+                {caseData.moTag === "Online Fraud" 
+                  ? translateVal("Cyberspace / Electronic Domain") 
+                  : translateVal(caseData.occurrencePlace || "Commercial Street, MG Road, Bengaluru")}
+              </td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("coords")}:</td>
+              <td className="py-1 text-black">Latitude: {caseData.latitude?.toFixed(5)}° N | Longitude: {caseData.longitude?.toFixed(5)}° E</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* 9. Complainant Details */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold text-black text-xs mb-1.5">{tLabel("complainantTitle")}</h3>
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("fullName")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.complainant.name)}</td>
+              <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("ageGender")}:</td>
+              <td className="w-1/4 py-1 text-black">{caseData.complainant.age} Years / {translateVal(caseData.complainant.gender, "gender")}</td>
+            </tr>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("occupation")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.complainant.occupation)}</td>
+              <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("religionCaste")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.complainant.religion)} ({translateVal(caseData.complainant.caste)})</td>
+            </tr>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("contactPhone")}:</td>
+              <td className="w-1/4 py-1 text-black">{caseData.complainant.phone || "+91 98765 43210"}</td>
+              <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("relationToCase")}:</td>
+              <td className="w-1/4 py-1 text-black">{translateVal(caseData.complainant.relation || "Self (Victim)")}</td>
+            </tr>
+            <tr>
+              <td className="w-1/4 font-bold py-1 pr-2">{tLabel("resAddress")}:</td>
+              <td className="col-span-3 py-1 text-black" colSpan={3}>{translateVal(caseData.complainant.address)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* 10. Accused Details */}
+      <div className="border-b border-black py-3 text-black">
+        <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("accusedTitle")}</h3>
         <div className="space-y-3">
           {caseData.accused.map((acc: any, idx: number) => (
-            <div key={idx} className="flex gap-4 items-start p-2 border border-black rounded text-black">
+            <div key={idx} className="flex gap-4 items-start p-2 border border-black rounded text-black bg-gray-50/50">
               {acc.photo ? (
                 <img src={acc.photo} alt="Accused Mugshot" className="h-14 w-14 border border-black object-cover shrink-0" />
               ) : (
-                <div className="h-14 w-14 border border-black flex items-center justify-center text-[8px] font-sans font-bold shrink-0 text-black">MUGSHOT</div>
+                <div className="h-14 w-14 border border-black flex items-center justify-center text-[7px] font-sans font-bold shrink-0 text-black">MUGSHOT</div>
               )}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] flex-1 text-black">
-                <p className="col-span-2 text-black"><strong>Accused Name:</strong> {acc.name}</p>
-                <p className="text-black"><strong>Age / Gender:</strong> {acc.age} Years / {acc.gender === "M" ? "Male" : "Female"}</p>
-                <p className="text-black"><strong>Custody Status:</strong> {acc.arrestId || acc.arrested ? "Arrested / In Custody" : "Wanted / At Large"}</p>
-                {acc.arrestId && (
-                  <>
-                    <p className="text-black"><strong>Arrest Warrant ID:</strong> ARR-{acc.arrestId}</p>
-                    <p className="text-black"><strong>Arrest Date:</strong> {formatDate(acc.arrestDate)}</p>
-                  </>
-                )}
-              </div>
+              <table className="w-full border-collapse text-left text-[9px] flex-1">
+                <tbody>
+                  <tr>
+                    <td className="w-1/4 font-bold py-0.5">{tLabel("accusedName")}:</td>
+                    <td className="w-3/4 py-0.5 text-black font-semibold" colSpan={3}>{translateVal(acc.name)}</td>
+                  </tr>
+                  <tr>
+                    <td className="w-1/4 font-bold py-0.5">{tLabel("ageGender")}:</td>
+                    <td className="w-1/4 py-0.5 text-black">{acc.age} Years / {translateVal(acc.gender, "gender")}</td>
+                    <td className="w-1/4 font-bold py-0.5 pl-2">{tLabel("custodyStatus")}:</td>
+                    <td className="w-1/4 py-0.5 text-black">{translateVal(acc.arrestId || acc.arrested ? "Arrested / In Custody" : "Wanted / At Large", "custody")}</td>
+                  </tr>
+                  {acc.arrestId && (
+                    <tr>
+                      <td className="w-1/4 font-bold py-0.5">{tLabel("warrantId")}:</td>
+                      <td className="w-1/4 py-0.5 text-black">ARR-{acc.arrestId}</td>
+                      <td className="w-1/4 font-bold py-0.5 pl-2">{tLabel("arrestDate")}:</td>
+                      <td className="w-1/4 py-0.5 text-black">{formatDate(acc.arrestDate)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 7. Victim Details */}
+      {/* 11. Victim Details */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1.5 text-black text-xs">11. Particulars of Victims:</h3>
-        <table className="w-full border-collapse border border-black text-left text-[10px]">
+        <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("victimsTitle")}</h3>
+        <table className="w-full border-collapse border border-black text-left text-[9px]">
           <thead>
             <tr className="bg-gray-100 border-b border-black">
-              <th className="border-r border-black p-1 font-bold text-center w-8 text-black">S.No</th>
-              <th className="border-r border-black p-1 font-bold text-black">Victim Name</th>
-              <th className="border-r border-black p-1 font-bold text-center w-16 text-black">Age / Sex</th>
-              <th className="border-r border-black p-1 font-bold text-center w-24 text-black">Police Officer</th>
-              <th className="p-1 font-bold text-black">Injury Status</th>
+              <th className="border-r border-black p-1 font-bold text-center w-8 text-black">{tLabel("sNo")}</th>
+              <th className="border-r border-black p-1 font-bold text-black">{tLabel("victimName")}</th>
+              <th className="border-r border-black p-1 font-bold text-center w-24 text-black">{tLabel("ageSex")}</th>
+              <th className="border-r border-black p-1 font-bold text-center w-24 text-black">{tLabel("policeOfficer")}</th>
+              <th className="p-1 font-bold text-black">{tLabel("injuryStatus")}</th>
             </tr>
           </thead>
           <tbody>
             {caseData.victims.map((vic: any, idx: number) => (
               <tr key={idx} className="border-b border-black last:border-b-0 text-black">
                 <td className="border-r border-black p-1 text-center text-black">{idx + 1}</td>
-                <td className="border-r border-black p-1 text-black">{vic.name}</td>
-                <td className="border-r border-black p-1 text-center text-black">{vic.age} / {vic.gender}</td>
-                <td className="border-r border-black p-1 text-center text-black">{vic.isPolice ? "Yes" : "No"}</td>
-                <td className="p-1 text-black">{vic.injuryStatus || "Uninjured"}</td>
+                <td className="border-r border-black p-1 text-black">{translateVal(vic.name)}</td>
+                <td className="border-r border-black p-1 text-center text-black">{vic.age} / {translateVal(vic.gender, "gender")}</td>
+                <td className="border-r border-black p-1 text-center text-black">{vic.isPolice ? (printLang === "kn" ? "ಹೌದು" : printLang === "en" ? "Yes" : "ಹೌದು / Yes") : (printLang === "kn" ? "ಇಲ್ಲ" : printLang === "en" ? "No" : "ಇಲ್ಲ / No")}</td>
+                <td className="p-1 text-black">{translateVal(vic.injuryStatus || "Uninjured")}</td>
               </tr>
             ))}
             {caseData.victims.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-2 text-center text-gray-500 italic text-black">No victim records filed.</td>
+                <td colSpan={5} className="p-2 text-center text-gray-500 italic text-black">{tLabel("noVictims")}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* 8. Brief Facts / Narrative */}
+      {/* 12. Brief Facts */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1 text-black text-xs">12. Brief Facts of the Crime (BriefFacts):</h3>
+        <h3 className="font-bold mb-1 text-black text-xs">{tLabel("briefFactsTitle")}</h3>
         <p className="italic text-justify font-sans text-[10px] leading-relaxed p-2.5 bg-gray-50 border border-gray-300 rounded text-black">
-          "{caseData.briefFacts}"
+          "{translateVal(caseData.briefFacts)}"
         </p>
       </div>
 
-      {/* Chargesheet details block in printed document */}
+      {/* 13. Chargesheet Details */}
       {caseData.status === "Charge Sheeted" && (
         <div className="border-b border-black py-3 text-black">
-          <h3 className="font-bold mb-1.5 text-black text-xs">13. Chargesheet Filing Records (ChargesheetDetails):</h3>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black text-[10px]">
-            <p><strong>Chargesheet No:</strong> {caseData.chargesheetNo || "CS-4412"}</p>
-            <p><strong>Filing Date:</strong> {caseData.chargesheetDate ? formatDate(caseData.chargesheetDate) : formatDate(caseData.registeredDate)}</p>
-            <p><strong>Chargesheet Type:</strong> {caseData.chargesheetType || "Original Chargesheet"}</p>
-            <p><strong>Filing Authority Officer:</strong> {caseData.registeringOfficer || "PI Ramesh Kumar"}</p>
-          </div>
+          <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("chargesheetTitle")}</h3>
+          <table className="w-full border-collapse text-left text-[10px]">
+            <tbody>
+              <tr>
+                <td className="w-1/4 font-bold py-1 pr-2">{tLabel("chargesheetNo")}:</td>
+                <td className="w-1/4 py-1 text-black">{caseData.chargesheetNo || "CS-4412"}</td>
+                <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("filingDate")}:</td>
+                <td className="w-1/4 py-1 text-black">{caseData.chargesheetDate ? formatDate(caseData.chargesheetDate) : formatDate(caseData.registeredDate)}</td>
+              </tr>
+              <tr>
+                <td className="w-1/4 font-bold py-1 pr-2">{tLabel("chargesheetType")}:</td>
+                <td className="w-1/4 py-1 text-black">{translateVal(caseData.chargesheetType || "Original Chargesheet")}</td>
+                <td className="w-1/4 font-bold py-1 pl-4 pr-2">{tLabel("authorityOfficer")}:</td>
+                <td className="w-1/4 py-1 text-black">{translateVal(caseData.registeringOfficer || "PI Ramesh Kumar")}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* 14. General Diary Details & Delay Status */}
+      {/* 14. GD Details */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1.5 text-black text-xs">14. General Diary (GD) Entry Details & Delay Record:</h3>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black text-[10px]">
-          <p><strong>GD Entry Number:</strong> GD-{(Math.abs(caseData.caseMasterId) % 1000).toString().padStart(3, '0')}/2026</p>
-          <p><strong>GD Date & Time:</strong> {formatDateTime(caseData.registeredDate)} HRS</p>
-          <p className="col-span-2"><strong>Reason for Delay in Reporting:</strong> No delay reported. FIR registered immediately upon receipt of complainant's written narrative statement.</p>
-        </div>
+        <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("gdTitle")}</h3>
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("gdNo")}:</td>
+              <td className="py-1 text-black">GD-{(Math.abs(caseData.caseMasterId) % 1000).toString().padStart(3, '0')}/2026</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("gdDateTime")}:</td>
+              <td className="py-1 text-black">{formatDateTime(caseData.registeredDate)} HRS</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("delayReason")}:</td>
+              <td className="py-1 text-black">{tLabel("noDelay")}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      {/* 15. Court Dispatch Details */}
+      {/* 15. Court Dispatch */}
       <div className="border-b border-black py-3 text-black">
-        <h3 className="font-bold mb-1.5 text-black text-xs">15. Dispatch & Judicial Record logs:</h3>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-black text-[10px]">
-          <p><strong>Dispatch Date & Time:</strong> {formatDateTime(new Date(new Date(caseData.registeredDate).getTime() + 2 * 60 * 60 * 1000).toISOString())} HRS</p>
-          <p><strong>Dispatch Mode:</strong> Special Police Messenger (KGID: 29013)</p>
-          <p className="col-span-2"><strong>Magistrate Jurisdictional Court:</strong> {caseData.courtName || "JMFC Court"}</p>
-        </div>
+        <h3 className="font-bold mb-1.5 text-black text-xs">{tLabel("dispatchTitle")}</h3>
+        <table className="w-full border-collapse text-left text-[10px]">
+          <tbody>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("dispatchDateTime")}:</td>
+              <td className="py-1 text-black">{formatDateTime(new Date(new Date(caseData.registeredDate).getTime() + 2 * 60 * 60 * 1000).toISOString())} HRS</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("dispatchMode")}:</td>
+              <td className="py-1 text-black">{translateVal("Special Police Messenger (KGID: 29013)")}</td>
+            </tr>
+            <tr>
+              <td className="w-1/3 font-bold py-1 pr-2">{tLabel("courtName")}:</td>
+              <td className="py-1 text-black">{translateVal(caseData.courtName || "JMFC Court")}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      {/* 9. Signature Block */}
+      {/* 9. Signatures Block */}
       <div className="pt-12 grid grid-cols-2 gap-12 text-center text-black">
         <div className="flex flex-col items-center justify-end h-24">
           <div className="border-t border-black pt-1.5 w-full text-[9px] font-sans text-black">
-            <strong>Signature / Left Thumb Impression</strong>
-            <p className="text-gray-600">of the Complainant / Informant</p>
+            <strong>{tLabel("signatureComplainant", "\n")}</strong>
           </div>
         </div>
         <div className="relative flex flex-col items-center justify-end h-24">
@@ -1116,16 +1378,16 @@ function PrintableFirCopy({ caseData, showOnScreen = false }: { caseData: any; s
             )}
           </div>
           <div className="border-t border-black pt-1.5 w-full text-[9px] font-sans text-black relative z-10">
-            <strong>Signature of Officer-in-Charge, Police Station</strong>
-            <p className="text-gray-600">Name: <span className="font-bold text-black">{caseData.registeringOfficer || "PI Ramesh Kumar"}</span></p>
-            <p className="text-gray-600">Rank: <span className="font-bold text-black">{caseData.officerRank || "Police Inspector (PI)"}</span></p>
+            <strong>{tLabel("signatureOfficer", "\n")}</strong>
+            <p className="text-gray-600">{tLabel("officerName")}: <span className="font-bold text-black">{translateVal(caseData.registeringOfficer || "PI Ramesh Kumar")}</span></p>
+            <p className="text-gray-600">{tLabel("officerRank")}: <span className="font-bold text-black">{translateVal(caseData.officerRank || "Police Inspector (PI)")}</span></p>
           </div>
         </div>
       </div>
 
-      {/* --- END OF DOCUMENT --- */}
+      {/* END OF DOCUMENT */}
       <div className="mt-10 pt-3 border-t border-dashed border-black/25 text-center font-mono text-[8px] text-black/50 select-none">
-        *** END OF FIRST INFORMATION REPORT (FORM NO. 1) ***
+        {tLabel("endDoc")}
       </div>
     </div>
   );

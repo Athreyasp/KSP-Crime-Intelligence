@@ -48,7 +48,7 @@ export function StateMapGL({
 
     const style: StyleSpecification = {
       version: 8,
-      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      glyphs: `https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=${MAPTILER_KEY}`,
       sources: {
         "osm": {
           "type": "raster",
@@ -79,18 +79,25 @@ export function StateMapGL({
       style,
       center: [76.5, 15.0],
       zoom: 6.4,
-      minZoom: 6,
-      maxZoom: 12,
+      minZoom: 5.5,
+      maxZoom: 12.0,
       maxBounds: [
         [73.0, 10.5],
         [79.5, 19.5],
       ],
       attributionControl: { compact: true },
+      scrollZoom: true,
+      boxZoom: true,
+      doubleClickZoom: true,
+      dragRotate: false,
+      dragPan: true,
+      touchZoomRotate: true,
+      keyboard: true,
     });
     mapRef.current = map;
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new maplibregl.FullscreenControl({ container: containerRef.current!.parentElement ?? containerRef.current! }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.fitBounds(
       KA_BOUNDS,
       { padding: 10, duration: 0 },
@@ -124,7 +131,9 @@ export function StateMapGL({
         };
       }
 
-      map.addSource("ka-districts", { type: "geojson", data: geo });
+      if (!map.getSource("ka-districts")) {
+        map.addSource("ka-districts", { type: "geojson", data: geo });
+      }
 
       // Build a world-covering mask with Karnataka cut out
       const holes: number[][][] = [];
@@ -140,84 +149,116 @@ export function StateMapGL({
       const worldRing: number[][] = [
         [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
       ];
-      map.addSource("ka-mask", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Polygon", coordinates: [worldRing, ...holes] },
-        },
-      });
-      map.addLayer({
-        id: "ka-mask-fill",
-        type: "fill",
-        source: "ka-mask",
-        paint: { "fill-color": "#f8fafc", "fill-opacity": 1 },
-      });
+      if (!map.getSource("ka-mask")) {
+        map.addSource("ka-mask", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "Polygon", coordinates: [worldRing, ...holes] },
+          },
+        });
+      }
+      if (!map.getLayer("ka-mask-fill")) {
+        map.addLayer({
+          id: "ka-mask-fill",
+          type: "fill",
+          source: "ka-mask",
+          paint: { "fill-color": "#e2e8f0", "fill-opacity": 0.96 },
+        });
+      }
 
 
 
-      map.addLayer({
-        id: "ka-fill",
-        type: "fill",
-        source: "ka-districts",
-        paint: {
-          "fill-color": [
-            "case",
-            [">=", ["get", "heat"], highT],
-            "#dc2626",
-            [">=", ["get", "heat"], (lowT + highT) / 2],
-            "#f59e0b",
-            [">=", ["get", "heat"], lowT],
-            "#22d3ee",
-            "#a5f3fc",
-          ],
-          "fill-opacity": [
-            "case",
-            ["==", ["get", "districtId"], selectedId ?? -999],
-            0.75,
-            ["boolean", ["feature-state", "hover"], false],
-            0.65,
-            0.5,
-          ],
-        },
-      });
+      if (!map.getLayer("ka-fill")) {
+        map.addLayer({
+          id: "ka-fill",
+          type: "fill",
+          source: "ka-districts",
+          paint: {
+            "fill-color": [
+              "case",
+              [">=", ["get", "heat"], highT],
+              "#dc2626",
+              [">=", ["get", "heat"], (lowT + highT) / 2],
+              "#f59e0b",
+              [">=", ["get", "heat"], lowT],
+              "#22d3ee",
+              "#a5f3fc",
+            ],
+            "fill-opacity": [
+              "case",
+              ["==", ["get", "districtId"], selectedId ?? -999],
+              0.88,
+              ["boolean", ["feature-state", "hover"], false],
+              0.75,
+              0.62,
+            ],
+          },
+        });
+      }
 
-      map.addLayer({
-        id: "ka-outline",
-        type: "line",
-        source: "ka-districts",
-        paint: {
-          "line-color": [
-            "case",
-            ["==", ["get", "districtId"], selectedId ?? -999],
-            "#1e3a8a",
-            "#334155",
-          ],
-          "line-width": [
-            "case",
-            ["==", ["get", "districtId"], selectedId ?? -999],
-            2.2,
-            0.8,
-          ],
-        },
-      });
+      if (!map.getLayer("ka-outline")) {
+        map.addLayer({
+          id: "ka-outline",
+          type: "line",
+          source: "ka-districts",
+          paint: {
+            "line-color": [
+              "case",
+              ["==", ["get", "districtId"], selectedId ?? -999],
+              "#1e40af",
+              "#ffffff",
+            ],
+            "line-width": [
+              "case",
+              ["==", ["get", "districtId"], selectedId ?? -999],
+              3.0,
+              1.4,
+            ],
+            "line-opacity": [
+              "case",
+              ["==", ["get", "districtId"], selectedId ?? -999],
+              1.0,
+              0.85,
+            ],
+          },
+        });
+      }
 
-      map.addLayer({
-        id: "ka-labels",
-        type: "symbol",
-        source: "ka-districts",
-        layout: {
-          "text-field": ["get", "districtName"],
-          "text-size": 10,
-          "text-font": ["Open Sans Regular", "Arial Unicode MS"],
-        },
-        paint: {
-          "text-color": "#0f172a",
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 1.4,
-        },
-      });
+      // Outer Karnataka state border (thicker white/dark)
+      if (!map.getLayer("ka-state-border")) {
+        map.addLayer({
+          id: "ka-state-border",
+          type: "line",
+          source: "ka-districts",
+          paint: {
+            "line-color": "#1e293b",
+            "line-width": 2.2,
+            "line-opacity": 0.55,
+          },
+        });
+      }
+
+      if (!map.getLayer("ka-labels")) {
+        map.addLayer({
+          id: "ka-labels",
+          type: "symbol",
+          source: "ka-districts",
+          layout: {
+            "text-field": ["get", "districtName"],
+            "text-size": 10.5,
+            "text-font": ["Open Sans Regular"],
+            "text-max-width": 8,
+          },
+          paint: {
+            "text-color": "#0f172a",
+            "text-halo-color": "rgba(255,255,255,0.92)",
+            "text-halo-width": 1.8,
+            "text-opacity": 0.95,
+          },
+        });
+      }
 
       let hoveredId: number | string | null = null;
       map.on("mousemove", "ka-fill", (e) => {
@@ -318,13 +359,19 @@ export function StateMapGL({
       "case",
       ["==", ["get", "districtId"], selectedId ?? -999],
       "#1e40af",
-      "#64748b",
+      "#ffffff",
     ]);
     map.setPaintProperty("ka-outline", "line-width", [
       "case",
       ["==", ["get", "districtId"], selectedId ?? -999],
-      2.0,
-      0.95,
+      3.0,
+      1.4,
+    ]);
+    map.setPaintProperty("ka-outline", "line-opacity", [
+      "case",
+      ["==", ["get", "districtId"], selectedId ?? -999],
+      1.0,
+      0.85,
     ]);
   }, [lowT, highT, selectedId]);
 

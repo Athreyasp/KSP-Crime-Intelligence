@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Terminal, X, Send, ShieldAlert, Network, Database, User, RefreshCw, ArrowRight, Mic, MicOff, Bot, ChevronRight, BadgeCheck } from "lucide-react";
+import { Terminal, X, Send, ShieldAlert, Network, Database, User, RefreshCw, ArrowRight, Mic, MicOff, ChevronRight, BadgeCheck } from "lucide-react";
 import { useDb } from "@/hooks/use-db";
+
+const BotIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="48" fill="black" />
+    <rect x="36" y="36" width="10" height="22" rx="5" fill="white" transform="rotate(12 41 47)" className="animate-bot-blink" />
+    <rect x="54" y="34" width="10" height="22" rx="5" fill="white" transform="rotate(12 59 45)" className="animate-bot-blink" />
+  </svg>
+);
 import { useLanguage } from "@/hooks/use-language";
 import { toast } from "sonner";
 
@@ -39,6 +47,7 @@ type Message = {
   sender: "user" | "system" | "security";
   text: string;
   timestamp: string;
+  formType?: "name" | "fir";
   firData?: FirData;
   graphData?: {
     criminal: string;
@@ -50,14 +59,435 @@ export function CopilotDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [searchState, setSearchState] = useState<{ step: 1 | 2; name: string; fir: string }>({
+  const [mode, setMode] = useState<"standard" | "simulator" | "advisor">("standard");
+  const [searchState, setSearchState] = useState<{ step: 1 | 2 | 3; name: string; fir: string }>({
     step: 1,
     name: "",
     fir: ""
   });
+  const [simulatorState, setSimulatorState] = useState<{ activeSuspect: string; turnCount: number }>({
+    activeSuspect: "",
+    turnCount: 0
+  });
   const { cases: allCases, offenders } = useDb();
   const { language } = useLanguage();
+  const [searchForm, setSearchForm] = useState({ name: "", fir: "" });
+  const [activeCaseContext, setActiveCaseContext] = useState<FirData | null>(null);
+  const [inlineName, setInlineName] = useState("");
+  const [inlineFir, setInlineFir] = useState("");
+
+  const handleInlineNameSubmit = (val: string) => {
+    if (!val.trim()) return;
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Post user name selection
+    setMessages(prev => [
+      ...prev.map(m => m.id === "init_name" ? { ...m, formType: undefined } : m),
+      {
+        id: Math.random().toString(),
+        sender: "user",
+        text: val.trim(),
+        timestamp
+      }
+    ]);
+
+    // Save state
+    const targetName = val.trim();
+    
+    // Try to auto-suggest matched FIR if possible to save typing
+    const matchedCase = allCases.find(c => c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase())));
+    const suggestedFir = matchedCase ? matchedCase.crimeNo : "";
+
+    setSearchState({ step: 2, name: targetName, fir: suggestedFir });
+    setInlineFir(suggestedFir);
+
+    // Ask for FIR
+    setTimeout(() => {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: "init_fir",
+          sender: "system",
+          text: language === "kn" ? "FIR ಸಂಖ್ಯೆ ನಮೂದಿಸಿ:" : "Enter Associated FIR Number:",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          formType: "fir"
+        }
+      ]);
+    }, 500);
+  };
+
+  const handleInlineFirSubmit = (val: string) => {
+    if (!val.trim()) return;
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const targetName = searchState.name;
+    const searchTerm = val.trim();
+
+    // Post user FIR selection
+    setMessages(prev => [
+      ...prev.map(m => m.id === "init_fir" ? { ...m, formType: undefined } : m),
+      {
+        id: Math.random().toString(),
+        sender: "user",
+        text: searchTerm,
+        timestamp
+      }
+    ]);
+
+    // Format FIR number
+    let formattedSearchTerm = searchTerm;
+    let cleanedInput = searchTerm.replace(/\s+/g, "").replace(/\//g, "").toLowerCase();
+    const firRegex = /^(fir)?([a-z]+)?(20\d{2})(\d+)$/;
+    const match = cleanedInput.match(firRegex);
+    if (match) {
+      const station = match[2] ? match[2].toUpperCase() : "BAG";
+      const year = match[3];
+      const number = match[4];
+      formattedSearchTerm = `FIR/${station}/${year}/${number}`;
+    } else {
+      formattedSearchTerm = searchTerm.toUpperCase().replace(/\s+/g, "");
+    }
+
+    const queryFormatted = formattedSearchTerm.toLowerCase();
+    
+    // Match case by crimeNo/caseId AND check if target criminal is listed in accused list
+    const matchedCase = allCases.find(c => 
+      (c.crimeNo.toLowerCase().includes(queryFormatted) || 
+       c.crimeNo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanedInput) ||
+       String(c.caseMasterId).includes(queryFormatted)) &&
+      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    );
+
+    if (!matchedCase) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          sender: "system",
+          text: language === "kn"
+            ? `ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ: ಆರೋಪಿ "${targetName}" ಒಳಗೊಂಡಿರುವ ಎಫ್‌ಐಆರ್ #${searchTerm} ನೊಂದಿಗೆ ಹೊಂದಾಣಿಕೆಯಾಗುವ ಯಾವುದೇ ಪ್ರಕರಣವು ಕಂಡುಬಂದಿಲ್ಲ.`
+            : `RECORD NOT FOUND: No record found for FIR #${searchTerm} involving accused "${targetName}". Please verify and try again.`,
+          timestamp
+        }]);
+        
+        // Reset to Step 1 name input so they can retry
+        setTimeout(() => {
+          setSearchState({ step: 1, name: "", fir: "" });
+          setInlineName("");
+          setMessages(prev => [...prev, {
+            id: "init_name",
+            sender: "system",
+            text: language === "kn" ? "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Try again. Enter Accused / Suspect Name:",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            formType: "name"
+          }]);
+        }, 800);
+      }, 500);
+      return;
+    }
+
+    // ── Prediction Engine ──
+    const allCriminalCases = allCases.filter(c =>
+      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    );
+
+    const crimeTypeFreq: Record<string, number> = {};
+    const districtFreq: Record<string, number> = {};
+    const moFreq: Record<string, number> = {};
+    const hourBuckets: number[] = [];
+    let heinousCount = 0;
+
+    allCriminalCases.forEach(c => {
+      const ct = c.crimeHead.name;
+      crimeTypeFreq[ct] = (crimeTypeFreq[ct] || 0) + 1;
+      districtFreq[c.district.name] = (districtFreq[c.district.name] || 0) + 1;
+      moFreq[c.moTag] = (moFreq[c.moTag] || 0) + 1;
+      hourBuckets.push(c.hour);
+      if (c.gravity === "Heinous") heinousCount++;
+    });
+
+    const totalCases = allCriminalCases.length;
+    const topCrimeType = Object.entries(crimeTypeFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.crimeHead.name;
+    const topDistricts = Object.entries(districtFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const topMo = Object.entries(moFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.moTag;
+    const avgHour = hourBuckets.length ? Math.round(hourBuckets.reduce((a, b) => a + b, 0) / hourBuckets.length) : 14;
+    const coAccusedCount = new Set(allCriminalCases.flatMap(c => c.accused.map(a => a.name))).size - 1;
+
+    let riskScore = 30;
+    riskScore += Math.min(totalCases * 8, 30);
+    riskScore += heinousCount > 0 ? 15 : 0;
+    riskScore += coAccusedCount > 2 ? 10 : 0;
+    riskScore += topDistricts.length > 1 ? 5 : 0;
+    riskScore = Math.min(riskScore, 100);
+
+    const riskLevel: PredictionData["riskLevel"] =
+      riskScore >= 85 ? "CRITICAL" :
+      riskScore >= 65 ? "HIGH" :
+      riskScore >= 45 ? "MEDIUM" : "LOW";
+
+    const timeOfDay = avgHour < 6 ? "late night (00:00–06:00)" :
+      avgHour < 12 ? "morning (06:00–12:00)" :
+      avgHour < 18 ? "afternoon (12:00–18:00)" : "evening/night (18:00–24:00)";
+
+    const recentHeinous = allCriminalCases.slice(-3).filter(c => c.gravity === "Heinous").length;
+    const olderHeinous  = allCriminalCases.slice(0, 3).filter(c => c.gravity === "Heinous").length;
+    const escalationTrend: PredictionData["escalationTrend"] =
+      recentHeinous > olderHeinous ? "ESCALATING" :
+      recentHeinous < olderHeinous ? "DE-ESCALATING" : "STABLE";
+
+    const triggers: string[] = [];
+    if (coAccusedCount >= 3) triggers.push("Organized syndicate member — acts in groups");
+    if (heinousCount > 0)    triggers.push("History of violence — escalation likely");
+    if (totalCases >= 3)     triggers.push("Repeat offender — established criminal pattern");
+    if (topDistricts.length > 1) triggers.push("Cross-district mobility — surveillance recommended");
+    triggers.push(`Preferred MO: ${topMo}`);
+    if (triggers.length < 3) triggers.push("Likely to target repeat victims from known network");
+
+    const recidivismChance = Math.min(20 + totalCases * 12 + (heinousCount > 0 ? 10 : 0), 98);
+
+    const prediction: PredictionData = {
+      riskLevel,
+      riskScore,
+      nextCrimeType: topCrimeType,
+      atRiskDistricts: topDistricts,
+      estimatedWindow: `Next 30–60 days · ${timeOfDay}`,
+      behavioralTriggers: triggers,
+      recidivismChance,
+      escalationTrend,
+      patternSummary: `Based on ${totalCases} FIR(s), primarily ${topCrimeType.toLowerCase()} offences ` +
+        `across ${topDistricts.join(", ")}. Operates with ${coAccusedCount} known associates.`
+    };
+
+    const firData: FirData = {
+      crimeNo: matchedCase.crimeNo,
+      targetAccused: targetName,
+      status: matchedCase.status,
+      gravity: `${matchedCase.gravity} — ${matchedCase.crimeHead.name}`,
+      crimeHead: matchedCase.crimeHead.name,
+      policeStation: matchedCase.policeStation,
+      district: matchedCase.district.name,
+      date: matchedCase.registeredDate,
+      acts: matchedCase.actSections.join(", "),
+      officer: matchedCase.registeringOfficer || "N/A",
+      victims: matchedCase.victims.map(v => v.name),
+      accused: matchedCase.accused.map(a => a.name),
+      briefFacts: matchedCase.briefFacts,
+      done: language === "kn" ? "ಅಪರಾಧಿ ಪ್ರೊಫೈಲ್ ಲೋಡ್ ಆಗಿದೆ." : "Accused profile loaded successfully.",
+      prediction
+    };
+
+    const connections: { name: string; role: "Co-Accused" | "Victim"; strength: number }[] = [
+      ...matchedCase.accused.map(a => ({
+        name: a.name,
+        role: "Co-Accused" as const,
+        strength: 80
+      })),
+      ...matchedCase.victims.map(v => ({
+        name: v.name,
+        role: "Victim" as const,
+        strength: 50
+      }))
+    ];
+
+    setSearchState({ step: 3, name: targetName, fir: searchTerm });
+    setActiveCaseContext(firData);
+
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        id: Math.random().toString(),
+        sender: "system",
+        text: "",
+        timestamp,
+        firData,
+        graphData: {
+          criminal: targetName,
+          connections
+        }
+      }]);
+    }, 500);
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleFormSearch = () => {
+    if (!searchForm.name.trim() || !searchForm.fir.trim()) {
+      toast.error(
+        language === "kn" ? "ಎರಡೂ ಕ್ಷೇತ್ರಗಳು ಕಡ್ಡಾಯ" : "Both Fields Required",
+        { description: language === "kn" ? "ದಯವಿಟ್ಟು ಆರೋಪಿಯ ಹೆಸರು ಮತ್ತು FIR ಸಂಖ್ಯೆ ಎರಡನ್ನೂ ನಮೂದಿಸಿ." : "Please enter both criminal name and FIR number." }
+      );
+      return;
+    }
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const targetName = searchForm.name.trim();
+    const searchTerm = searchForm.fir.trim();
+
+    // Log the search action in the chat feed
+    setMessages(prev => [...prev, {
+      id: Math.random().toString(),
+      sender: "user",
+      text: language === "kn"
+        ? `ವಿಚಾರಣೆ: ಆರೋಪಿ="${targetName}" · FIR="${searchTerm}"`
+        : `Interrogating: Accused="${targetName}" · FIR="${searchTerm}"`,
+      timestamp
+    }]);
+
+    // Format the search query
+    let formattedSearchTerm = searchTerm;
+    let cleanedInput = searchTerm.replace(/\s+/g, "").replace(/\//g, "").toLowerCase();
+    const firRegex = /^(fir)?([a-z]+)?(20\d{2})(\d+)$/;
+    const match = cleanedInput.match(firRegex);
+    if (match) {
+      const station = match[2] ? match[2].toUpperCase() : "BAG";
+      const year = match[3];
+      const number = match[4];
+      formattedSearchTerm = `FIR/${station}/${year}/${number}`;
+    } else {
+      formattedSearchTerm = searchTerm.toUpperCase().replace(/\s+/g, "");
+    }
+
+    const queryFormatted = formattedSearchTerm.toLowerCase();
+    
+    // Match case by crimeNo/caseId AND check if target criminal is listed in accused list
+    const matchedCase = allCases.find(c => 
+      (c.crimeNo.toLowerCase().includes(queryFormatted) || 
+       c.crimeNo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanedInput) ||
+       String(c.caseMasterId).includes(queryFormatted)) &&
+      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    );
+
+    if (!matchedCase) {
+      setMessages(prev => [...prev, {
+        id: Math.random().toString(),
+        sender: "system",
+        text: language === "kn"
+          ? `ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ: ಆರೋಪಿ "${targetName}" ಒಳಗೊಂಡಿರುವ ಎಫ್‌ಐಆರ್ #${searchTerm} ನೊಂದಿಗೆ ಹೊಂದಾಣಿಕೆಯಾಗುವ ಯಾವುದೇ ಪ್ರಕರಣವು ಡೇಟಾಸ್ಟೋರ್‌ನಲ್ಲಿ ಕಂಡುಬಂದಿಲ್ಲ.`
+          : `RECORD NOT FOUND: No record found for FIR #${searchTerm} involving accused "${targetName}". Please verify and try again.`,
+        timestamp
+      }]);
+      return;
+    }
+
+    // ── Prediction Engine ──
+    const allCriminalCases = allCases.filter(c =>
+      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    );
+
+    const crimeTypeFreq: Record<string, number> = {};
+    const districtFreq: Record<string, number> = {};
+    const moFreq: Record<string, number> = {};
+    const hourBuckets: number[] = [];
+    let heinousCount = 0;
+
+    allCriminalCases.forEach(c => {
+      const ct = c.crimeHead.name;
+      crimeTypeFreq[ct] = (crimeTypeFreq[ct] || 0) + 1;
+      districtFreq[c.district.name] = (districtFreq[c.district.name] || 0) + 1;
+      moFreq[c.moTag] = (moFreq[c.moTag] || 0) + 1;
+      hourBuckets.push(c.hour);
+      if (c.gravity === "Heinous") heinousCount++;
+    });
+
+    const totalCases = allCriminalCases.length;
+    const topCrimeType = Object.entries(crimeTypeFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.crimeHead.name;
+    const topDistricts = Object.entries(districtFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const topMo = Object.entries(moFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.moTag;
+    const avgHour = hourBuckets.length ? Math.round(hourBuckets.reduce((a, b) => a + b, 0) / hourBuckets.length) : 14;
+    const coAccusedCount = new Set(allCriminalCases.flatMap(c => c.accused.map(a => a.name))).size - 1;
+
+    let riskScore = 30;
+    riskScore += Math.min(totalCases * 8, 30);
+    riskScore += heinousCount > 0 ? 15 : 0;
+    riskScore += coAccusedCount > 2 ? 10 : 0;
+    riskScore += topDistricts.length > 1 ? 5 : 0;
+    riskScore = Math.min(riskScore, 100);
+
+    const riskLevel: PredictionData["riskLevel"] =
+      riskScore >= 85 ? "CRITICAL" :
+      riskScore >= 65 ? "HIGH" :
+      riskScore >= 45 ? "MEDIUM" : "LOW";
+
+    const timeOfDay = avgHour < 6 ? "late night (00:00–06:00)" :
+      avgHour < 12 ? "morning (06:00–12:00)" :
+      avgHour < 18 ? "afternoon (12:00–18:00)" : "evening/night (18:00–24:00)";
+
+    const recentHeinous = allCriminalCases.slice(-3).filter(c => c.gravity === "Heinous").length;
+    const olderHeinous  = allCriminalCases.slice(0, 3).filter(c => c.gravity === "Heinous").length;
+    const escalationTrend: PredictionData["escalationTrend"] =
+      recentHeinous > olderHeinous ? "ESCALATING" :
+      recentHeinous < olderHeinous ? "DE-ESCALATING" : "STABLE";
+
+    const triggers: string[] = [];
+    if (coAccusedCount >= 3) triggers.push("Organized syndicate member — acts in groups");
+    if (heinousCount > 0)    triggers.push("History of violence — escalation likely");
+    if (totalCases >= 3)     triggers.push("Repeat offender — established criminal pattern");
+    if (topDistricts.length > 1) triggers.push("Cross-district mobility — surveillance recommended");
+    triggers.push(`Preferred MO: ${topMo}`);
+    if (triggers.length < 3) triggers.push("Likely to target repeat victims from known network");
+
+    const recidivismChance = Math.min(20 + totalCases * 12 + (heinousCount > 0 ? 10 : 0), 98);
+
+    const prediction: PredictionData = {
+      riskLevel,
+      riskScore,
+      nextCrimeType: topCrimeType,
+      atRiskDistricts: topDistricts,
+      estimatedWindow: `Next 30–60 days · ${timeOfDay}`,
+      behavioralTriggers: triggers,
+      recidivismChance,
+      escalationTrend,
+      patternSummary: `Based on ${totalCases} FIR(s), primarily ${topCrimeType.toLowerCase()} offences ` +
+        `across ${topDistricts.join(", ")}. Operates with ${coAccusedCount} known associates.`
+    };
+
+    const firData: FirData = {
+      crimeNo: matchedCase.crimeNo,
+      targetAccused: targetName,
+      status: matchedCase.status,
+      gravity: `${matchedCase.gravity} — ${matchedCase.crimeHead.name}`,
+      crimeHead: matchedCase.crimeHead.name,
+      policeStation: matchedCase.policeStation,
+      district: matchedCase.district.name,
+      date: matchedCase.registeredDate,
+      acts: matchedCase.actSections.join(", "),
+      officer: matchedCase.registeringOfficer || "N/A",
+      victims: matchedCase.victims.map(v => v.name),
+      accused: matchedCase.accused.map(a => a.name),
+      briefFacts: matchedCase.briefFacts,
+      done: language === "kn" ? "ಹೊಸ ಹುಡುಕಾಟಕ್ಕಾಗಿ ಮೇಲಿನ ಫಾರ್ಮ್ ಬಳಸಿ" : "Search complete — use the form above to run a new search",
+      prediction
+    };
+
+    const connections: { name: string; role: "Co-Accused" | "Victim"; strength: number }[] = [
+      ...matchedCase.accused.map(a => ({
+        name: a.name,
+        role: "Co-Accused" as const,
+        strength: 80
+      })),
+      ...matchedCase.victims.map(v => ({
+        name: v.name,
+        role: "Victim" as const,
+        strength: 50
+      }))
+    ];
+
+    setMessages(prev => [...prev, {
+      id: Math.random().toString(),
+      sender: "system",
+      text: "",
+      timestamp,
+      firData,
+      graphData: {
+        criminal: targetName,
+        connections
+      }
+    }]);
+
+    // Clear form inputs and save context
+    setSearchForm({ name: "", fir: "" });
+    setActiveCaseContext(firData);
+  };
+
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
@@ -154,11 +584,52 @@ export function CopilotDrawer() {
     return `FIR/${station}/${year}/${num}`;
   };
 
-  const handleInputChange = (raw: string) => {
-    if (searchState.step === 2) {
-      setInput(formatFirInput(raw));
+  const getWelcomeMessage = (currentMode: "standard" | "simulator" | "advisor") => {
+    const isKn = language === "kn";
+    if (currentMode === "simulator") {
+      return isKn
+        ? "[ತನಿಖಾ ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್] ಶಂಕಿತರನ್ನು ವಿಚಾರಣೆ ಮಾಡುವ ಅಭ್ಯಾಸ ವಲಯಕ್ಕೆ ಸುಸ್ವಾಗತ. ದಯವಿಟ್ಟು ವಿಚಾರಣೆ ಮಾಡಲು ಶಂಕಿತನ ಹೆಸರನ್ನು ನಮೂದಿಸಿ (ಉದಾ: Vijay Bhat ಅಥವಾ Darshan):"
+        : "[INTERROGATION SANDBOX] Welcome to the suspect interrogation simulation. Prepare your questions, check contradictions, and practice statements.\n\nPlease enter the suspect's name to begin (e.g., Vijay Bhat or Darshan):";
+    }
+    if (currentMode === "advisor") {
+      return isKn
+        ? "[BNS ಕಾನೂನು ಸಲಹೆಗಾರ] ಅಪರಾಧದ ಸಾರಾಂಶವನ್ನು ನಮೂದಿಸಿ (ಉದಾ: ರಾತ್ರಿ ಮನೆ ಕಳ್ಳತನ). ನಾನು ಅದನ್ನು ಹೊಸ ಬಿಎನ್‌ಎಸ್ (BNS) ಸೆಕ್ಷನ್‌ಗಳಿಗೆ ಮ್ಯಾಪ್ ಮಾಡುತ್ತೇನೆ:"
+        : "[BNS LEGAL ADVISOR] Describe the crime scene or modus or operandi in plain words. I will map it to the corresponding Bharatiya Nyaya Sanhita (BNS) and legacy IPC sections instantly:";
+    }
+    return isKn 
+      ? "[ಆರೋಪಿ ಶೋಧಕ] ದಯವಿಟ್ಟು ಆರೋಪಿಯ ಹೆಸರು ಮತ್ತು FIR ಸಂಖ್ಯೆಯನ್ನು ಮೇಲಿನ ಫಾರ್ಮ್‌ನಲ್ಲಿ ಭರ್ತಿ ಮಾಡಿ ಮತ್ತು 'ಶೋಧನೆ ಪ್ರಾರಂಭಿಸಿ' ಕ್ಲಿಕ್ ಮಾಡಿ:"
+      : "[ACCUSED CASE INTERROGATOR] Please fill in both the Accused Name and FIR Number in the form box above, then click 'Run Intel Search' to interrogate the database:";
+  };
+
+  const handleModeChange = (newMode: "standard" | "simulator" | "advisor") => {
+    setMode(newMode);
+    setSearchState({ step: 1, name: "", fir: "" });
+    setSimulatorState({ activeSuspect: "", turnCount: 0 });
+    setActiveCaseContext(null);
+    setInlineName("");
+    setInlineFir("");
+    
+    if (newMode === "standard") {
+      setMessages([
+        {
+          id: "init_name",
+          sender: "system",
+          text: language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Enter Accused / Suspect Name:",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          formType: "name"
+        }
+      ]);
     } else {
-      setInput(raw);
+      const welcome = getWelcomeMessage(newMode);
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setMessages([
+        {
+          id: "welcome_" + newMode,
+          sender: "system",
+          text: welcome,
+          timestamp
+        }
+      ]);
     }
   };
 
@@ -168,12 +639,13 @@ export function CopilotDrawer() {
     return {
       title: isKn ? "ಎಸ್‌ಸಿಆರ್‌ಬಿ ಇಂಟೆಲ್ ಅಸಿಸ್ಟೆಂಟ್" : "SCRB Intel Assistant",
       statusOnline: isKn ? "ಆನ್‌ಲೈನ್" : "AI ONLINE",
-      placeholder: searchState.step === 1 
-        ? (isKn ? "ಅಪರಾಧಿಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ..." : "Enter Criminal Name...")
-        : (isKn ? "ಸಂಬಂಧಿತ ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ..." : "Enter associated FIR number..."),
-      welcome: isKn 
-        ? "[ಆದೇಶ ಪರಿಶೀಲನೆ] ಡೇಟಾಬೇಸ್ ತನಿಖೆ ಮಾಡಲು ಅಪರಾಧಿಯ ಹೆಸರು ಮತ್ತು ಎಫ್‌ಐಆರ್ (FIR) ಸಂಖ್ಯೆ ಎರಡೂ ಕಡ್ಡಾಯವಾಗಿದೆ.\n\nಹಂತ 1: ದಯವಿಟ್ಟು ಅಪರಾಧಿಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ:"
-        : "[MANDATE CHECK] Both Criminal Name and FIR Number are COMPULSORY to interrogate the database.\n\nStep 1: Please enter the Criminal Name:",
+      placeholder: mode === "standard"
+        ? (isKn ? "ಆರೋಪಿ ಬಗ್ಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿ (ಉದಾ: ಸಹಚರರು)..." : "Ask about accused (e.g., associates)...")
+        : (mode === "simulator"
+          ? (simulatorState.activeSuspect 
+            ? (isKn ? "ಪ್ರಶ್ನೆ ಕೇಳಿ ಅಥವಾ ಸಾಕ್ಷ್ಯವನ್ನು ಮಂಡಿಸಿ..." : "Ask suspect a question or present evidence...")
+            : (isKn ? "ವಿಚಾರಣೆ ನಡೆಸಬೇಕಾದ ಶಂಕಿತನ ಹೆಸರು..." : "Enter suspect's name to interrogate..."))
+          : (isKn ? "ಅಪರಾಧದ ವಿವರಣೆ ನಮೂದಿಸಿ..." : "Describe the crime for legal mapping...")),
       securityAlert: isKn
         ? "[ಭದ್ರತಾ ಪರಿಶೀಲನೆ] ಅನಧಿಕೃತ ವಿನಂತಿ. ಈ ಟರ್ಮಿನಲ್ ಅಪರಾಧ ದಾಖಲೆಗಳು ಮತ್ತು ನೆಟ್‌ವರ್ಕ್ ಲಿಂಕ್ ಅನ್ವೇಷಣೆಗೆ ಮಾತ್ರ ಸೀಮಿತವಾಗಿದೆ."
         : "[SECURITY CHECK] Unauthorized prompt. This terminal is restricted strictly to profile querying and network link discovery.",
@@ -182,44 +654,55 @@ export function CopilotDrawer() {
       associatesFound: isKn ? "ಅಸೋಸಿಯೇಟ್ಸ್ / ಸಂಪರ್ಕಗಳು" : "Accused Associates & Connections",
       clickToInterrogate: isKn ? "ನೆಟ್‌ವರ್ಕ್ ತನಿಖೆ ಮಾಡಲು ಹೆಸರನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ" : "Click node to interrogate associate"
     };
-  }, [language, searchState.step]);
+  }, [language, searchState.step, mode, simulatorState.activeSuspect]);
 
   // Initialize welcome message
   useEffect(() => {
-    if (messages.length === 0) {
+    if (mode === "standard") {
+      setSearchState({ step: 1, name: "", fir: "" });
+      setInlineName("");
+      setInlineFir("");
+      setActiveCaseContext(null);
       setMessages([
         {
-          id: "welcome",
+          id: "init_name",
           sender: "system",
-          text: systemText.welcome,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Enter Accused / Suspect Name:",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          formType: "name"
         }
       ]);
+      return;
     }
-  }, [systemText]);
+    const welcome = getWelcomeMessage(mode);
+    setMessages([
+      {
+        id: "welcome_" + mode,
+        sender: "system",
+        text: welcome,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  }, [language, mode]);
 
   // Fetch quick suggestions from active cases/offenders database based on step
   const suggestions = useMemo(() => {
     const list: { type: "name" | "fir"; value: string }[] = [];
-    if (searchState.step === 1) {
+    if (mode === "standard") {
       if (offenders && offenders.length > 0) {
         list.push({ type: "name", value: offenders[0].name });
         if (offenders[1]) list.push({ type: "name", value: offenders[1].name });
       }
-    } else if (searchState.step === 2) {
-      // Show suggestions for FIRs containing the target criminal name
-      const matchingCases = allCases.filter(c => 
-        c.accused.some(a => a.name.toLowerCase().includes(searchState.name.toLowerCase()))
-      );
-      matchingCases.slice(0, 2).forEach(c => {
-        list.push({ type: "fir", value: c.crimeNo });
-      });
-      if (list.length === 0 && allCases.length > 0) {
-        list.push({ type: "fir", value: allCases[0].crimeNo });
-      }
+    } else if (mode === "simulator" && !simulatorState.activeSuspect) {
+      list.push({ type: "name", value: "Vijay Bhat" });
+      list.push({ type: "name", value: "Darshan" });
+    } else if (mode === "advisor") {
+      list.push({ type: "fir", value: "Theft of gold necklace at night" });
+      list.push({ type: "fir", value: "Suspect hit victim with stick" });
+      list.push({ type: "fir", value: "Online bank account phishing" });
     }
     return list;
-  }, [searchState, offenders, allCases]);
+  }, [searchState, offenders, allCases, mode, simulatorState.activeSuspect]);
 
   // Execute database search matching criminal name or FIR number
   const handleSearch = (searchTerm: string) => {
@@ -233,210 +716,285 @@ export function CopilotDrawer() {
       timestamp
     };
 
-    setMessages(prev => [...prev, userMsg]);
     setInput("");
 
     const query = searchTerm.trim().toLowerCase();
 
-    // STEP 1: Process Criminal Name
-    if (searchState.step === 1) {
-      // Check general chat guardrail
-      const commonQuestionTriggers = ["hello", "hi", "hey", "who", "what", "where", "how", "why", "joke", "weather", "capital", "you", "help"];
-      const isGeneralChat = commonQuestionTriggers.some(t => query.includes(t)) || query.length > 25;
+    // 1. STANDARD MODE
+    if (mode === "standard") {
+      const isFir = /fir/i.test(searchTerm) || searchTerm.split("/").length > 2 || /^\d+$/.test(searchTerm);
+      const isQuestion = query.split(" ").length > 3 || 
+                         query.includes("who") || query.includes("what") || query.includes("show") || 
+                         query.includes("list") || query.includes("help") || query.includes("ಯಾರು") || 
+                         query.includes("ಹೇಗೆ") || query.includes("ತೋರಿಸಿ");
 
-      if (isGeneralChat) {
-        setMessages(prev => [...prev, {
-          id: Math.random().toString(),
-          sender: "security",
-          text: systemText.securityAlert,
-          timestamp
-        }]);
-        toast.error(language === "kn" ? "ಅನಧಿಕೃತ ವಿನಂತಿ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ" : "Unauthorized Query Blocked", {
-          description: language === "kn" ? "ಟರ್ಮಿನಲ್ ಪ್ರವೇಶ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ." : "Security system is locking response parameters.",
-        });
+      if (searchState.step === 1 && !isFir && !isQuestion) {
+        setInlineName(searchTerm);
+        handleInlineNameSubmit(searchTerm);
+        return;
+      }
+      if (searchState.step === 2 && isFir && !isQuestion) {
+        setInlineFir(searchTerm);
+        handleInlineFirSubmit(searchTerm);
         return;
       }
 
-      // Record name and move to Step 2
-      setSearchState({ step: 2, name: searchTerm.trim(), fir: "" });
-      setMessages(prev => [...prev, {
+      // If they click on another offender when already in step 3 (dossier loaded), reset to start new search
+      if (searchState.step === 3 && !isFir && !isQuestion) {
+        setMessages([]);
+        setSearchState({ step: 1, name: "", fir: "" });
+        setInlineName(searchTerm);
+        setInlineFir("");
+        setActiveCaseContext(null);
+        setTimeout(() => {
+          setMessages([
+            {
+              id: "init_name",
+              sender: "system",
+              text: language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Enter Accused / Suspect Name:",
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              formType: "name"
+            }
+          ]);
+          setTimeout(() => {
+            handleInlineNameSubmit(searchTerm);
+          }, 300);
+        }, 100);
+        return;
+      }
+
+      if (!activeCaseContext) {
+        // Fallback responses for general queries before loading an accused dossier
+        let reply = "";
+        const isKn = language === "kn";
+        
+        if (query.includes("offender") || query.includes("suspect") || query.includes("criminal") || query.includes("ಆರೋಪಿ") || query.includes("ಅಪರಾಧಿ")) {
+          const offenderNames = offenders.slice(0, 4).map(o => o.name).join(", ");
+          reply = isKn
+            ? `ವ್ಯವಸ್ಥೆಯಲ್ಲಿ ನೋಂದಾಯಿಸಲಾದ ಕೆಲವು ಪ್ರಮುಖ ಅಪರಾಧಿಗಳು: ${offenderNames}. ಅವರ ವಿವರವಾದ ಪ್ರೊಫೈಲ್ ಮತ್ತು ನಡವಳಿಕೆಯ ಡಿಎನ್ಎ ವಿಶ್ಲೇಷಿಸಲು ಅವರ ಹೆಸರನ್ನು ಇಲ್ಲಿ ನಮೂದಿಸಿ.`
+            : `Some active offenders in our records include: ${offenderNames}. Enter any of their names to load their behavioral DNA dossier.`;
+        }
+        else if (query.includes("hotspot") || query.includes("map") || query.includes("location") || query.includes("ನಕ್ಷೆ") || query.includes("ಸ್ಥಳ") || query.includes("ಹಾಟ್‌ಸ್ಪಾಟ್")) {
+          reply = isKn
+            ? `ಅಪರಾಧ ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳನ್ನು ನಕ್ಷೆಯಲ್ಲಿ ಗುರುತಿಸಲಾಗಿದೆ. ಮೇಲಿನ ನ್ಯಾವಿಗೇಶನ್ ಮೆನುವಿನಲ್ಲಿರುವ 'Hotspots' ವಿಭಾಗಕ್ಕೆ ಭೇಟಿ ನೀಡಿ.`
+            : `Crime hotspots and spatial clusters are tracked dynamically. Visit the 'Hotspots' tab in the left sidebar to view the live interactive map.`;
+        }
+        else if (query.includes("case") || query.includes("fir") || query.includes("ಪ್ರಕರಣ") || query.includes("ಎಫ್‌ಐಆರ್")) {
+          const recentFirs = allCases.slice(0, 3).map(c => c.crimeNo).join(", ");
+          reply = isKn
+            ? `ಇತ್ತೀಚಿನ ಅಪರಾಧ ಪ್ರಕರಣಗಳು: ${recentFirs}. ನಿರ್ದಿಷ್ಟ ಪ್ರಕರಣದ ವಿವರಗಳಿಗಾಗಿ ಆರೋಪಿಯ ಹೆಸರು ಮತ್ತು ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ.`
+            : `Recent registered cases: ${recentFirs}. Interrogate by providing a suspect's name to examine their specific files.`;
+        }
+        else {
+          reply = isKn
+            ? `ನಮಸ್ಕಾರ, ನಾನು SCRB ಇಂಟೆಲ್ ಅಸಿಸ್ಟೆಂಟ್. ತನಿಖೆ ಪ್ರಾರಂಭಿಸಲು ಆರೋಪಿಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ:`
+            : `Hello, I am the SCRB Intelligence Assistant. Please enter an Accused / Suspect Name to begin querying the crime database:`;
+        }
+
+        // Add user message to feed
+        setMessages(prev => [...prev, userMsg]);
+
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            id: Math.random().toString(),
+            sender: "system",
+            text: reply,
+            timestamp
+          }]);
+        }, 500);
+
+        return;
+      }
+
+      // Add user message to feed
+      const userMsg: Message = {
         id: Math.random().toString(),
-        sender: "system",
-        text: language === "kn"
-          ? `ಅಪರಾಧಿಯ ಹೆಸರನ್ನು "${searchTerm.trim()}" ಎಂದು ದಾಖಲಿಸಲಾಗಿದೆ.\n\nಹಂತ 2: ದಯವಿಟ್ಟು ಸಂಬಂಧಿತ ಎಫ್‌ಐಆರ್ (FIR) ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ:`
-          : `Criminal Name recorded: "${searchTerm.trim()}".\n\nStep 2: Now, enter the associated FIR Number to run validation:`,
+        sender: "user",
+        text: searchTerm,
         timestamp
-      }]);
+      };
+      setMessages(prev => [...prev, userMsg]);
+      setInput("");
+
+      // Analyze question
+      let reply = "";
+      const text = searchTerm.toLowerCase();
+      const isKn = language === "kn";
+
+      if (text.includes("associate") || text.includes("co-accused") || text.includes("partner") || text.includes("ಸಹಚರ") || text.includes("ಸಂಗಡಿಗ") || text.includes("ಮಿತ್ರ")) {
+        const names = activeCaseContext.accused.filter(n => n.toLowerCase() !== activeCaseContext.targetAccused.toLowerCase());
+        if (names.length > 0) {
+          reply = isKn
+            ? `ಆರೋಪಿ ${activeCaseContext.targetAccused} ರ ಸಹಚರರು: ${names.join(", ")}.`
+            : `The co-accused associates linked with ${activeCaseContext.targetAccused} in this case are: ${names.join(", ")}.`;
+        } else {
+          reply = isKn
+            ? `ಈ ಪ್ರಕರಣದಲ್ಲಿ ಆರೋಪಿ ${activeCaseContext.targetAccused} ಗೆ ಯಾವುದೇ ಸಹಚರರು ಕಂಡುಬಂದಿಲ್ಲ (ಒಂಟಿಯಾಗಿ ಅಪರಾಧ ಎಸಗಿದ್ದಾನೆ).`
+            : `No co-accused associates were listed for ${activeCaseContext.targetAccused} in this specific case.`;
+        }
+      } 
+      else if (text.includes("fact") || text.includes("detail") || text.includes("happen") || text.includes("crime") || text.includes("ಮಾಹಿತಿ") || text.includes("ವಿವರ") || text.includes("ಘಟನೆ") || text.includes("ಸಂಗತಿ")) {
+        reply = isKn
+          ? `ಅಪರಾಧದ ಸಾರಾಂಶ: ${activeCaseContext.briefFacts}\n\nಪ್ರಕರಣದ ಶೀರ್ಷಿಕೆ: ${activeCaseContext.gravity}`
+          : `Brief Facts of the Crime:\n${activeCaseContext.briefFacts}\n\nOffence Classification: ${activeCaseContext.gravity}`;
+      } 
+      else if (text.includes("bail") || text.includes("section") || text.includes("act") || text.includes("ಕಾನೂನು") || text.includes("ಸೆಕ್ಷನ್") || text.includes("ಜಾಮೀನು") || text.includes("ಕಲಂ")) {
+        const isBailable = !activeCaseContext.prediction?.behavioralTriggers.some(t => t.toLowerCase().includes("heinous")) && !activeCaseContext.gravity.toLowerCase().includes("heinous");
+        const bailStatus = isBailable 
+          ? (isKn ? "ಜಾಮೀನು ಪಡೆಯಬಹುದಾದ ಅಪರಾಧ" : "Bailable Offence") 
+          : (isKn ? "ಜಾಮೀನು ರಹಿತ ಗಂಭೀರ ಅಪರಾಧ" : "Non-Bailable Heinous Offence");
+          
+        reply = isKn
+          ? `ನಮೂದಿಸಲಾದ ಸೆಕ್ಷನ್ಗಳು: ${activeCaseContext.acts}\n\nಜಾಮೀನು ಸ್ಥಿತಿ: ${bailStatus}`
+          : `Registered Sections: ${activeCaseContext.acts}\n\nBail Parameter: ${bailStatus}`;
+      } 
+      else if (text.includes("officer") || text.includes("station") || text.includes("police") || text.includes("ಠಾಣೆ") || text.includes("ಅಧಿಕಾರಿ") || text.includes("ಠಾಣೆಯ")) {
+        reply = isKn
+          ? `ಈ ಪ್ರಕರಣವನ್ನು '${activeCaseContext.policeStation}' ಪೊಲೀಸ್ ಠಾಣೆಯಲ್ಲಿ ದಾಖಲಿಸಲಾಗಿದೆ. ತನಿಖಾಧಿಕಾರಿ: ${activeCaseContext.officer}.`
+          : `This case was registered at '${activeCaseContext.policeStation}' Police Station. Registered by Officer: ${activeCaseContext.officer}.`;
+      } 
+      else if (text.includes("risk") || text.includes("threat") || text.includes("repeat") || text.includes("ಅಪಾಯ") || text.includes("ಶಂಕೆ") || text.includes("ಅಪರಾಧ ಸಾಧ್ಯತೆ")) {
+        reply = isKn
+          ? `ಆರೋಪಿಯ ಅಪಾಯದ ಮಟ್ಟ: ${activeCaseContext.prediction?.riskLevel} (${activeCaseContext.prediction?.riskScore}%)\n\nಮತ್ತೆ ಅಪರಾಧ ಎಸಗುವ ಸಾಧ್ಯತೆ: ${activeCaseContext.prediction?.recidivismChance}%\n\nಪ್ರವೃತ್ತಿ ಟ್ರೆಂಡ್: ${activeCaseContext.prediction?.escalationTrend}`
+          : `Offender Risk Assessment:\n• Risk Level: ${activeCaseContext.prediction?.riskLevel} (${activeCaseContext.prediction?.riskScore}%)\n• Recidivism Probability: ${activeCaseContext.prediction?.recidivismChance}%\n• Escalation Trend: ${activeCaseContext.prediction?.escalationTrend}`;
+      }
+      else {
+        reply = isKn
+          ? `ನಾನು ಆರೋಪಿ ${activeCaseContext.targetAccused} (FIR: ${activeCaseContext.crimeNo}) ರ ಪ್ರಕರಣದ ವಿವರಗಳನ್ನು ಹೊಂದಿದ್ದೇನೆ. ನೀವು ಅವರ ಸಹಚರರು, ಜಾಮೀನು ವಿವರಗಳು, ಅಧಿಕಾರಿ ಅಥವಾ ಅಪರಾಧದ ಸಾರಾಂಶದ ಬಗ್ಗೆ ಕೇಳಬಹುದು.`
+          : `I am currently analyzing the dossier for ${activeCaseContext.targetAccused} (FIR: ${activeCaseContext.crimeNo}). You can ask me about their associates, crime details, bail status, risk profile, or the investigating officer.`;
+      }
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          sender: "system",
+          text: reply,
+          timestamp
+        }]);
+      }, 500);
+
       return;
     }
 
-    // STEP 2: Process FIR Number & Run Validation
-    if (searchState.step === 2) {
-      const targetName = searchState.name;
-      
-      // Auto-format the search query if it contains spaced-out characters/words
-      // e.g. "f i r b a g 2026 0001" -> "FIR/BAG/2026/0001"
-      let formattedSearchTerm = searchTerm.trim();
-      let cleanedInput = searchTerm.replace(/\s+/g, "").replace(/\//g, "").toLowerCase();
-      const firRegex = /^(fir)?([a-z]+)?(20\d{2})(\d+)$/;
-      const match = cleanedInput.match(firRegex);
-      if (match) {
-        const station = match[2] ? match[2].toUpperCase() : "BAG";
-        const year = match[3];
-        const number = match[4];
-        formattedSearchTerm = `FIR/${station}/${year}/${number}`;
-      } else {
-        formattedSearchTerm = searchTerm.toUpperCase().replace(/\s+/g, "");
-      }
+    setMessages(prev => [...prev, userMsg]);
 
-      const queryFormatted = formattedSearchTerm.toLowerCase();
-      
-      // Match case by crimeNo/caseId AND check if target criminal is listed in accused list
-      const matchedCase = allCases.find(c => 
-        (c.crimeNo.toLowerCase().includes(queryFormatted) || 
-         c.crimeNo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanedInput) ||
-         String(c.caseMasterId).includes(queryFormatted)) &&
-        c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
-      );
-
-      // Reset step to 1 for the next query session
-      setSearchState({ step: 1, name: "", fir: "" });
-
-      if (!matchedCase) {
+    // 2. SIMULATOR MODE
+    if (mode === "simulator") {
+      if (!simulatorState.activeSuspect) {
+        setSimulatorState({ activeSuspect: searchTerm.trim(), turnCount: 0 });
         setMessages(prev => [...prev, {
           id: Math.random().toString(),
           sender: "system",
           text: language === "kn"
-            ? `ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ: ಅಪರಾಧಿ "${targetName}" ಒಳಗೊಂಡಿರುವ ಎಫ್‌ಐಆರ್ #${searchTerm} ನೊಂದಿಗೆ ಹೊಂದಾಣಿಕೆಯಾಗುವ ಯಾವುದೇ ಪ್ರಕರಣವು ಡೇಟಾಸ್ಟೋರ್‌ನಲ್ಲಿ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.\n\nಹಂತ 1: ಅಪರಾಧಿಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ:`
-            : `RECORD NOT FOUND: No record found for FIR #${searchTerm} involving criminal "${targetName}". Please verify and start again.\n\nStep 1: Enter Criminal Name:`,
+            ? `[ವಿಚಾರಣೆ ಲೋಡ್ ಆಗಿದೆ] ಶಂಕಿತ: ${searchTerm.trim()}.\n\nವಿಚಾರಣೆ ಪ್ರಾರಂಭಿಸಿ. ಉದಾಹರಣೆಗೆ ಅವರ ಫೋನ್ ರೆಕಾರ್ಡ್ಸ್ ಅಥವಾ ವಾಹನದ ಬಗ್ಗೆ ಪ್ರಶ್ನಿಸಿ!`
+            : `[SIMULATION ACTIVE] Now interrogating suspect: "${searchTerm.trim()}".\n\nAsk your questions or present evidence. (Try asking about their "phone logs", "vehicle plate", or "alibi")`,
           timestamp
         }]);
         return;
       }
 
-      // ── Prediction Engine ────────────────────────────────────────────
-      // Gather ALL cases involving this criminal across the database
-      const allCriminalCases = allCases.filter(c =>
-        c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
-      );
+      let reply = "";
+      let alertMsg = "";
+      const count = simulatorState.turnCount + 1;
+      setSimulatorState(prev => ({ ...prev, turnCount: count }));
 
-      // Crime type frequency map
-      const crimeTypeFreq: Record<string, number> = {};
-      const districtFreq: Record<string, number> = {};
-      const moFreq: Record<string, number> = {};
-      const hourBuckets: number[] = [];
-      let heinousCount = 0;
+      if (query.includes("phone") || query.includes("call") || query.includes("tower") || query.includes("mobile")) {
+        reply = language === "kn"
+          ? "ನನ್ನ ಫೋನ್? ಆ ರಾತ್ರಿ... ನಾನು ಅದನ್ನು ಮನೆಯಲ್ಲೇ ಬಿಟ್ಟಿದ್ದೆ. ಅಥವಾ ಬೇರೊಬ್ಬರು ತಗೊಂಡಿರಬಹುದು. ನಾನು ಅಲ್ಲಿಗೆ ಹೋಗಿಲ್ಲ!"
+          : "My phone? On that night... I must have left it at home. Or maybe someone else took it. You can't prove I was at the crime scene just because of tower logs!";
+        alertMsg = language === "kn"
+          ? "ಅಸಂಗತತೆ: ಶಂಕಿತರ ಸ್ಥಳ ದಾಖಲೆಗಳು ಮತ್ತು ಸೆಲ್ ಟವರ್ ಲಾಗ್‌ಗಳು ಹೊಂದಾಣಿಕೆಯಾಗುತ್ತಿಲ್ಲ!"
+          : "CONTRADICTION DETECTED: Suspect cell tower ping logs place them at the crime scene location at 02:30 AM!";
+      } else if (query.includes("vehicle") || query.includes("car") || query.includes("plate") || query.includes("drive") || query.includes("bike")) {
+        reply = language === "kn"
+          ? "ನಾನು ಆ ದಿನ ಗಾಡಿ ಓಡಿಸಿಲ್ಲ. ನನ್ನ ಹೆಸರಿನಲ್ಲಿ ಗಾಡಿ ಇರುವುದು ನಿಜ, ಆದರೆ ನನ್ನ ಸ್ನೇಹಿತ ತಗೊಂಡಿದ್ದ. ನನಗೂ ಅದಕ್ಕೂ ಸಂಬಂಧ ಇಲ್ಲ."
+          : "I wasn't driving that day. Yes, the vehicle is registered in my name, but my friend borrowed it for some work. I have nothing to do with any robbery!";
+        alertMsg = language === "kn"
+          ? "ಸಾಕ್ಷ್ಯ ಹೊಂದಾಣಿಕೆ: ಪ್ರಕರಣದ ವಾಹನ ಸಂಖ್ಯೆಯು ಆರೋಪಿಗೆ ಸೇರಿದೆ!"
+          : "EVIDENCE MATCHED: Entered case vehicle plate maps directly to suspect's registered vehicle asset registry!";
+      } else if (query.includes("alibi") || query.includes("where") || query.includes("at the time") || query.includes("home")) {
+        reply = language === "kn"
+          ? "ನಾನು ಮನೆಯಲ್ಲೇ ಮಲಗಿದ್ದೆ! ನನ್ನ ಹೆಂಡತಿ ಅದನ್ನು ಖಚಿತಪಡಿಸಬಹುದು. ಅವಳನ್ನು ಕೇಳಿ. ನನಗೆ ಏನೂ ಗೊತ್ತಿಲ್ಲ."
+          : "I was sleeping peacefully at home! My family can verify it. Ask them. I have no knowledge of any stolen cash.";
+        alertMsg = language === "kn"
+          ? "ಅಲಿಬಿ ಲಾಗ್: ಶಂಕಿತರ ಅಲಿಬಿ ಹೇಳಿಕೆಗಳು ಅಪರಾಧದ ಸಮಯದೊಂದಿಗೆ ಹೊಂದಾಣಿಕೆಯಾಗುತ್ತಿಲ್ಲ."
+          : "ALIBI VERIFICATION ACTIVE: Checking family statements for verification... Discrepancy logged.";
+      } else {
+        reply = language === "kn"
+          ? `ನೋಡಿ ಸರ್, ನಾನು ಮೊದಲೇ ಹೇಳಿದ್ದೇನೆ. ನನಗೂ ಆ ಕಳ್ಳತನಕ್ಕೂ ಯಾವುದೇ ಸಂಬಂಧವಿಲ್ಲ. ನೀವು ನನ್ನನ್ನು ಸುಮ್ಮನೆ ಇಲ್ಲೇ ಇರಿಸಿದ್ದೀರಿ.`
+          : `Look officer, I have already told you. I have no idea about the incident and I don't know the complainant. You are holding me here without any proof.`;
+      }
 
-      allCriminalCases.forEach(c => {
-        const ct = c.crimeHead.name;
-        crimeTypeFreq[ct] = (crimeTypeFreq[ct] || 0) + 1;
-        districtFreq[c.district.name] = (districtFreq[c.district.name] || 0) + 1;
-        moFreq[c.moTag] = (moFreq[c.moTag] || 0) + 1;
-        hourBuckets.push(c.hour);
-        if (c.gravity === "Heinous") heinousCount++;
-      });
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          sender: "system",
+          text: reply,
+          timestamp
+        }]);
 
-      const totalCases = allCriminalCases.length;
-      const topCrimeType = Object.entries(crimeTypeFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.crimeHead.name;
-      const topDistricts = Object.entries(districtFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
-      const topMo = Object.entries(moFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.moTag;
-      const avgHour = hourBuckets.length ? Math.round(hourBuckets.reduce((a, b) => a + b, 0) / hourBuckets.length) : 14;
-      const coAccusedCount = new Set(allCriminalCases.flatMap(c => c.accused.map(a => a.name))).size - 1;
-
-      // Risk score heuristic (0-100)
-      let riskScore = 30;
-      riskScore += Math.min(totalCases * 8, 30);      // repeat offender weight
-      riskScore += heinousCount > 0 ? 15 : 0;         // heinous crime bonus
-      riskScore += coAccusedCount > 2 ? 10 : 0;       // organized crime indicator
-      riskScore += topDistricts.length > 1 ? 5 : 0;   // multi-district activity
-      riskScore = Math.min(riskScore, 100);
-
-      const riskLevel: PredictionData["riskLevel"] =
-        riskScore >= 85 ? "CRITICAL" :
-        riskScore >= 65 ? "HIGH" :
-        riskScore >= 45 ? "MEDIUM" : "LOW";
-
-      // Time window prediction
-      const timeOfDay = avgHour < 6 ? "late night (00:00–06:00)" :
-        avgHour < 12 ? "morning (06:00–12:00)" :
-        avgHour < 18 ? "afternoon (12:00–18:00)" : "evening/night (18:00–24:00)";
-
-      // Escalation trend (compare heinous ratio over time)
-      const recentHeinous = allCriminalCases.slice(-3).filter(c => c.gravity === "Heinous").length;
-      const olderHeinous  = allCriminalCases.slice(0, 3).filter(c => c.gravity === "Heinous").length;
-      const escalationTrend: PredictionData["escalationTrend"] =
-        recentHeinous > olderHeinous ? "ESCALATING" :
-        recentHeinous < olderHeinous ? "DE-ESCALATING" : "STABLE";
-
-      // Behavioral triggers
-      const triggers: string[] = [];
-      if (coAccusedCount >= 3) triggers.push("Organized syndicate member — acts in groups");
-      if (heinousCount > 0)    triggers.push("History of violence — escalation likely");
-      if (totalCases >= 3)     triggers.push("Repeat offender — established criminal pattern");
-      if (topDistricts.length > 1) triggers.push("Cross-district mobility — surveillance recommended");
-      triggers.push(`Preferred MO: ${topMo}`);
-      if (triggers.length < 3) triggers.push("Likely to target repeat victims from known network");
-
-      const recidivismChance = Math.min(20 + totalCases * 12 + (heinousCount > 0 ? 10 : 0), 98);
-
-      const prediction: PredictionData = {
-        riskLevel,
-        riskScore,
-        nextCrimeType: topCrimeType,
-        atRiskDistricts: topDistricts,
-        estimatedWindow: `Next 30–60 days · ${timeOfDay}`,
-        behavioralTriggers: triggers,
-        recidivismChance,
-        escalationTrend,
-        patternSummary: `Based on ${totalCases} FIR(s), primarily ${topCrimeType.toLowerCase()} offences ` +
-          `across ${topDistricts.join(", ")}. Operates with ${coAccusedCount} known associates.`
-      };
-      // ── End Prediction Engine ────────────────────────────────────────
-
-      // Build structured FIR card data
-      const firData: FirData = {
-        crimeNo: matchedCase.crimeNo,
-        targetAccused: targetName,
-        status: matchedCase.status,
-        gravity: `${matchedCase.gravity} — ${matchedCase.crimeHead.name}`,
-        crimeHead: matchedCase.crimeHead.name,
-        policeStation: matchedCase.policeStation,
-        district: matchedCase.district.name,
-        date: matchedCase.registeredDate,
-        acts: matchedCase.actSections.join(", "),
-        officer: matchedCase.registeringOfficer || "N/A",
-        victims: matchedCase.victims.map(v => v.name),
-        accused: matchedCase.accused.map(a => a.name),
-        briefFacts: matchedCase.briefFacts,
-        done: language === "kn" ? "ಹೊಸ ಹುಡುಕಾಟಕ್ಕಾಗಿ ಅಪರಾಧಿಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ" : "Interrogation complete — enter a new Criminal Name to search again",
-        prediction
-      };
-
-      // Build graph nodes
-      const connections: { name: string; role: "Co-Accused" | "Victim"; strength: number }[] = [
-        ...matchedCase.accused.map(a => ({
-          name: a.name,
-          role: "Co-Accused" as const,
-          strength: 80
-        })),
-        ...matchedCase.victims.map(v => ({
-          name: v.name,
-          role: "Victim" as const,
-          strength: 50
-        }))
-      ];
-
-      setMessages(prev => [...prev, {
-        id: Math.random().toString(),
-        sender: "system",
-        text: "",
-        timestamp,
-        firData,
-        graphData: {
-          criminal: targetName,
-          connections
+        if (alertMsg) {
+          setMessages(prev => [...prev, {
+            id: Math.random().toString(),
+            sender: "security",
+            text: alertMsg,
+            timestamp
+          }]);
         }
-      }]);
+      }, 600);
+      return;
+    }
+
+    // 3. ADVISOR MODE
+    if (mode === "advisor") {
+      let bnsSec = "Section 303 (Theft)";
+      let ipcSec = "IPC Section 379";
+      let details = "Punishment: Imprisonment up to 3 years or fine. Non-bailable, triable by any Magistrate.";
+      
+      if (query.includes("theft") || query.includes("steal") || query.includes("stole") || query.includes("rob")) {
+        bnsSec = "BNS Section 303 (Theft)";
+        ipcSec = "IPC Section 379";
+        details = language === "kn"
+          ? "ಶಿಕ್ಷೆ: 3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ಅವರಿಂದ ವಿಚಾರಣೆ."
+          : "Punishment: Up to 3 years imprisonment, or fine, or both. Non-bailable, triable by any Magistrate.";
+      } else if (query.includes("trespass") || query.includes("break") || query.includes("night") || query.includes("window")) {
+        bnsSec = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
+        ipcSec = "IPC Section 457";
+        details = language === "kn"
+          ? "ಶಿಕ್ಷೆ: 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+          : "Punishment: Rigorous imprisonment up to 14 years and fine. Non-bailable, triable by Magistrate of First Class.";
+      } else if (query.includes("hurt") || query.includes("beat") || query.includes("assault") || query.includes("hit")) {
+        bnsSec = "BNS Section 115 (Voluntarily causing hurt)";
+        ipcSec = "IPC Section 323";
+        details = language === "kn"
+          ? "ಶಿಕ್ಷೆ: 1 ವರ್ಷದವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ಸಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+          : "Punishment: Imprisonment up to 1 year or fine. Bailable, triable by any Magistrate.";
+      } else if (query.includes("cyber") || query.includes("hack") || query.includes("online") || query.includes("phish") || query.includes("phone")) {
+        bnsSec = "BNS Section 318 (Cheating by impersonation & cyber fraud)";
+        ipcSec = "IPC Section 419 / 420";
+        details = language === "kn"
+          ? "ಶಿಕ್ಷೆ: 3 ರಿಂದ 7 ವರ್ಷಗಳ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಸೈಬರ್ ಪೊಲೀಸ್ ವ್ಯಾಪ್ತಿ."
+          : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, triable by Magistrate of First Class.";
+      } else {
+        bnsSec = "BNS Section 318(4) (Cheating and dishonestly inducing delivery of property)";
+        ipcSec = "IPC Section 420";
+        details = language === "kn"
+          ? "ಶಿಕ್ಷೆ: 7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+          : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, triable by Magistrate of First Class.";
+      }
+
+      const responseText = language === "kn"
+        ? `⚖️ [BNS ಕ್ರಾಸ್-ಮ್ಯಾಪಿಂಗ್ ವರದಿ]\n\n• ಹೊಸ ಬಿಎನ್‌ಎಸ್ ಸೆಕ್ಷನ್: ${bnsSec}\n• ಹಳೆಯ ಐಪಿಸಿ ಸೆಕ್ಷನ್: ${ipcSec}\n\n• ಕಾನೂನು ವಿವರಗಳು: ${details}\n\nಸಲಹೆ: ಈ ಸೆಕ್ಷನ್ಗಳನ್ನು ಎಫ್‌ಐಆರ್ ನ ಹಂತ 3 ರಲ್ಲಿ ನಮೂದಿಸಬೇಕು.`
+        : `⚖️ [LEGAL CROSS-MAPPING ANALYSIS]\n\n• New BNS Section: ${bnsSec}\n• Legacy IPC Section: ${ipcSec}\n\n• Procedural Details: ${details}\n\nOfficer Action: Map these sections inside Step 3 (Acts & Sections) of the FIR Filing form.`;
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          sender: "system",
+          text: responseText,
+          timestamp
+        }]);
+      }, 500);
     }
   };
 
@@ -448,11 +1006,7 @@ export function CopilotDrawer() {
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-sm bg-[#0b57d0] text-white border-2 border-ink shadow-[4px_4px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_0_#202124] transition-all duration-200 active:scale-95 group cursor-pointer animate-in fade-in duration-300"
         title={language === "kn" ? "SCRB ಇಂಟೆಲ್ ಅಸಿಸ್ಟೆಂಟ್" : "SCRB Intel Assistant"}
       >
-        <Bot className="h-6 w-6 group-hover:scale-110 transition-all duration-200" />
-        <span className="absolute -top-1 -right-1 flex h-4 w-4">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-sm bg-[#d93025] opacity-75"></span>
-          <span className="relative inline-flex rounded-sm h-4 w-4 bg-[#d93025] border-2 border-ink shadow-xs"></span>
-        </span>
+        <BotIcon className="h-7 w-7 animate-bot-float animate-bot-wobble transition-all duration-200" />
       </button>
 
       {/* Backdrop — UNBLURRED background overlay per user request */}
@@ -472,8 +1026,8 @@ export function CopilotDrawer() {
         {/* ── Header — Matches Website Masthead & Editorial Typography ── */}
         <div className="flex items-center gap-3 bg-paper border-b-4 border-ink px-5 py-4 text-ink shrink-0 justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-ink text-paper border-2 border-ink shrink-0 shadow-sm">
-              <Bot className="h-4.5 w-4.5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-white text-ink border-2 border-ink shrink-0 shadow-sm">
+              <BotIcon className="h-4.5 w-4.5 animate-bot-wobble" />
             </div>
             <div className="flex flex-col">
               <p className="font-editorial text-[15px] italic leading-none font-bold text-ink">{systemText.title}</p>
@@ -494,51 +1048,70 @@ export function CopilotDrawer() {
           </div>
         </div>
 
-        {/* ── Step Progress Indicator — Flat Border-2 Styled Pills ── */}
-        <div className="flex items-center gap-0 border-b-2 border-ink/15 bg-surface-2 shrink-0 px-5 py-3">
-          {/* Step 1 */}
-          <div className="flex items-center gap-2">
-            <div className={`flex h-5 w-5 items-center justify-center rounded-sm border-2 border-ink text-[9px] font-bold font-mono transition-all duration-300 ${
-              searchState.step >= 1 
-                ? "bg-[#0b57d0] text-white shadow-xs" 
-                : "bg-paper text-[#5f6368]"
-            }`}>
-              {searchState.step > 1 ? <BadgeCheck className="h-3 w-3 text-white" /> : "1"}
-            </div>
-            <span className={`text-[9px] font-mono font-bold tracking-wider uppercase transition-colors duration-300 ${
-              searchState.step === 1 ? "text-[#0b57d0]" : "text-[#5f6368]"
-            }`}>
-              {language === "kn" ? "ಹೆಸರು" : "Criminal Name"}
-            </span>
-          </div>
-
-          <ChevronRight className="h-3.5 w-3.5 text-ink/30 mx-2.5" />
-
-          {/* Step 2 */}
-          <div className="flex items-center gap-2">
-            <div className={`flex h-5 w-5 items-center justify-center rounded-sm border-2 border-ink text-[9px] font-bold font-mono transition-all duration-300 ${
-              searchState.step === 2 
-                ? "bg-[#0b57d0] text-white shadow-xs" 
-                : "bg-paper text-[#5f6368]"
-            }`}>
-              2
-            </div>
-            <span className={`text-[9px] font-mono font-bold tracking-wider uppercase transition-colors duration-300 ${
-              searchState.step === 2 ? "text-[#0b57d0]" : "text-[#5f6368]"
-            }`}>
-              {language === "kn" ? "FIR ಸಂಖ್ಯೆ" : "FIR Number"}
-            </span>
-          </div>
-
-          {searchState.name && (
-            <span className="ml-auto text-[9px] font-mono bg-[#e8f0fe] text-[#0b57d0] px-2.5 py-0.5 rounded-sm border-2 border-ink font-bold shadow-xs truncate max-w-[130px]">
-              🔍 {searchState.name}
-            </span>
-          )}
+        {/* Mode Tabs */}
+        <div className="grid grid-cols-3 border-b-2 border-ink bg-surface-2 shrink-0 p-1 gap-1">
+          <button
+            onClick={() => handleModeChange("standard")}
+            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+              mode === "standard"
+                ? "bg-[#0b57d0] text-white border-ink shadow-xs"
+                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+            }`}
+          >
+            {language === "kn" ? "🔍 ಸಾಮಾನ್ಯ ಶೋಧ" : "🔍 Standard"}
+          </button>
+          <button
+            onClick={() => handleModeChange("simulator")}
+            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+              mode === "simulator"
+                ? "bg-[#d93025] text-white border-ink shadow-xs"
+                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+            }`}
+          >
+            {language === "kn" ? "🎭 ಶಂಕಿತ ಸಿಮ್" : "🎭 Suspect Sim"}
+          </button>
+          <button
+            onClick={() => handleModeChange("advisor")}
+            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+              mode === "advisor"
+                ? "bg-amber-600 text-white border-ink shadow-xs"
+                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+            }`}
+          >
+            {language === "kn" ? "⚖️ BNS ಸಲಹೆಗಾರ" : "⚖️ BNS Advisor"}
+          </button>
         </div>
+
+
+
+        {mode === "simulator" && (
+          <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface-2 shrink-0 px-5 py-3 font-mono text-[9.5px] font-bold text-[#d93025] w-full">
+            🎭 {language === "kn" ? "ವಿಚಾರಣೆ ಸಿಮ್ಯುಲೇಟರ್ ಸಕ್ರಿಯವಾಗಿದೆ" : "SUSPECT SIMULATOR ACTIVE"}
+            {simulatorState.activeSuspect && (
+              <>
+                <span className="bg-rose-50 text-[#d93025] px-2 py-0.5 rounded-sm border border-[#d93025]/30 ml-2 truncate max-w-[120px]">
+                  🕵️ {simulatorState.activeSuspect.toUpperCase()}
+                </span>
+                <button
+                  onClick={() => setSimulatorState({ activeSuspect: "", turnCount: 0 })}
+                  className="ml-auto bg-paper hover:bg-surface-2 text-[#d93025] border-2 border-ink px-2 py-0.5 rounded-xs font-bold shadow-2xs cursor-pointer text-[8px]"
+                >
+                  {language === "kn" ? "ರೀಸೆಟ್" : "Reset"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {mode === "advisor" && (
+          <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface-2 shrink-0 px-5 py-3 font-mono text-[9.5px] font-bold text-amber-600">
+            ⚖️ {language === "kn" ? "BNS ಕಾನೂನು ಸಲಹೆಗಾರ ಸಕ್ರಿಯವಾಗಿದೆ" : "BNS LEGAL ADVISOR ACTIVE"}
+          </div>
+        )}
 
         {/* ── Messages Feed — Google Web Fonts & Editorial Aesthetic ── */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[11px] leading-relaxed text-ink bg-paper scrollbar-thin">
+
           {messages.map((m) => {
             if (m.sender === "user") {
               return (
@@ -575,8 +1148,8 @@ export function CopilotDrawer() {
               const f = m.firData;
               return (
                 <div key={m.id} className="flex gap-2.5 animate-in fade-in duration-300">
-                  <div className="h-7.5 w-7.5 rounded-sm bg-paper border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <Bot className="h-4.5 w-4.5 text-ink" />
+                  <div className="h-7.5 w-7.5 rounded-sm bg-white border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                    <BotIcon className="h-4.5 w-4.5 text-ink animate-bot-wobble" />
                   </div>
                   <div className="flex-1 flex flex-col gap-1.5 min-w-0">
                     <div className="bg-paper border-2 border-ink rounded-sm shadow-[4px_4px_0_0_#202124] overflow-hidden w-full">
@@ -785,96 +1358,188 @@ export function CopilotDrawer() {
                         );
                       })()}
 
-                      {/* Network Graph — Branded Platform View */}
-                      {m.graphData && m.graphData.connections.length > 0 && (
-                        <div className="border-t-2 border-ink p-4 bg-surface-2">
-                          <p className="text-[8.5px] uppercase tracking-wider text-[#d93025] mb-3 flex items-center gap-1 font-bold">
-                            <Network className="h-3.5 w-3.5 text-[#d93025] animate-[pulse_2s_infinite]" />
-                            {language === "kn" ? "ಸಂಪರ್ಕ ಜಾಲ" : "Connection Network"}
-                          </p>
-                          <div className="border-2 border-ink rounded-sm bg-paper relative overflow-hidden shadow-sm">
-                            {(() => {
-                              const conns = m.graphData!.connections;
-                              const cx = 200, cy = 95;
-                              const r = 70;
-                              const svgH = 190 + (conns.length > 4 ? 30 : 0);
-                              return (
-                                <svg viewBox={`0 0 400 ${svgH}`} className="w-full" style={{ height: `${svgH}px` }}>
-                                  <defs>
-                                    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
-                                      <stop offset="0%" stopColor="#d93025" stopOpacity="0.2" />
-                                      <stop offset="100%" stopColor="#d93025" stopOpacity="0" />
-                                    </radialGradient>
-                                  </defs>
+                      {/* Network Graph — Professional Radial Layout */}
+                      {m.graphData && m.graphData.connections.length > 0 && (() => {
+                        const conns = m.graphData!.connections;
+                        const W = 560, H = 300;
+                        const cx = W / 2, cy = H / 2;
+                        // Radius scales with count so nodes never overlap
+                        const r = Math.min(115, Math.max(80, 40 + conns.length * 18));
 
-                                  {/* Connection Lines */}
-                                  {conns.map((c, i) => {
-                                    const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
-                                    const tx = cx + r * Math.cos(angle);
-                                    const ty = cy + r * Math.sin(angle);
-                                    return (
-                                      <line key={i}
-                                        x1={cx} y1={cy} x2={tx} y2={ty}
-                                        stroke={c.role === "Co-Accused" ? "#f59e0b" : "#0b57d0"}
-                                        strokeWidth="1.75" strokeDasharray="5 3" opacity="0.85"
-                                      />
-                                    );
-                                  })}
-
-                                  {/* Center pulsing glow */}
-                                  <circle cx={cx} cy={cy} r="28" fill="url(#centerGlow)" className="animate-pulse" />
-                                  <circle cx={cx} cy={cy} r="17" fill="#d93025" stroke="currentColor" className="text-ink" strokeWidth="2.5" />
-                                  <text x={cx} y={cy - 2.5} textAnchor="middle" fill="#fff" fontSize="7" fontWeight="extrabold" className="font-sans">
-                                    {m.graphData!.criminal.split(" ").map(w => w[0]).join("").slice(0, 3).toUpperCase()}
-                                  </text>
-                                  <text x={cx} y={cy + 7.5} textAnchor="middle" fill="#fff" fontSize="5" fontWeight="black" opacity="0.95" className="font-mono tracking-wider">
-                                    TARGET
-                                  </text>
-
-                                  {/* Orbit Nodes */}
-                                  {conns.map((c, i) => {
-                                    const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
-                                    const tx = cx + r * Math.cos(angle);
-                                    const ty = cy + r * Math.sin(angle);
-                                    const color = c.role === "Co-Accused" ? "#f59e0b" : "#0b57d0";
-                                    const words = c.name.trim().split(" ");
-                                    const label1 = words[0] ?? "";
-                                    const label2 = words.slice(1).join(" ");
-                                    return (
-                                      <g key={i} className="cursor-pointer group" onClick={() => handleSearch(c.name)}>
-                                        <circle cx={tx} cy={ty} r="13" fill={color} stroke="currentColor" className="text-ink group-hover:scale-105 transition-transform duration-200" strokeWidth="2" opacity="0.95" />
-                                        <text x={tx} y={ty + 1} textAnchor="middle" fill="#fff" fontSize="6.5" fontWeight="bold" dominantBaseline="middle" className="font-sans pointer-events-none">
-                                          {c.name.split(" ").map(w => w[0]).join("").slice(0, 3).toUpperCase()}
-                                        </text>
-                                        {/* Name label below node */}
-                                        <text x={tx} y={ty + 20} textAnchor="middle" fill="currentColor" className="fill-ink font-sans pointer-events-none font-bold" fontSize="7">{label1}</text>
-                                        {label2 && <text x={tx} y={ty + 29} textAnchor="middle" fill="currentColor" className="fill-[#5f6368] font-sans pointer-events-none" fontSize="6">{label2}</text>}
-                                        <text x={tx} y={ty + (label2 ? 38 : 29)} textAnchor="middle" fill={color} fontSize="5.5" fontWeight="black" className="font-mono tracking-wider pointer-events-none">
-                                          {c.role === "Co-Accused" ? "CO-ACCUSED" : "VICTIM"}
-                                        </text>
-                                        <title>{c.name} · {c.role}</title>
-                                      </g>
-                                    );
-                                  })}
-
-                                  {/* Legend */}
-                                  <g transform="translate(10, 10)">
-                                    <circle cx="5" cy="5" r="4.5" fill="#f59e0b" />
-                                    <text x="14" y="8" fill="currentColor" className="fill-ink font-mono font-bold" fontSize="6">Co-Accused</text>
-                                    <circle cx="5" cy="17" r="4.5" fill="#0b57d0" />
-                                    <text x="14" y="20" fill="currentColor" className="fill-ink font-mono font-bold" fontSize="6">Victim</text>
-                                    <circle cx="5" cy="29" r="4.5" fill="#d93025" />
-                                    <text x="14" y="32" fill="currentColor" className="fill-ink font-mono font-bold" fontSize="6">Target Accused</text>
-                                  </g>
-                                </svg>
-                              );
-                            })()}
-                            <p className="text-[8px] text-center text-[#5f6368] tracking-wider py-2 bg-surface-2 border-t-2 border-ink font-mono font-bold">
-                              {systemText.clickToInterrogate}
+                        return (
+                          <div className="border-t-2 border-ink p-4 bg-surface-2">
+                            <p className="text-[8.5px] uppercase tracking-wider text-[#d93025] mb-3 flex items-center gap-1.5 font-bold">
+                              <Network className="h-3.5 w-3.5 text-[#d93025] animate-[pulse_2s_infinite]" />
+                              {language === "kn" ? "ಸಂಪರ್ಕ ಜಾಲ" : "Connection Network"}
+                              <span className="ml-auto text-[#5f6368] font-mono">{conns.length} node{conns.length !== 1 ? "s" : ""}</span>
                             </p>
+                            <div className="border-2 border-ink rounded-sm bg-[#0d1117] relative overflow-hidden shadow-sm">
+                              {(() => {
+                                return (
+                                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: `${H}px` }}>
+                                    <defs>
+                                      {/* Glow filter for target node */}
+                                      <filter id="targetGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feGaussianBlur stdDeviation="6" result="blur" />
+                                        <feMerge>
+                                          <feMergeNode in="blur" />
+                                          <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                      </filter>
+                                      {/* Soft glow for orbit nodes */}
+                                      <filter id="nodeGlow" x="-40%" y="-40%" width="180%" height="180%">
+                                        <feGaussianBlur stdDeviation="3.5" result="blur" />
+                                        <feMerge>
+                                          <feMergeNode in="blur" />
+                                          <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                      </filter>
+                                      {/* Gradient background */}
+                                      <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
+                                        <stop offset="0%" stopColor="#1a2035" />
+                                        <stop offset="100%" stopColor="#0d1117" />
+                                      </radialGradient>
+                                      {/* Target pulse ring gradient */}
+                                      <radialGradient id="pulseRing" cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.25" />
+                                        <stop offset="100%" stopColor="#d93025" stopOpacity="0" />
+                                      </radialGradient>
+                                      {/* Line gradient amber */}
+                                      <linearGradient id="lineAmber" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.6" />
+                                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.9" />
+                                      </linearGradient>
+                                      {/* Line gradient blue */}
+                                      <linearGradient id="lineBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.6" />
+                                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.9" />
+                                      </linearGradient>
+                                    </defs>
+
+                                    {/* Background */}
+                                    <rect width={W} height={H} fill="url(#bgGrad)" />
+
+                                    {/* Subtle grid lines */}
+                                    {[...Array(6)].map((_, i) => (
+                                      <circle key={`grid-${i}`} cx={cx} cy={cy} r={(i + 1) * (r / 3.5)}
+                                        fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.06" strokeDasharray="4 6" />
+                                    ))}
+
+                                    {/* Connection lines with gradient + glow */}
+                                    {conns.map((c, i) => {
+                                      const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
+                                      const tx = cx + r * Math.cos(angle);
+                                      const ty = cy + r * Math.sin(angle);
+                                      const gradId = c.role === "Co-Accused" ? "lineAmber" : "lineBlue";
+                                      const strokeColor = c.role === "Co-Accused" ? "#f59e0b" : "#3b82f6";
+                                      // Midpoint for glow dot
+                                      const mx = (cx + tx) / 2;
+                                      const my = (cy + ty) / 2;
+                                      return (
+                                        <g key={`line-${i}`}>
+                                          {/* Glow blur copy */}
+                                          <line x1={cx} y1={cy} x2={tx} y2={ty}
+                                            stroke={strokeColor} strokeWidth="4" opacity="0.15" />
+                                          {/* Main line */}
+                                          <line x1={cx} y1={cy} x2={tx} y2={ty}
+                                            stroke={`url(#${gradId})`} strokeWidth="1.5"
+                                            strokeDasharray="6 4" opacity="0.9" />
+                                          {/* Midpoint pulse dot */}
+                                          <circle cx={mx} cy={my} r="2.5"
+                                            fill={strokeColor} opacity="0.7" />
+                                        </g>
+                                      );
+                                    })}
+
+                                    {/* Target node — center */}
+                                    {/* Outer pulse rings */}
+                                    <circle cx={cx} cy={cy} r="46" fill="none" stroke="#d93025" strokeWidth="0.8" opacity="0.25" strokeDasharray="3 5" />
+                                    <circle cx={cx} cy={cy} r="36" fill="url(#pulseRing)" className="animate-pulse" />
+                                    {/* Main circle */}
+                                    <circle cx={cx} cy={cy} r="22"
+                                      fill="#d93025" stroke="#fff" strokeWidth="2"
+                                      filter="url(#targetGlow)" opacity="0.97" />
+                                    {/* Initials */}
+                                    <text x={cx} y={cy - 3} textAnchor="middle" fill="#fff"
+                                      fontSize="8.5" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
+                                      {m.graphData!.criminal.split(" ").map(w => w[0]).join("").slice(0, 3).toUpperCase()}
+                                    </text>
+                                    <text x={cx} y={cy + 9} textAnchor="middle" fill="#ffb3b0"
+                                      fontSize="5" fontWeight="900" fontFamily="monospace" letterSpacing="1">
+                                      TARGET
+                                    </text>
+                                    {/* Name label below */}
+                                    <text x={cx} y={cy + 31} textAnchor="middle" fill="#ffffff"
+                                      fontSize="7.5" fontWeight="bold" fontFamily="sans-serif">
+                                      {m.graphData!.criminal.split(" ")[0]}
+                                    </text>
+
+                                    {/* Orbit nodes */}
+                                    {conns.map((c, i) => {
+                                      const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
+                                      const tx = cx + r * Math.cos(angle);
+                                      const ty = cy + r * Math.sin(angle);
+                                      const color = c.role === "Co-Accused" ? "#f59e0b" : "#3b82f6";
+                                      const ringColor = c.role === "Co-Accused" ? "#fcd34d" : "#93c5fd";
+                                      const initials = c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                                      const nameParts = c.name.trim().split(" ");
+                                      const firstName = nameParts[0] ?? "";
+                                      const restName = nameParts.slice(1).join(" ");
+                                      return (
+                                        <g key={`node-${i}`} className="cursor-pointer" onClick={() => handleSearch(c.name)}>
+                                          {/* Outer strength ring */}
+                                          <circle cx={tx} cy={ty} r="20" fill="none"
+                                            stroke={ringColor} strokeWidth="1" opacity="0.35" strokeDasharray="3 3" />
+                                          {/* Node body */}
+                                          <circle cx={tx} cy={ty} r="15"
+                                            fill={color} stroke="#ffffff" strokeWidth="1.5"
+                                            filter="url(#nodeGlow)" opacity="0.95" />
+                                          {/* Initials */}
+                                          <text x={tx} y={ty + 1} textAnchor="middle" fill="#fff"
+                                            fontSize="7" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
+                                            {initials}
+                                          </text>
+                                          {/* Name labels */}
+                                          <text x={tx} y={ty + 24} textAnchor="middle" fill="#e2e8f0"
+                                            fontSize="7" fontWeight="bold" fontFamily="sans-serif">
+                                            {firstName}
+                                          </text>
+                                          {restName && (
+                                            <text x={tx} y={ty + 33} textAnchor="middle" fill="#94a3b8"
+                                              fontSize="6" fontFamily="sans-serif">
+                                              {restName}
+                                            </text>
+                                          )}
+                                          {/* Role badge */}
+                                          <text x={tx} y={ty + (restName ? 43 : 34)} textAnchor="middle"
+                                            fill={ringColor} fontSize="5.5" fontWeight="900" fontFamily="monospace" letterSpacing="0.8">
+                                            {c.role === "Co-Accused" ? "CO-ACCUSED" : "VICTIM"}
+                                          </text>
+                                          <title>{c.name} · {c.role} · Click to interrogate</title>
+                                        </g>
+                                      );
+                                    })}
+
+                                    {/* Legend — bottom left */}
+                                    <g transform={`translate(10, ${H - 42})`}>
+                                      <rect x="-4" y="-6" width="120" height="46" rx="3" fill="#0d1117" opacity="0.75" />
+                                      <circle cx="6" cy="6" r="5" fill="#f59e0b" opacity="0.95" />
+                                      <text x="16" y="10" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Co-Accused</text>
+                                      <circle cx="6" cy="20" r="5" fill="#3b82f6" opacity="0.95" />
+                                      <text x="16" y="24" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Victim</text>
+                                      <circle cx="6" cy="34" r="5" fill="#d93025" opacity="0.95" />
+                                      <text x="16" y="38" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Target Accused</text>
+                                    </g>
+                                  </svg>
+                                );
+                              })()}
+                              <p className="text-[8px] text-center text-slate-400 tracking-wider py-2 bg-[#111827] border-t border-white/10 font-mono font-bold">
+                                {systemText.clickToInterrogate}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Done footer */}
                       <div className="border-t-2 border-ink px-4 py-2.5 bg-surface-2 flex items-center gap-2 rounded-b-sm">
@@ -891,12 +1556,61 @@ export function CopilotDrawer() {
             // ── Generic system text bubble — Elegant Cards ──────────────────────────────
             return (
               <div key={m.id} className="flex gap-2.5 animate-in fade-in duration-200">
-                <div className="h-7.5 w-7.5 rounded-sm bg-paper border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                  <Bot className="h-4.5 w-4.5 text-ink" />
+                <div className="h-7.5 w-7.5 rounded-sm bg-white border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm animate-in zoom-in-50 duration-200">
+                  <BotIcon className="h-4.5 w-4.5 text-ink animate-bot-wobble" />
                 </div>
-                <div className="flex flex-col gap-1 max-w-[90%]">
-                  <div className="bg-paper border-2 border-ink text-ink px-4 py-3 rounded-sm shadow-[2px_2px_0_0_#202124]">
+                <div className="flex flex-col gap-1 max-w-[90%] w-full">
+                  <div className="bg-paper border-2 border-ink text-ink px-4 py-3 rounded-sm shadow-[2px_2px_0_0_#202124] w-full">
                     <p className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed font-medium">{m.text}</p>
+                    
+                    {/* Inline Form Bubble Rendering */}
+                    {m.formType === "name" && (
+                      <div className="mt-3.5 pt-3 border-t border-ink/10 space-y-2.5 font-sans">
+                        <input
+                          type="text"
+                          value={inlineName}
+                          onChange={(e) => setInlineName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleInlineNameSubmit(inlineName);
+                          }}
+                          placeholder={language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು..." : "e.g., Vijay Bhat"}
+                          className="w-full bg-paper border border-ink rounded-xs px-2 py-1 text-[11px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] font-sans"
+                          autoFocus
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => handleInlineNameSubmit(inlineName)}
+                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-mono text-[9px] uppercase tracking-widest font-extrabold px-3 py-1.5 rounded-xs border border-ink shadow-[1px_1px_0_0_#202124] cursor-pointer"
+                          >
+                            {language === "kn" ? "ಸಲ್ಲಿಸು" : "Submit"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {m.formType === "fir" && (
+                      <div className="mt-3.5 pt-3 border-t border-ink/10 space-y-2.5 font-sans">
+                        <input
+                          type="text"
+                          value={inlineFir}
+                          onChange={(e) => setInlineFir(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleInlineFirSubmit(inlineFir);
+                          }}
+                          placeholder={language === "kn" ? "FIR ಸಂಖ್ಯೆ..." : "e.g., FIR/BAG/2026/001"}
+                          className="w-full bg-paper border border-ink rounded-xs px-2 py-1 text-[11px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] font-mono"
+                          autoFocus
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => handleInlineFirSubmit(inlineFir)}
+                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-mono text-[9px] uppercase tracking-widest font-extrabold px-3 py-1.5 rounded-xs border border-ink shadow-[1px_1px_0_0_#202124] cursor-pointer"
+                          >
+                            {language === "kn" ? "ಸಲ್ಲಿಸು" : "Submit"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <span className="text-[8px] font-mono text-[#5f6368] tracking-wider pl-1.5">{m.timestamp}</span>
                 </div>
@@ -919,23 +1633,15 @@ export function CopilotDrawer() {
                   onClick={() => handleSearch(s.value)}
                   className="text-[9.5px] text-[#0b57d0] bg-paper border-2 border-ink hover:bg-[#0b57d0] hover:text-white px-3 py-1 rounded-sm shadow-[2px_2px_0_0_#202124] hover:shadow-[3px_3px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer font-bold"
                 >
-                  {s.type === "fir" ? "FIR: " : "Accused: "}{s.value}
+                  {s.type === "fir" ? "FIR: " : s.type === "name" ? "Accused: " : ""}{s.value}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Input Panel — Pill Shape & Glowing States ── */}
+        {/* ── Input Panel ── */}
         <div className="p-4 border-t-2 border-ink bg-paper shrink-0">
-          {/* Step 2 live format preview */}
-          {searchState.step === 2 && input && (
-            <div className="mb-3 px-3 py-2 bg-[#e8f0fe] border-2 border-ink rounded-sm flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-200">
-              <span className="text-[9px] text-[#0b57d0] font-mono font-bold tracking-wider">FORMAT PREVIEW:</span>
-              <span className="text-[10px] font-bold font-mono text-ink tracking-widest">{input}</span>
-              <span className="ml-auto text-[8.5px] text-emerald-700 font-bold flex items-center gap-0.5">✓ {language === "kn" ? "ಸ್ವಯಂ" : "AUTO"}</span>
-            </div>
-          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -947,7 +1653,7 @@ export function CopilotDrawer() {
               <input
                 type="text"
                 value={input}
-                onChange={(e) => handleInputChange(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
                 placeholder={systemText.placeholder}
                 className="w-full bg-paper border-2 border-ink rounded-sm pl-4 pr-12 py-3 text-[12px] text-ink font-sans focus:outline-none focus:border-[#0b57d0] placeholder-[#5f6368] transition-all"
               />
@@ -987,7 +1693,7 @@ export function CopilotDrawer() {
 
             <button
               type="submit"
-              className="bg-gradient-to-tr from-[#0b57d0] to-[#1a73e8] dark:from-[#3b82f6] dark:to-[#1d4ed8] hover:shadow-[0_4px_12px_rgba(11,87,208,0.25)] text-white p-3 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 shadow-sm hover:scale-105"
+              className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white p-3 rounded-sm border-2 border-ink flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 shadow-[2px_2px_0_0_#202124] hover:shadow-[3px_3px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5"
             >
               <Send className="h-4 w-4" />
             </button>
