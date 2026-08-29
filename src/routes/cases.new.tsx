@@ -152,11 +152,12 @@ function NewCasePage() {
     isPolice: boolean;
     injuryStatus: string;
     photo: string;
+    phone: string;
   }[]>([
-    { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "" }
+    { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "", phone: "" }
   ]);
 
-  const handleAddVictim = () => setVictims([...victims, { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "" }]);
+  const handleAddVictim = () => setVictims([...victims, { name: "", age: 30, gender: "M", isPolice: false, injuryStatus: "Uninjured", photo: "", phone: "" }]);
   const handleRemoveVictim = (index: number) => setVictims(victims.filter((_, i) => i !== index));
   const handleUpdateVictim = (index: number, field: string, value: any) => {
     const updated = [...victims];
@@ -192,8 +193,11 @@ function NewCasePage() {
     ioName: string;
     courtName: string;
     photo: string;
+    phone: string;
+    vehicleUsed: boolean;
+    vehicleNo: string;
   }[]>([
-    { name: "", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0], photo: "" }
+    { name: "", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0], photo: "", phone: "", vehicleUsed: false, vehicleNo: "" }
   ]);
 
   const handleAddAccused = () => setAccused([...accused, {
@@ -205,7 +209,10 @@ function NewCasePage() {
     arrestDistrict: DISTRICTS[0].name,
     ioName: registeringOfficer,
     courtName: courtName,
-    photo: ""
+    photo: "",
+    phone: "",
+    vehicleUsed: false,
+    vehicleNo: ""
   }]);
   const handleRemoveAccused = (index: number) => setAccused(accused.filter((_, i) => i !== index));
   const handleUpdateAccused = (index: number, field: string, value: any) => {
@@ -674,7 +681,8 @@ function NewCasePage() {
         gender: v.gender,
         isPolice: v.isPolice,
         injuryStatus: v.injuryStatus,
-        photo: v.photo
+        photo: v.photo,
+        phone: v.phone.trim()
       })),
       accused: accused.map((a, idx) => ({
         id: `A${idx + 1}`,
@@ -686,7 +694,10 @@ function NewCasePage() {
         arrestDistrict: a.arrested ? a.arrestDistrict : undefined,
         ioName: a.arrested ? a.ioName : undefined,
         courtName: a.arrested ? a.courtName : undefined,
-        photo: a.photo
+        photo: a.photo,
+        phone: a.phone.trim(),
+        vehicleUsed: a.vehicleUsed,
+        vehicleNo: a.vehicleUsed ? a.vehicleNo.trim() : ""
       })),
       latitude: Number(lat) || 12.9716,
       longitude: Number(lng) || 77.5946
@@ -1208,6 +1219,10 @@ function NewCasePage() {
                         <option value="Fatal">Fatal</option>
                       </select>
                     </div>
+                    <div className="w-32 flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone Number</label>
+                      <Input placeholder="Phone/Mobile" value={victim.phone} onChange={e => handleUpdateVictim(idx, "phone", e.target.value)} className="bg-paper border-border" />
+                    </div>
                     <PhotoUploadWidget
                       label="Victim Photo"
                       value={victim.photo}
@@ -1264,11 +1279,31 @@ function NewCasePage() {
                           <option value="T">Transgender</option>
                         </select>
                       </div>
+                      <div className="w-32 flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone Number</label>
+                        <Input placeholder="Phone/Mobile" value={acc.phone} onChange={e => handleUpdateAccused(idx, "phone", e.target.value)} className="bg-paper border-border" />
+                      </div>
                       <PhotoUploadWidget
                         label="Mugshot"
                         value={acc.photo}
                         onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
                       />
+                      <div className="flex items-center gap-2 h-9 px-2 pb-1">
+                        <input
+                          type="checkbox"
+                          id={`a-vehicle-${idx}`}
+                          checked={acc.vehicleUsed}
+                          onChange={e => handleUpdateAccused(idx, "vehicleUsed", e.target.checked)}
+                          className="form-checkbox h-4 w-4 text-signal rounded border-border"
+                        />
+                        <label htmlFor={`a-vehicle-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Vehicle Used?</label>
+                      </div>
+                      {acc.vehicleUsed && (
+                        <div className="w-36 flex flex-col gap-1 animate-in fade-in slide-in-from-left-2 duration-200">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Vehicle Number</label>
+                          <Input placeholder="KA-01-XX-0000" value={acc.vehicleNo} onChange={e => handleUpdateAccused(idx, "vehicleNo", e.target.value)} className="bg-paper border-border uppercase" />
+                        </div>
+                      )}
                       <div className="w-36 flex flex-col gap-1">
                         <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
                         <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
@@ -1517,6 +1552,7 @@ function NewCasePage() {
                       <div>
                         <span className="font-bold text-foreground">Victim #{i + 1}: {v.name}</span>
                         <span className="text-muted-foreground ml-2">({v.age} yrs, {v.gender})</span>
+                        {v.phone && <span className="text-muted-foreground ml-2 font-mono">· Tel: {v.phone}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1564,7 +1600,14 @@ function NewCasePage() {
                           ) : (
                             <div className="h-6 w-6 rounded bg-border flex items-center justify-center text-[7px] font-bold text-muted-foreground shrink-0">MUG</div>
                           )}
-                          <span>Accused #{i + 1}: {a.name} ({a.age} yrs, {a.gender})</span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-[11px] text-foreground">Accused #{i + 1}: {a.name} ({a.age} yrs, {a.gender})</span>
+                            <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono mt-0.5">
+                              {a.phone && <span>Tel: {a.phone}</span>}
+                              {a.phone && a.vehicleUsed && <span>·</span>}
+                              {a.vehicleUsed && <span>Vehicle: {a.vehicleNo || "Yes"}</span>}
+                            </div>
+                          </div>
                         </div>
                         <Badge variant={a.arrested ? "default" : "outline"} className="text-[9px]">
                           {a.arrested ? `Arrested (${a.arrestDistrict})` : "Wanted / At Large"}
