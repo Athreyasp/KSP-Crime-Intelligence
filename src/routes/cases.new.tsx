@@ -253,7 +253,20 @@ function NewCasePage() {
   // Geocode Complainant Residential Address
   const geocodeComplainantAddress = async () => {
     if (!complainantAddress) return;
-    const query = encodeURIComponent(`${complainantAddress}, Bengaluru, Karnataka, India`);
+    
+    // Clean trailing unclosed brackets, parentheses, spaces, or commas
+    const addressClean = complainantAddress.trim().replace(/[\(\[\{\,\s\-]+$/, "");
+    const addressLower = addressClean.toLowerCase();
+    
+    const queryParts = [addressClean];
+    if (!addressLower.includes("karnataka")) {
+      queryParts.push("Karnataka");
+    }
+    if (!addressLower.includes("india")) {
+      queryParts.push("India");
+    }
+    
+    const query = encodeURIComponent(queryParts.join(", "));
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
         headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
