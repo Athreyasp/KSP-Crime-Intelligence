@@ -45,6 +45,16 @@ const REGISTERING_OFFICERS = [
   "PSI Vinayaka Hegde (KGID: 32490)"
 ];
 
+const isLatLngInKarnataka = (latitude: number, longitude: number): boolean => {
+  // Karnataka Bounding Box
+  return (
+    latitude >= 11.4 &&
+    latitude <= 18.6 &&
+    longitude >= 73.9 &&
+    longitude <= 78.7
+  );
+};
+
 function PhotoUploadWidget({
   label,
   value,
@@ -345,20 +355,36 @@ function NewCasePage() {
 
     marker.on("dragend", async () => {
       const lngLat = marker.getLngLat();
-      const newLat = lngLat.lat.toFixed(4);
-      const newLng = lngLat.lng.toFixed(4);
-      setCompLat(newLat);
-      setCompLng(newLng);
+      const newLat = lngLat.lat;
+      const newLng = lngLat.lng;
+
+      if (!isLatLngInKarnataka(newLat, newLng)) {
+        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+        marker.setLngLat([Number(compLng), Number(compLat)]);
+        return;
+      }
+
+      const formattedLat = newLat.toFixed(4);
+      const formattedLng = newLng.toFixed(4);
+      setCompLat(formattedLat);
+      setCompLng(formattedLng);
 
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${formattedLat}&lon=${formattedLng}`, {
           headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.display_name) {
-            setComplainantAddress(data.display_name);
-            toast.success("Residential Address updated from map pin!");
+          if (data) {
+            if (data.address && data.address.state && !String(data.address.state).toLowerCase().includes("karnataka")) {
+              toast.error(`Invalid Location: Selected location is in ${data.address.state}. Address must be within Karnataka state.`);
+              marker.setLngLat([Number(compLng), Number(compLat)]);
+              return;
+            }
+            if (data.display_name) {
+              setComplainantAddress(data.display_name);
+              toast.success("Residential Address updated from map pin!");
+            }
           }
         }
       } catch (err) {
@@ -367,22 +393,37 @@ function NewCasePage() {
     });
 
     map.on("click", async (e) => {
-      const newLat = e.lngLat.lat.toFixed(4);
-      const newLng = e.lngLat.lng.toFixed(4);
-      setCompLat(newLat);
-      setCompLng(newLng);
+      const newLat = e.lngLat.lat;
+      const newLng = e.lngLat.lng;
+
+      if (!isLatLngInKarnataka(newLat, newLng)) {
+        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+        return;
+      }
+
+      const formattedLat = newLat.toFixed(4);
+      const formattedLng = newLng.toFixed(4);
+      setCompLat(formattedLat);
+      setCompLng(formattedLng);
       marker.setLngLat(e.lngLat);
       map.panTo(e.lngLat);
 
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${formattedLat}&lon=${formattedLng}`, {
           headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.display_name) {
-            setComplainantAddress(data.display_name);
-            toast.success("Residential Address updated from map click!");
+          if (data) {
+            if (data.address && data.address.state && !String(data.address.state).toLowerCase().includes("karnataka")) {
+              toast.error(`Invalid Location: Selected location is in ${data.address.state}. Address must be within Karnataka state.`);
+              marker.setLngLat([Number(compLng), Number(compLat)]);
+              return;
+            }
+            if (data.display_name) {
+              setComplainantAddress(data.display_name);
+              toast.success("Residential Address updated from map click!");
+            }
           }
         }
       } catch (err) {
@@ -465,20 +506,36 @@ function NewCasePage() {
 
     marker.on("dragend", async () => {
       const lngLat = marker.getLngLat();
-      const newLat = lngLat.lat.toFixed(4);
-      const newLng = lngLat.lng.toFixed(4);
-      setLat(newLat);
-      setLng(newLng);
+      const newLat = lngLat.lat;
+      const newLng = lngLat.lng;
+
+      if (!isLatLngInKarnataka(newLat, newLng)) {
+        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+        marker.setLngLat([Number(lng), Number(lat)]);
+        return;
+      }
+
+      const formattedLat = newLat.toFixed(4);
+      const formattedLng = newLng.toFixed(4);
+      setLat(formattedLat);
+      setLng(formattedLng);
 
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${formattedLat}&lon=${formattedLng}`, {
           headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.display_name) {
-            setOccurrencePlace(data.display_name);
-            toast.success("Occurrence Location updated from map pin!");
+          if (data) {
+            if (data.address && data.address.state && !String(data.address.state).toLowerCase().includes("karnataka")) {
+              toast.error(`Invalid Location: Selected location is in ${data.address.state}. Occurrence must be within Karnataka state.`);
+              marker.setLngLat([Number(lng), Number(lat)]);
+              return;
+            }
+            if (data.display_name) {
+              setOccurrencePlace(data.display_name);
+              toast.success("Occurrence Location updated from map pin!");
+            }
           }
         }
       } catch (err) {
@@ -487,22 +544,37 @@ function NewCasePage() {
     });
 
     map.on("click", async (e) => {
-      const newLat = e.lngLat.lat.toFixed(4);
-      const newLng = e.lngLat.lng.toFixed(4);
-      setLat(newLat);
-      setLng(newLng);
+      const newLat = e.lngLat.lat;
+      const newLng = e.lngLat.lng;
+
+      if (!isLatLngInKarnataka(newLat, newLng)) {
+        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+        return;
+      }
+
+      const formattedLat = newLat.toFixed(4);
+      const formattedLng = newLng.toFixed(4);
+      setLat(formattedLat);
+      setLng(formattedLng);
       marker.setLngLat(e.lngLat);
       map.panTo(e.lngLat);
 
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${formattedLat}&lon=${formattedLng}`, {
           headers: { "User-Agent": "KSP-Crime-Intelligence-Platform/1.0" }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.display_name) {
-            setOccurrencePlace(data.display_name);
-            toast.success("Occurrence Location updated from map click!");
+          if (data) {
+            if (data.address && data.address.state && !String(data.address.state).toLowerCase().includes("karnataka")) {
+              toast.error(`Invalid Location: Selected location is in ${data.address.state}. Occurrence must be within Karnataka state.`);
+              marker.setLngLat([Number(lng), Number(lat)]);
+              return;
+            }
+            if (data.display_name) {
+              setOccurrencePlace(data.display_name);
+              toast.success("Occurrence Location updated from map click!");
+            }
           }
         }
       } catch (err) {
@@ -563,6 +635,10 @@ function NewCasePage() {
         toast.error("Please enter complainant address.");
         return;
       }
+      if (!isLatLngInKarnataka(Number(compLat), Number(compLng))) {
+        toast.error("Invalid Location: Complainant coordinates must be within the border of Karnataka.");
+        return;
+      }
     }
     if (step === 2) {
       if (!policeStation.trim()) {
@@ -577,6 +653,10 @@ function NewCasePage() {
       }
       if (!lat.trim() || !lng.trim()) {
         toast.error("Please enter coordinates (Latitude/Longitude) in Step 3.");
+        return;
+      }
+      if (!isLatLngInKarnataka(Number(lat), Number(lng))) {
+        toast.error("Invalid Location: Crime occurrence coordinates must be within the border of Karnataka.");
         return;
       }
     }
@@ -605,6 +685,11 @@ function NewCasePage() {
       setStep(1);
       return;
     }
+    if (!isLatLngInKarnataka(Number(compLat), Number(compLng))) {
+      toast.error("Invalid Location: Complainant coordinates must be within the border of Karnataka.");
+      setStep(1);
+      return;
+    }
     if (!policeStation.trim()) {
       toast.error("Please enter police station name.");
       setStep(2);
@@ -612,6 +697,11 @@ function NewCasePage() {
     }
     if (!occurrencePlace.trim()) {
       toast.error("Please enter occurrence place.");
+      setStep(3);
+      return;
+    }
+    if (!isLatLngInKarnataka(Number(lat), Number(lng))) {
+      toast.error("Invalid Location: Crime occurrence coordinates must be within the border of Karnataka.");
       setStep(3);
       return;
     }
@@ -1108,6 +1198,10 @@ function NewCasePage() {
                           (position) => {
                             const newLat = position.coords.latitude.toFixed(4);
                             const newLng = position.coords.longitude.toFixed(4);
+                            if (!isLatLngInKarnataka(Number(newLat), Number(newLng))) {
+                              toast.error("Invalid GPS Location: Coordinates must be within the border of Karnataka.");
+                              return;
+                            }
                             setLat(newLat);
                             setLng(newLng);
                             if (occMapRef.current) occMapRef.current.panTo([Number(newLng), Number(newLat)]);
