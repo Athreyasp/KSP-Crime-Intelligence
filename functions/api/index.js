@@ -31,6 +31,7 @@ function getCatalystApp(req) {
   try {
     return catalyst.initialize(req);
   } catch (err) {
+    console.error("Catalyst initialization failed:", err.message || err);
     return null;
   }
 }
@@ -542,7 +543,9 @@ const postCasesHandler = async (req, res) => {
     if (datastore) {
       try {
         insertedCaseRow = await datastore.table('CaseMaster').insertRow(caseMasterPayload);
+        console.log(`CaseMaster inserted successfully: ID ${caseMasterIdVal}`);
       } catch (insertErr) {
+        console.error(`CaseMaster insert failed for ID ${caseMasterIdVal}:`, insertErr.message || insertErr);
         insertedCaseRow = { CaseMaster: caseMasterPayload };
       }
     } else {
@@ -574,7 +577,11 @@ const postCasesHandler = async (req, res) => {
       ReligionID: relMap[newCase.complainant?.religion || ""] || 7,
       CasteID: casteMap[newCase.complainant?.caste || ""] || 1
     };
-    if (datastore) await datastore.table('ComplainantDetails').insertRow(complainantPayload).catch(() => {});
+    if (datastore) {
+      await datastore.table('ComplainantDetails').insertRow(complainantPayload).catch((e) => {
+        console.error("ComplainantDetails insert failed:", e.message || e);
+      });
+    }
     memoryTableStore['ComplainantDetails'].push(complainantPayload);
 
     // 3. Victim (ROWID omitted)
@@ -587,7 +594,11 @@ const postCasesHandler = async (req, res) => {
       GenderID: genderMap[v.gender] || 1,
       VictimPolice: v.isPolice ? "1" : "0"
     }));
-    if (datastore) await datastore.table('Victim').insertRows(victimPayloads).catch(() => {});
+    if (datastore) {
+      await datastore.table('Victim').insertRows(victimPayloads).catch((e) => {
+        console.error("Victim insert failed:", e.message || e);
+      });
+    }
     victimPayloads.forEach(vp => memoryTableStore['Victim'].push(vp));
 
     // Upload Victim photos if present
@@ -611,7 +622,11 @@ const postCasesHandler = async (req, res) => {
       GenderID: genderMap[a.gender] || 1,
       PersonID: String(a.id || `A${idx + 1}`)
     }));
-    if (datastore) await datastore.table('Accused').insertRows(accusedPayloads).catch(() => {});
+    if (datastore) {
+      await datastore.table('Accused').insertRows(accusedPayloads).catch((e) => {
+        console.error("Accused insert failed:", e.message || e);
+      });
+    }
     accusedPayloads.forEach(ap => memoryTableStore['Accused'].push(ap));
 
     // Upload Accused photos if present
@@ -642,7 +657,11 @@ const postCasesHandler = async (req, res) => {
     });
 
     if (arrestPayloads.length > 0) {
-      if (datastore) await datastore.table('ArrestSurrender').insertRows(arrestPayloads).catch(() => {});
+      if (datastore) {
+        await datastore.table('ArrestSurrender').insertRows(arrestPayloads).catch((e) => {
+          console.error("ArrestSurrender insert failed:", e.message || e);
+        });
+      }
       arrestPayloads.forEach(ap => memoryTableStore['ArrestSurrender'].push(ap));
     } else {
       const defaultArrest = {
@@ -654,7 +673,11 @@ const postCasesHandler = async (req, res) => {
         ArrestSurrenderStateId: 1,
         ArrestSurrenderDistrictId: districtId
       };
-      if (datastore) await datastore.table('ArrestSurrender').insertRow(defaultArrest).catch(() => {});
+      if (datastore) {
+        await datastore.table('ArrestSurrender').insertRow(defaultArrest).catch((e) => {
+          console.error("Default ArrestSurrender insert failed:", e.message || e);
+        });
+      }
       memoryTableStore['ArrestSurrender'].push(defaultArrest);
     }
 
@@ -672,7 +695,11 @@ const postCasesHandler = async (req, res) => {
         SectionOrderID: idx + 1
       };
     });
-    if (datastore) await datastore.table('ActSectionAssociation').insertRows(actPayloads).catch(() => {});
+    if (datastore) {
+      await datastore.table('ActSectionAssociation').insertRows(actPayloads).catch((e) => {
+        console.error("ActSectionAssociation insert failed:", e.message || e);
+      });
+    }
     actPayloads.forEach(ap => memoryTableStore['ActSectionAssociation'].push(ap));
 
     // Upload finalized mapping

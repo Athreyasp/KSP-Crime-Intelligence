@@ -1300,56 +1300,82 @@ function NewCasePage() {
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
                 {victims.map((victim, idx) => (
-                  <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
-                    <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Victim {idx + 1} Name *</label>
-                      <Input placeholder="Victim Full Name" value={victim.name} onChange={e => handleUpdateVictim(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                  <div key={idx} className="relative p-4 bg-surface-2 border border-border/50 rounded-xl space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-border/30 pb-2">
+                      <span className="text-[11px] font-bold text-foreground font-mono uppercase tracking-wider">Victim Profile #{idx + 1}</span>
+                      {victims.length > 1 && (
+                        <Button 
+                          type="button" 
+                          onClick={() => handleRemoveVictim(idx)} 
+                          variant="ghost" 
+                          className="h-7 px-2 text-muted-foreground hover:text-signal hover:bg-transparent"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Remove
+                        </Button>
+                      )}
                     </div>
-                    <div className="w-20 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
-                      <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {/* Name */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
+                        <Input placeholder="Victim Full Name" value={victim.name} onChange={e => handleUpdateVictim(idx, "name", e.target.value)} className="bg-paper border-border" required />
+                      </div>
+                      
+                      {/* Phone */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone / Contact</label>
+                        <Input placeholder="Phone Number" value={victim.phone} onChange={e => handleUpdateVictim(idx, "phone", e.target.value)} className="bg-paper border-border" />
+                      </div>
+
+                      {/* Age & Gender side-by-side */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                          <Input type="number" value={victim.age} onChange={e => handleUpdateVictim(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                          <select value={victim.gender} onChange={e => handleUpdateVictim(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                            <option value="T">Transgender</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Injury Status */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Injury Status</label>
+                        <select value={victim.injuryStatus} onChange={e => handleUpdateVictim(idx, "injuryStatus", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                          <option value="Uninjured">Uninjured</option>
+                          <option value="Minor Injuries">Minor Injuries</option>
+                          <option value="Severe / Hospitalized">Severe / Hospitalized</option>
+                          <option value="Fatal">Fatal</option>
+                        </select>
+                      </div>
+
+                      {/* Photo Upload Widget */}
+                      <div className="flex flex-col gap-1.5">
+                        <PhotoUploadWidget
+                          label="Victim Photo"
+                          value={victim.photo}
+                          onChange={(base64) => handleUpdateVictim(idx, "photo", base64)}
+                        />
+                      </div>
+
+                      {/* Police Duty checkbox */}
+                      <div className="flex items-center gap-2 h-full pt-5">
+                        <input
+                          type="checkbox"
+                          id={`v-police-${idx}`}
+                          checked={victim.isPolice}
+                          onChange={e => handleUpdateVictim(idx, "isPolice", e.target.checked)}
+                          className="form-checkbox h-4 w-4 text-signal rounded border-border"
+                        />
+                        <label htmlFor={`v-police-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Police Duty? (VictimPolice)</label>
+                      </div>
                     </div>
-                    <div className="w-24 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
-                      <select value={victim.gender} onChange={e => handleUpdateVictim(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
-                        <option value="T">Transgender</option>
-                      </select>
-                    </div>
-                    <div className="w-36 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Injury Status</label>
-                      <select value={victim.injuryStatus} onChange={e => handleUpdateVictim(idx, "injuryStatus", e.target.value)} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
-                        <option value="Uninjured">Uninjured</option>
-                        <option value="Minor Injuries">Minor Injuries</option>
-                        <option value="Severe / Hospitalized">Severe / Hospitalized</option>
-                        <option value="Fatal">Fatal</option>
-                      </select>
-                    </div>
-                    <div className="w-32 flex flex-col gap-1">
-                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone Number</label>
-                      <Input placeholder="Phone/Mobile" value={victim.phone} onChange={e => handleUpdateVictim(idx, "phone", e.target.value)} className="bg-paper border-border" />
-                    </div>
-                    <PhotoUploadWidget
-                      label="Victim Photo"
-                      value={victim.photo}
-                      onChange={(base64) => handleUpdateVictim(idx, "photo", base64)}
-                    />
-                    <div className="flex items-center gap-2 h-9 px-2 pb-1">
-                      <input
-                        type="checkbox"
-                        id={`v-police-${idx}`}
-                        checked={victim.isPolice}
-                        onChange={e => handleUpdateVictim(idx, "isPolice", e.target.checked)}
-                        className="form-checkbox h-4 w-4 text-signal rounded border-border"
-                      />
-                      <label htmlFor={`v-police-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Police Duty? (VictimPolice)</label>
-                    </div>
-                    {victims.length > 1 && (
-                      <Button type="button" onClick={() => handleRemoveVictim(idx)} variant="destructive" className="h-9 px-3">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 ))}
               </CardContent>
@@ -1368,61 +1394,86 @@ function NewCasePage() {
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
                 {accused.map((acc, idx) => (
-                  <div key={idx} className="space-y-3.5 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
-                    <div className="flex flex-wrap md:flex-nowrap gap-3 items-end p-3.5 bg-surface-2 border border-border/50 rounded-md">
-                      <div className="flex-1 flex flex-col gap-1 min-w-[180px]">
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Accused {idx + 1} Name *</label>
+                  <div key={idx} className="relative p-4 bg-surface-2 border border-border/50 rounded-xl space-y-4 shadow-xs pb-5">
+                    <div className="flex items-center justify-between border-b border-border/30 pb-2">
+                      <span className="text-[11px] font-bold text-foreground font-mono uppercase tracking-wider">Accused Profile #{idx + 1}</span>
+                      {accused.length > 1 && (
+                        <Button 
+                          type="button" 
+                          onClick={() => handleRemoveAccused(idx)} 
+                          variant="ghost" 
+                          className="h-7 px-2 text-muted-foreground hover:text-signal hover:bg-transparent"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Remove
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {/* Name */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
                         <Input placeholder="Accused / Suspect Name" value={acc.name} onChange={e => handleUpdateAccused(idx, "name", e.target.value)} className="bg-paper border-border" required />
                       </div>
-                      <div className="w-20 flex flex-col gap-1">
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
-                        <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
+                      
+                      {/* Phone */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone / Contact</label>
+                        <Input placeholder="Phone Number" value={acc.phone} onChange={e => handleUpdateAccused(idx, "phone", e.target.value)} className="bg-paper border-border" />
                       </div>
-                      <div className="w-24 flex flex-col gap-1">
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
-                        <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
-                          <option value="M">Male</option>
-                          <option value="F">Female</option>
-                          <option value="T">Transgender</option>
-                        </select>
-                      </div>
-                      <div className="w-32 flex flex-col gap-1">
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Phone Number</label>
-                        <Input placeholder="Phone/Mobile" value={acc.phone} onChange={e => handleUpdateAccused(idx, "phone", e.target.value)} className="bg-paper border-border" />
-                      </div>
-                      <PhotoUploadWidget
-                        label="Mugshot"
-                        value={acc.photo}
-                        onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
-                      />
-                      <div className="flex items-center gap-2 h-9 px-2 pb-1">
-                        <input
-                          type="checkbox"
-                          id={`a-vehicle-${idx}`}
-                          checked={acc.vehicleUsed}
-                          onChange={e => handleUpdateAccused(idx, "vehicleUsed", e.target.checked)}
-                          className="form-checkbox h-4 w-4 text-signal rounded border-border"
-                        />
-                        <label htmlFor={`a-vehicle-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Vehicle Used?</label>
-                      </div>
-                      {acc.vehicleUsed && (
-                        <div className="w-36 flex flex-col gap-1 animate-in fade-in slide-in-from-left-2 duration-200">
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Vehicle Number</label>
-                          <Input placeholder="KA-01-XX-0000" value={acc.vehicleNo} onChange={e => handleUpdateAccused(idx, "vehicleNo", e.target.value)} className="bg-paper border-border uppercase" />
+
+                      {/* Age & Gender */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Age *</label>
+                          <Input type="number" value={acc.age} onChange={e => handleUpdateAccused(idx, "age", Number(e.target.value))} className="bg-paper border-border" required />
                         </div>
-                      )}
-                      <div className="w-36 flex flex-col gap-1">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                          <select value={acc.gender} onChange={e => handleUpdateAccused(idx, "gender", e.target.value)} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                            <option value="T">Transgender</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Arrest Status */}
+                      <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Arrest Status</label>
-                        <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2 py-1.5 rounded-md text-xs">
+                        <select value={acc.arrested ? "1" : "0"} onChange={e => handleUpdateAccused(idx, "arrested", e.target.value === "1")} className="form-select border border-border bg-paper px-2.5 py-1.5 rounded-md text-sm">
                           <option value="0">Wanted / At Large</option>
                           <option value="1">Arrested / In Custody</option>
                         </select>
                       </div>
-                      {accused.length > 1 && (
-                        <Button type="button" onClick={() => handleRemoveAccused(idx)} variant="destructive" className="h-9 px-3 shrink-0">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+
+                      {/* Mugshot Upload */}
+                      <div className="flex flex-col gap-1.5">
+                        <PhotoUploadWidget
+                          label="Mugshot"
+                          value={acc.photo}
+                          onChange={(base64) => handleUpdateAccused(idx, "photo", base64)}
+                        />
+                      </div>
+
+                      {/* Vehicle details */}
+                      <div className="flex flex-col gap-2.5 justify-center h-full pt-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`a-vehicle-${idx}`}
+                            checked={acc.vehicleUsed}
+                            onChange={e => handleUpdateAccused(idx, "vehicleUsed", e.target.checked)}
+                            className="form-checkbox h-4 w-4 text-signal rounded border-border"
+                          />
+                          <label htmlFor={`a-vehicle-${idx}`} className="text-xs font-semibold text-muted-foreground cursor-pointer select-none">Vehicle Used?</label>
+                        </div>
+                        {acc.vehicleUsed && (
+                          <div className="w-full animate-in fade-in slide-in-from-left-2 duration-200">
+                            <Input placeholder="Vehicle No (e.g. KA-01-XX-0000)" value={acc.vehicleNo} onChange={e => handleUpdateAccused(idx, "vehicleNo", e.target.value)} className="bg-paper border-border uppercase text-xs h-9" />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Behavioral DNA preview if offender is found in the database */}
