@@ -272,7 +272,12 @@ export async function syncWithCatalyst() {
         };
       });
 
-      saveCases(mergedCases);
+      // Also preserve any local cases that were not returned by Catalyst (e.g. newly created local cases, or cases whose remote sync is pending/failed)
+      const localOnlyCases = localCases.filter(lc => 
+        !liveCases.some(rc => rc.caseMasterId === lc.caseMasterId || rc.crimeNo === lc.crimeNo || String(rc.caseMasterId) === String(lc.caseMasterId))
+      );
+      const finalCases = [...mergedCases, ...localOnlyCases];
+      saveCases(finalCases);
     } else {
       // API returned empty — use mock seed data so dashboard is never blank
       if (loadedCases.length === 0) {
