@@ -143,7 +143,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
         age: Number(v.AgeYear) || 30,
         gender: v.GenderID === 2 || v.GenderID === "2" ? "F" : "M",
         isPolice: v.VictimPolice === true || v.VictimPolice === 1 || v.VictimPolice === "1" || v.VictimPolice === "true",
-        photo: v.photo || ""
+        photo: v.photo ? (v.photo.startsWith("/") ? `${API_BASE}${v.photo}` : v.photo) : ""
       }));
 
       const accused = mappedChildData.accused.map((a, aIdx) => {
@@ -162,7 +162,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
           arrestDistrict: isArrested ? (DISTRICTS.find(d => d.id === Number(arrestRecord.ArrestSurrenderDistrictId))?.name || "Bengaluru Urban") : undefined,
           ioName: isArrested ? `Officer ID ${arrestRecord.IOID}` : undefined,
           courtName: isArrested ? (COURTS[Number(arrestRecord.CourtID) - 1] || "JMFC Court") : undefined,
-          photo: a.photo || ""
+          photo: a.photo ? (a.photo.startsWith("/") ? `${API_BASE}${a.photo}` : a.photo) : ""
         };
       });
 
@@ -256,7 +256,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
         accused,
         latitude: lat,
         longitude: lng,
-        officerPhoto: row.officerPhoto || "",
+        officerPhoto: row.officerPhoto ? (row.officerPhoto.startsWith("/") ? `${API_BASE}${row.officerPhoto}` : row.officerPhoto) : "",
         chargesheetNo,
         chargesheetDate,
         chargesheetType

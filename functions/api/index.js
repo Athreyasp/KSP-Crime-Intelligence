@@ -12,8 +12,15 @@ app.use(express.urlencoded({ limit: '15mb', extended: true }));
 // request with ERR_FAILED. By echoing the incoming Origin we produce exactly
 // one valid value and the gateway header becomes redundant.
 app.use((req, res, next) => {
-  const origin = req.headers['origin'] || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  const origin = req.headers['origin'];
+  // If the request comes from the custom domain or the developer subdomain,
+  // Zoho Catalyst API Gateway automatically appends the CORS origin header.
+  // We do not set it in Express to prevent duplicate headers.
+  if (origin && (origin.includes('onslate.in') || origin.includes('catalystserverless.in'))) {
+    // Let the API Gateway handle Access-Control-Allow-Origin
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Catalyst-Token,X-CATALYST-AUTH');
@@ -74,7 +81,8 @@ async function savePhotoMapping(catalystApp) {
 async function getFolderByNameOrId(filestore, targetName) {
   try {
     const folders = await filestore.getFolderDetails();
-    if (folders && Array.isArray(folders)) {
+    if (folders && Array.isArray(folders) && folders.length > 0) {
+      // 1. Try to find the folder named 'photos'
       const found = folders.find(f => 
         (f.folder_name && f.folder_name.toLowerCase() === targetName.toLowerCase()) ||
         (f.folderName && f.folderName.toLowerCase() === targetName.toLowerCase())
@@ -82,6 +90,13 @@ async function getFolderByNameOrId(filestore, targetName) {
       if (found) {
         const id = found.id || found.folder_id || found.folderId;
         if (id) return filestore.folder(id);
+      }
+      // 2. Auto-fallback to the first folder present in this environment
+      const firstFolder = folders[0];
+      const fallbackId = firstFolder.id || firstFolder.folder_id || firstFolder.folderId;
+      if (fallbackId) {
+        console.log(`[Folder Lookup] Target folder '${targetName}' not found. Using first available folder: ${firstFolder.folder_name || firstFolder.folderName}`);
+        return filestore.folder(fallbackId);
       }
     }
   } catch (err) {
