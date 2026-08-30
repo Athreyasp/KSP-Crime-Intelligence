@@ -16,7 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DISTRICTS, CRIME_HEADS, MO_TAGS } from "@/data/mock";
+import { DISTRICTS, CRIME_HEADS, MO_TAGS, DISTRICT_COORDS, AREA_NAMES, AREA_COORDS } from "@/data/mock";
 import { addCase, clearDb, getStoredCases } from "@/lib/db";
 import {
   ShieldAlert, User, ShieldCheck, Plus, Trash2, Calendar, FileText, MapPin, Scale, Database, RefreshCcw, Landmark, CheckCircle2, AlertCircle, Edit3, ArrowRight, Clock, Phone, Home, Check
@@ -130,6 +130,8 @@ function NewCasePage() {
   const [complainantCaste, setComplainantCaste] = useState("General");
   const [complainantPhone, setComplainantPhone] = useState("+91 98765 43210");
   const [complainantAddress, setComplainantAddress] = useState("MG Road, Bengaluru");
+  const [complainantDistrict, setComplainantDistrict] = useState(DISTRICTS[0].name);
+  const [complainantSubArea, setComplainantSubArea] = useState(AREA_NAMES[DISTRICTS[0].name][0]);
   const [complainantRelation, setComplainantRelation] = useState("Self (Victim)");
   const [compLat, setCompLat] = useState("12.9716");
   const [compLng, setCompLng] = useState("77.5946");
@@ -299,6 +301,46 @@ function NewCasePage() {
     } catch (err) {
       console.error(err);
       toast.error("Network error fetching map coordinates.");
+    }
+  };
+
+  const handleDistrictSelect = (districtName: string) => {
+    setComplainantDistrict(districtName);
+    const subAreas = AREA_NAMES[districtName] ?? [];
+    const firstSubArea = subAreas[0] || "";
+    setComplainantSubArea(firstSubArea);
+
+    const subAreaCoord = AREA_COORDS[firstSubArea] ?? DISTRICT_COORDS[districtName] ?? [12.9716, 77.5946];
+    const newLat = subAreaCoord[0];
+    const newLng = subAreaCoord[1];
+    
+    setCompLat(newLat.toFixed(4));
+    setCompLng(newLng.toFixed(4));
+    setComplainantAddress(firstSubArea ? `${firstSubArea}, ${districtName}, Karnataka` : `${districtName}, Karnataka`);
+
+    if (compMapRef.current) {
+      compMapRef.current.flyTo({ center: [newLng, newLat], zoom: 12 });
+    }
+    if (compMarkerRef.current) {
+      compMarkerRef.current.setLngLat([newLng, newLat]);
+    }
+  };
+
+  const handleSubAreaSelect = (subAreaName: string) => {
+    setComplainantSubArea(subAreaName);
+    const subAreaCoord = AREA_COORDS[subAreaName] ?? DISTRICT_COORDS[complainantDistrict] ?? [12.9716, 77.5946];
+    const newLat = subAreaCoord[0];
+    const newLng = subAreaCoord[1];
+
+    setCompLat(newLat.toFixed(4));
+    setCompLng(newLng.toFixed(4));
+    setComplainantAddress(`${subAreaName}, ${complainantDistrict}, Karnataka`);
+
+    if (compMapRef.current) {
+      compMapRef.current.flyTo({ center: [newLng, newLat], zoom: 14 });
+    }
+    if (compMarkerRef.current) {
+      compMarkerRef.current.setLngLat([newLng, newLat]);
     }
   };
 
@@ -1029,7 +1071,32 @@ function NewCasePage() {
                   ))}
                 </select>
               </div>
-              <div className="md:col-span-3 flex flex-col gap-1">
+              {/* Complainant District & Sub-Area selection */}
+              <div className="md:col-span-2 flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Select Resident District *</label>
+                <select 
+                  value={complainantDistrict} 
+                  onChange={e => handleDistrictSelect(e.target.value)} 
+                  className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm"
+                >
+                  {DISTRICTS.map(d => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2 flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Select Resident Locality / Sub-Area *</label>
+                <select 
+                  value={complainantSubArea} 
+                  onChange={e => handleSubAreaSelect(e.target.value)} 
+                  className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm"
+                >
+                  {(AREA_NAMES[complainantDistrict] || []).map(sa => (
+                    <option key={sa} value={sa}>{sa}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-4 flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Residential Address *</label>
                 <div className="flex gap-2">
                   <Input 
