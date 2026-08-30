@@ -317,6 +317,13 @@ function Overview() {
 
   const { language, t } = useLanguage();
 
+  // Sort cases dynamically by date and Case ID descending (most recent first)
+  const sortedCasesForFeed = [...allCases].sort((a, b) => {
+    const dateDiff = new Date(b.registeredDate).getTime() - new Date(a.registeredDate).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return b.caseMasterId - a.caseMasterId;
+  });
+
   const [selectedId, setSelectedId] = useState<number>(() => DISTRICT_STATS[0]?.district.id ?? 1);
   const [isSyncing, setIsSyncing] = useState(false);
   const syncInfo = getCatalystSyncInfo();
@@ -599,7 +606,7 @@ function Overview() {
           </span>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {allCases.slice(-4).reverse().map((c) => {
+          {sortedCasesForFeed.slice(0, 4).map((c) => {
             const primaryVictim = c.victims?.[0];
             const primaryAccused = c.accused?.[0];
             return (
