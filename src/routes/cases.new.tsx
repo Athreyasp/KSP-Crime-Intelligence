@@ -633,6 +633,11 @@ function NewCasePage() {
     }
   };
 
+  const isValid10DigitPhone = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, "");
+    return cleaned.length === 10;
+  };
+
   // Step validation helpers
   const handleNextStep = () => {
     if (step === 1) {
@@ -642,6 +647,10 @@ function NewCasePage() {
       }
       if (!complainantPhone.trim()) {
         toast.error("Please enter complainant contact phone.");
+        return;
+      }
+      if (!isValid10DigitPhone(complainantPhone)) {
+        toast.error("Complainant contact phone must be exactly 10 digits.");
         return;
       }
       if (!complainantAddress.trim()) {
@@ -674,13 +683,45 @@ function NewCasePage() {
       }
     }
     if (step === 4) {
-      if (victims.some(v => !v.name.trim())) {
-        toast.error("Please fill in names for all victims in Step 4.");
-        return;
+      // 1. Victims validation
+      for (let i = 0; i < victims.length; i++) {
+        const v = victims[i];
+        if (!v.name.trim()) {
+          toast.error(`Please enter name for Victim #${i + 1}.`);
+          return;
+        }
+        if (v.phone.trim() && !isValid10DigitPhone(v.phone)) {
+          toast.error(`Victim #${i + 1} phone number must be exactly 10 digits.`);
+          return;
+        }
+        if (v.age <= 0 || v.age > 100) {
+          toast.error(`Victim #${i + 1} age must be between 1 and 100.`);
+          return;
+        }
+        if (!v.photo) {
+          toast.error(`Victim #${i + 1} photo is mandatory.`);
+          return;
+        }
       }
-      if (accused.some(a => !a.name.trim())) {
-        toast.error("Please fill in names for all accused persons in Step 4.");
-        return;
+      // 2. Accused validation
+      for (let i = 0; i < accused.length; i++) {
+        const a = accused[i];
+        if (!a.name.trim()) {
+          toast.error(`Please enter name for Accused #${i + 1}.`);
+          return;
+        }
+        if (a.phone.trim() && !isValid10DigitPhone(a.phone)) {
+          toast.error(`Accused #${i + 1} phone number must be exactly 10 digits.`);
+          return;
+        }
+        if (a.age <= 0 || a.age > 100) {
+          toast.error(`Accused #${i + 1} age must be between 1 and 100.`);
+          return;
+        }
+        if (!a.photo) {
+          toast.error(`Accused #${i + 1} photo/mugshot is mandatory.`);
+          return;
+        }
       }
     }
     setStep(prev => Math.min(prev + 1, 5));
@@ -695,6 +736,11 @@ function NewCasePage() {
     e.preventDefault();
     if (!complainantName.trim()) {
       toast.error("Please enter complainant name.");
+      setStep(1);
+      return;
+    }
+    if (!complainantPhone.trim() || !isValid10DigitPhone(complainantPhone)) {
+      toast.error("Complainant phone must be exactly 10 digits.");
       setStep(1);
       return;
     }
@@ -718,15 +764,53 @@ function NewCasePage() {
       setStep(3);
       return;
     }
-    if (victims.some(v => !v.name.trim())) {
-      toast.error("Please fill in names for all victims.");
-      setStep(4);
-      return;
+    // Final victims check
+    for (let i = 0; i < victims.length; i++) {
+      const v = victims[i];
+      if (!v.name.trim()) {
+        toast.error(`Please enter name for Victim #${i + 1}.`);
+        setStep(4);
+        return;
+      }
+      if (v.phone.trim() && !isValid10DigitPhone(v.phone)) {
+        toast.error(`Victim #${i + 1} phone number must be exactly 10 digits.`);
+        setStep(4);
+        return;
+      }
+      if (v.age <= 0 || v.age > 100) {
+        toast.error(`Victim #${i + 1} age must be between 1 and 100.`);
+        setStep(4);
+        return;
+      }
+      if (!v.photo) {
+        toast.error(`Victim #${i + 1} photo is mandatory.`);
+        setStep(4);
+        return;
+      }
     }
-    if (accused.some(a => !a.name.trim())) {
-      toast.error("Please fill in names for all accused.");
-      setStep(4);
-      return;
+    // Final accused check
+    for (let i = 0; i < accused.length; i++) {
+      const a = accused[i];
+      if (!a.name.trim()) {
+        toast.error(`Please enter name for Accused #${i + 1}.`);
+        setStep(4);
+        return;
+      }
+      if (a.phone.trim() && !isValid10DigitPhone(a.phone)) {
+        toast.error(`Accused #${i + 1} phone number must be exactly 10 digits.`);
+        setStep(4);
+        return;
+      }
+      if (a.age <= 0 || a.age > 100) {
+        toast.error(`Accused #${i + 1} age must be between 1 and 100.`);
+        setStep(4);
+        return;
+      }
+      if (!a.photo) {
+        toast.error(`Accused #${i + 1} photo/mugshot is mandatory.`);
+        setStep(4);
+        return;
+      }
     }
     if (!briefFacts.trim()) {
       toast.error("Please provide brief facts of the crime in Step 5.");
