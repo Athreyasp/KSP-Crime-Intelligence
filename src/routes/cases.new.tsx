@@ -680,6 +680,13 @@ function NewCasePage() {
     return cleaned.length === 10;
   };
 
+  const isValidIndianVehicleNo = (plate: string) => {
+    const cleaned = plate.replace(/[\s-]/g, "").toUpperCase();
+    const standardPattern = /^[A-Z]{2}\d{2}[A-Z]{0,2}\d{4}$/;
+    const bhPattern = /^\d{2}BH\d{4}[A-Z]{2}$/;
+    return standardPattern.test(cleaned) || bhPattern.test(cleaned);
+  };
+
   // Step validation helpers
   const handleNextStep = () => {
     if (step === 1) {
@@ -772,6 +779,16 @@ function NewCasePage() {
         if (!a.photo) {
           toast.error(`Accused #${i + 1} photo/mugshot is mandatory.`);
           return;
+        }
+        if (a.vehicleUsed) {
+          if (!a.vehicleNo.trim()) {
+            toast.error(`Accused #${i + 1} vehicle registration number is required.`);
+            return;
+          }
+          if (!isValidIndianVehicleNo(a.vehicleNo)) {
+            toast.error(`Accused #${i + 1} vehicle number must be a valid Indian format (e.g. KA04NC9090).`);
+            return;
+          }
         }
       }
     }
@@ -872,6 +889,18 @@ function NewCasePage() {
         toast.error(`Accused #${i + 1} photo/mugshot is mandatory.`);
         setStep(4);
         return;
+      }
+      if (a.vehicleUsed) {
+        if (!a.vehicleNo.trim()) {
+          toast.error(`Accused #${i + 1} vehicle registration number is required.`);
+          setStep(4);
+          return;
+        }
+        if (!isValidIndianVehicleNo(a.vehicleNo)) {
+          toast.error(`Accused #${i + 1} vehicle number must be a valid Indian format (e.g. KA04NC9090).`);
+          setStep(4);
+          return;
+        }
       }
     }
     if (!briefFacts.trim()) {
