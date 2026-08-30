@@ -333,6 +333,18 @@ export function detectAnomalies(cases: Case[]): AnomalyResult[] {
       reasons.push("Geospatial coordination error: Coordinates lie outside district boundary mesh");
     }
 
+    // 6. Extreme Gravity Event (Heinous offense)
+    if (c.gravity === "Heinous") {
+      anomalyScore += 0.25;
+      reasons.push("Severe threat profile: Flagged under heinous offense protocol");
+    }
+
+    // 7. Zero FIR (Jurisdictional boundary bypass)
+    if (c.category === "Zero FIR") {
+      anomalyScore += 0.20;
+      reasons.push("Precinct deviation: Zero FIR filed outside standard local jurisdiction");
+    }
+
     if (anomalyScore > 0.30) {
       anomaliesList.push({
         caseMasterId: c.caseMasterId,

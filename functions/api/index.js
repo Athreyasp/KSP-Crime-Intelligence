@@ -398,7 +398,10 @@ router.get('/photos/:fileId', async (req, res) => {
       }
     }
     console.error('Failed to download photo:', err.message);
-    res.status(404).send('Not Found');
+    // Return a clean default SVG avatar instead of a red 404 console error
+    const defaultAvatar = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#cbd5e1" width="24" height="24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-6.1 0-8 4-8 4h16s-1.9-4-8-4z"/></svg>`;
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.status(200).send(defaultAvatar);
   }
 });
 
@@ -474,8 +477,11 @@ const getCasesHandler = async (req, res) => {
       }
       return;
     } catch (err) {
-      console.error('Failed to download photo via query param:', err.message);
-      return res.status(404).send('Not Found');
+      console.error('Failed to download photo via query param, sending placeholder:', err.message);
+      // Return a clean default SVG avatar instead of a red 404 console error
+      const defaultAvatar = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#cbd5e1" width="24" height="24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-6.1 0-8 4-8 4h16s-1.9-4-8-4z"/></svg>`;
+      res.setHeader('Content-Type', 'image/svg+xml');
+      return res.status(200).send(defaultAvatar);
     }
   }
 
@@ -533,7 +539,7 @@ const getCasesHandler = async (req, res) => {
 
     // Format the cases and map photo assets from dynamic mapping registry
     const casesWithPhotos = normalizedCases.map(c => {
-      const officerKey = `officer_${c.PolicePersonID}`;
+      const officerKey = `officer_${c.PolicePersonID}_${c.CaseMasterID}`;
       const officerPhoto = photoMapping[officerKey]
         ? (photoMapping[officerKey].startsWith('data:image') ? photoMapping[officerKey] : `/server/api/cases?photo=${photoMapping[officerKey]}`)
         : undefined;
@@ -661,7 +667,7 @@ const postCasesHandler = async (req, res) => {
     // Upload Officer photo if present
     let officerPhotoUrl = "";
     if (newCase.officerPhoto) {
-      officerPhotoUrl = await uploadPhoto(catalystApp, newCase.officerPhoto, `officer_${policePersonId}`, caseMasterIdVal);
+      officerPhotoUrl = await uploadPhoto(catalystApp, newCase.officerPhoto, `officer_${policePersonId}_${caseMasterIdVal}`, caseMasterIdVal);
     }
 
     // 2. ComplainantDetails (ROWID omitted so Zoho auto-generates it)
