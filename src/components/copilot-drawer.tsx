@@ -1000,13 +1000,17 @@ export function CopilotDrawer() {
 
   return (
     <>
-      {/* Floating FAB — Premium Branded Material Editorial Square Button */}
+      {/* Floating FAB — Premium Branded Material Circular Icon Button without Blue Box */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-sm bg-[#0b57d0] text-white border-2 border-ink shadow-[4px_4px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_0_#202124] transition-all duration-200 active:scale-95 group cursor-pointer animate-in fade-in duration-300"
+        className="fixed bottom-6 right-6 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-transparent group cursor-pointer hover:scale-110 active:scale-95 transition-all duration-300"
         title={language === "kn" ? "SCRB ಇಂಟೆಲ್ ಅಸಿಸ್ಟೆಂಟ್" : "SCRB Intel Assistant"}
       >
-        <BotIcon className="h-7 w-7 animate-bot-float animate-bot-wobble transition-all duration-200" />
+        {/* Pulsing ring background animations to attract user's attention */}
+        <div className="absolute inset-0 rounded-full bg-black/15 dark:bg-white/20 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
+        <div className="absolute inset-0.5 rounded-full border border-black/15 dark:border-white/20 animate-pulse pointer-events-none" />
+
+        <BotIcon className="h-14 w-14 drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)] dark:drop-shadow-[0_6px_16px_rgba(255,255,255,0.2)] animate-bot-float animate-bot-wobble transition-all duration-200" />
       </button>
 
       {/* Backdrop — UNBLURRED background overlay per user request */}
@@ -1019,29 +1023,29 @@ export function CopilotDrawer() {
 
       {/* Drawer Panel — Website-Similar High-Contrast Editorial Style */}
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[480px] bg-paper border-l-4 border-ink shadow-[-4px_0_20px_rgba(0,0,0,0.06)] z-50 flex flex-col transition-all duration-300 ease-out transform ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-50 flex flex-col transition-all duration-300 ease-out transform ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {/* ── Header — Matches Website Masthead & Editorial Typography ── */}
-        <div className="flex items-center gap-3 bg-paper border-b-4 border-ink px-5 py-4 text-ink shrink-0 justify-between">
+        <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border-b border-slate-150 dark:border-slate-800 px-5 py-4 text-slate-800 dark:text-slate-100 shrink-0 justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-white text-ink border-2 border-ink shrink-0 shadow-sm">
-              <BotIcon className="h-4.5 w-4.5 animate-bot-wobble" />
+            <div className="flex h-10 w-10 items-center justify-center shrink-0">
+              <BotIcon className="h-10 w-10 drop-shadow-md animate-bot-wobble" />
             </div>
             <div className="flex flex-col">
-              <p className="font-editorial text-[15px] italic leading-none font-bold text-ink">{systemText.title}</p>
-              <p className="text-[9px] text-[#5f6368] font-mono tracking-widest uppercase mt-0.5">KSP · SCRB · SYSTEM INTEL</p>
+              <p className="font-sans text-[15px] font-bold text-slate-800 dark:text-slate-100 tracking-tight">{systemText.title}</p>
+              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-mono tracking-widest uppercase mt-0.5">KSP · SCRB · SYSTEM INTEL</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 font-mono">
-            <span className="flex items-center gap-1.5 bg-[#e8f0fe] border-2 border-ink rounded-sm px-2.5 py-0.5 shadow-sm text-[9px] font-bold text-[#0b57d0]">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse border border-ink shadow-[0_0_4px_#10b981]" />
+          <div className="flex items-center gap-2 font-mono">
+            <span className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/30 rounded-full px-3 py-1 shadow-xs text-[9px] font-bold text-blue-600 dark:text-blue-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               {systemText.statusOnline}
             </span>
             <button 
               onClick={() => setIsOpen(false)} 
-              className="p-1 rounded-sm border-2 border-ink bg-paper hover:bg-surface-2 text-ink shadow-sm cursor-pointer transition-colors active:scale-95"
+              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 cursor-pointer transition-colors active:scale-95"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1049,33 +1053,33 @@ export function CopilotDrawer() {
         </div>
 
         {/* Mode Tabs */}
-        <div className="grid grid-cols-3 border-b-2 border-ink bg-surface-2 shrink-0 p-1 gap-1">
+        <div className="grid grid-cols-3 bg-slate-100/80 dark:bg-slate-950/20 p-1.5 rounded-xl border border-slate-200/50 dark:border-slate-800/40 m-3 gap-1 shrink-0">
           <button
             onClick={() => handleModeChange("standard")}
-            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+            className={`py-2 text-[10.5px] font-sans font-semibold uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer ${
               mode === "standard"
-                ? "bg-[#0b57d0] text-white border-ink shadow-xs"
-                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+                ? "bg-[#0b57d0] text-white shadow-md shadow-blue-500/10"
+                : "text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-850/50"
             }`}
           >
             {language === "kn" ? "🔍 ಸಾಮಾನ್ಯ ಶೋಧ" : "🔍 Standard"}
           </button>
           <button
             onClick={() => handleModeChange("simulator")}
-            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+            className={`py-2 text-[10.5px] font-sans font-semibold uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer ${
               mode === "simulator"
-                ? "bg-[#d93025] text-white border-ink shadow-xs"
-                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+                ? "bg-rose-600 text-white shadow-md shadow-rose-500/10"
+                : "text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-850/50"
             }`}
           >
             {language === "kn" ? "🎭 ಶಂಕಿತ ಸಿಮ್" : "🎭 Suspect Sim"}
           </button>
           <button
             onClick={() => handleModeChange("advisor")}
-            className={`py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs border-2 transition-all cursor-pointer ${
+            className={`py-2 text-[10.5px] font-sans font-semibold uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer ${
               mode === "advisor"
-                ? "bg-amber-600 text-white border-ink shadow-xs"
-                : "bg-paper text-ink border-transparent hover:bg-surface-1"
+                ? "bg-amber-500 text-white shadow-md shadow-amber-500/10"
+                : "text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-850/50"
             }`}
           >
             {language === "kn" ? "⚖️ BNS ಸಲಹೆಗಾರ" : "⚖️ BNS Advisor"}
@@ -1085,11 +1089,11 @@ export function CopilotDrawer() {
 
 
         {mode === "simulator" && (
-          <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface-2 shrink-0 px-5 py-3 font-mono text-[9.5px] font-bold text-[#d93025] w-full">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 bg-rose-50/40 dark:bg-rose-950/10 shrink-0 px-5 py-2.5 font-sans text-[10px] font-bold text-rose-600 dark:text-rose-400 w-full">
             🎭 {language === "kn" ? "ವಿಚಾರಣೆ ಸಿಮ್ಯುಲೇಟರ್ ಸಕ್ರಿಯವಾಗಿದೆ" : "SUSPECT SIMULATOR ACTIVE"}
             {simulatorState.activeSuspect && (
               <>
-                <span className="bg-rose-50 text-[#d93025] px-2 py-0.5 rounded-sm border border-[#d93025]/30 ml-2 truncate max-w-[120px]">
+                <span className="bg-rose-100/60 dark:bg-rose-900/35 text-rose-700 dark:text-rose-300 px-2.5 py-0.5 rounded-full border border-rose-200/30 ml-2 truncate max-w-[120px]">
                   🕵️ {simulatorState.activeSuspect.toUpperCase()}
                 </span>
                 <button
@@ -1104,20 +1108,20 @@ export function CopilotDrawer() {
         )}
 
         {mode === "advisor" && (
-          <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface-2 shrink-0 px-5 py-3 font-mono text-[9.5px] font-bold text-amber-600">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 bg-amber-50/40 dark:bg-amber-950/10 shrink-0 px-5 py-2.5 font-sans text-[10px] font-bold text-amber-600 dark:text-amber-400">
             ⚖️ {language === "kn" ? "BNS ಕಾನೂನು ಸಲಹೆಗಾರ ಸಕ್ರಿಯವಾಗಿದೆ" : "BNS LEGAL ADVISOR ACTIVE"}
           </div>
         )}
 
         {/* ── Messages Feed — Google Web Fonts & Editorial Aesthetic ── */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[11px] leading-relaxed text-ink bg-paper scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[11px] leading-relaxed text-slate-700 dark:text-slate-350 bg-slate-50/50 dark:bg-slate-950/10 scrollbar-thin">
 
           {messages.map((m) => {
             if (m.sender === "user") {
               return (
                 <div key={m.id} className="flex flex-col items-end gap-1 animate-in fade-in duration-200">
-                  <div className="bg-[#e8f0fe] border-2 border-ink text-ink px-4 py-2.5 rounded-sm max-w-[85%] shadow-[2px_2px_0_0_#202124]">
-                    <p className="font-sans text-[11.5px] leading-snug font-bold">{m.text}</p>
+                  <div className="bg-[#0b57d0] text-white px-4 py-2.5 rounded-2xl rounded-tr-xs max-w-[85%] shadow-md shadow-blue-500/10 border border-blue-600/10">
+                    <p className="font-sans text-[11.5px] leading-relaxed font-semibold">{m.text}</p>
                   </div>
                   <span className="text-[8px] font-mono text-[#5f6368] tracking-wider pr-1.5">{m.timestamp}</span>
                 </div>
@@ -1127,11 +1131,13 @@ export function CopilotDrawer() {
             if (m.sender === "security") {
               return (
                 <div key={m.id} className="flex gap-2.5 animate-in fade-in duration-200">
-                  <div className="h-7.5 w-7.5 rounded-sm bg-rose-50 border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <ShieldAlert className="h-4.5 w-4.5 text-[#d93025]" />
+                  <div className="flex h-7.5 w-7.5 items-center justify-center shrink-0 mt-0.5">
+                    <div className="h-7.5 w-7.5 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center border border-rose-200/30">
+                      <ShieldAlert className="h-4.5 w-4.5 text-[#d93025]" />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-1.5 max-w-[90%]">
-                    <div className="bg-rose-50 border-2 border-[#d93025] text-ink px-4 py-3 rounded-sm shadow-[2px_2px_0_0_#d93025]">
+                    <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 text-slate-800 dark:text-rose-250 px-4 py-3 rounded-2xl rounded-tl-xs shadow-sm">
                       <p className="font-bold text-[9px] text-[#d93025] mb-1 tracking-wider uppercase flex items-center gap-1 font-mono">
                         ⚠️ {language === "kn" ? "ಭದ್ರತಾ ಉಲ್ಲಂಘನೆ" : "SECURITY VIOLATION"}
                       </p>
@@ -1148,8 +1154,8 @@ export function CopilotDrawer() {
               const f = m.firData;
               return (
                 <div key={m.id} className="flex gap-2.5 animate-in fade-in duration-300">
-                  <div className="h-7.5 w-7.5 rounded-sm bg-white border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <BotIcon className="h-4.5 w-4.5 text-ink animate-bot-wobble" />
+                  <div className="flex h-7.5 w-7.5 items-center justify-center shrink-0 mt-0.5">
+                    <BotIcon className="h-7.5 w-7.5 drop-shadow-sm animate-bot-wobble" />
                   </div>
                   <div className="flex-1 flex flex-col gap-1.5 min-w-0">
                     <div className="bg-paper border-2 border-ink rounded-sm shadow-[4px_4px_0_0_#202124] overflow-hidden w-full">
@@ -1367,65 +1373,49 @@ export function CopilotDrawer() {
                         const r = Math.min(115, Math.max(80, 40 + conns.length * 18));
 
                         return (
-                          <div className="border-t-2 border-ink p-4 bg-surface-2">
+                          <div className="border-t border-slate-100 p-4 bg-slate-50/50">
                             <p className="text-[8.5px] uppercase tracking-wider text-[#d93025] mb-3 flex items-center gap-1.5 font-bold">
                               <Network className="h-3.5 w-3.5 text-[#d93025] animate-[pulse_2s_infinite]" />
                               {language === "kn" ? "ಸಂಪರ್ಕ ಜಾಲ" : "Connection Network"}
-                              <span className="ml-auto text-[#5f6368] font-mono">{conns.length} node{conns.length !== 1 ? "s" : ""}</span>
+                              <span className="ml-auto text-slate-400 font-mono">{conns.length} node{conns.length !== 1 ? "s" : ""}</span>
                             </p>
-                            <div className="border-2 border-ink rounded-sm bg-[#0d1117] relative overflow-hidden shadow-sm">
+                            <div className="border border-slate-250 rounded-xl bg-white relative overflow-hidden shadow-xs">
                               {(() => {
                                 return (
                                   <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: `${H}px` }}>
                                     <defs>
-                                      {/* Glow filter for target node */}
-                                      <filter id="targetGlow" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feGaussianBlur stdDeviation="6" result="blur" />
-                                        <feMerge>
-                                          <feMergeNode in="blur" />
-                                          <feMergeNode in="SourceGraphic" />
-                                        </feMerge>
-                                      </filter>
-                                      {/* Soft glow for orbit nodes */}
-                                      <filter id="nodeGlow" x="-40%" y="-40%" width="180%" height="180%">
-                                        <feGaussianBlur stdDeviation="3.5" result="blur" />
-                                        <feMerge>
-                                          <feMergeNode in="blur" />
-                                          <feMergeNode in="SourceGraphic" />
-                                        </feMerge>
-                                      </filter>
-                                      {/* Gradient background */}
-                                      <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
-                                        <stop offset="0%" stopColor="#1a2035" />
-                                        <stop offset="100%" stopColor="#0d1117" />
-                                      </radialGradient>
                                       {/* Target pulse ring gradient */}
                                       <radialGradient id="pulseRing" cx="50%" cy="50%" r="50%">
-                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.25" />
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.15" />
                                         <stop offset="100%" stopColor="#d93025" stopOpacity="0" />
                                       </radialGradient>
                                       {/* Line gradient amber */}
                                       <linearGradient id="lineAmber" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.6" />
-                                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.9" />
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.5" />
+                                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.8" />
                                       </linearGradient>
                                       {/* Line gradient blue */}
                                       <linearGradient id="lineBlue" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.6" />
-                                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.9" />
+                                        <stop offset="0%" stopColor="#d93025" stopOpacity="0.5" />
+                                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.8" />
                                       </linearGradient>
+                                      {/* Gradient background */}
+                                      <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
+                                        <stop offset="0%" stopColor="#f8fafc" stopOpacity="1" />
+                                        <stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
+                                      </radialGradient>
                                     </defs>
 
                                     {/* Background */}
                                     <rect width={W} height={H} fill="url(#bgGrad)" />
 
-                                    {/* Subtle grid lines */}
+                                    {/* Subtle grid lines matching network page */}
                                     {[...Array(6)].map((_, i) => (
                                       <circle key={`grid-${i}`} cx={cx} cy={cy} r={(i + 1) * (r / 3.5)}
-                                        fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.06" strokeDasharray="4 6" />
+                                        fill="none" stroke="#0f172a" strokeWidth="0.4" opacity="0.05" strokeDasharray="4 6" />
                                     ))}
 
-                                    {/* Connection lines with gradient + glow */}
+                                    {/* Connection lines with gradient */}
                                     {conns.map((c, i) => {
                                       const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
                                       const tx = cx + r * Math.cos(angle);
@@ -1437,81 +1427,88 @@ export function CopilotDrawer() {
                                       const my = (cy + ty) / 2;
                                       return (
                                         <g key={`line-${i}`}>
-                                          {/* Glow blur copy */}
-                                          <line x1={cx} y1={cy} x2={tx} y2={ty}
-                                            stroke={strokeColor} strokeWidth="4" opacity="0.15" />
                                           {/* Main line */}
                                           <line x1={cx} y1={cy} x2={tx} y2={ty}
-                                            stroke={`url(#${gradId})`} strokeWidth="1.5"
-                                            strokeDasharray="6 4" opacity="0.9" />
+                                            stroke={`url(#${gradId})`} strokeWidth="1.2"
+                                            strokeDasharray="5 3" opacity="0.8" />
                                           {/* Midpoint pulse dot */}
-                                          <circle cx={mx} cy={my} r="2.5"
-                                            fill={strokeColor} opacity="0.7" />
+                                          <circle cx={mx} cy={my} r="2"
+                                            fill={strokeColor} opacity="0.6" />
                                         </g>
                                       );
                                     })}
 
-                                    {/* Target node — center */}
-                                    {/* Outer pulse rings */}
-                                    <circle cx={cx} cy={cy} r="46" fill="none" stroke="#d93025" strokeWidth="0.8" opacity="0.25" strokeDasharray="3 5" />
-                                    <circle cx={cx} cy={cy} r="36" fill="url(#pulseRing)" className="animate-pulse" />
-                                    {/* Main circle */}
-                                    <circle cx={cx} cy={cy} r="22"
-                                      fill="#d93025" stroke="#fff" strokeWidth="2"
-                                      filter="url(#targetGlow)" opacity="0.97" />
+                                    {/* Target node — center matching network.tsx style */}
+                                    <circle cx={cx} cy={cy} r="40" fill="none" stroke="#d93025" strokeWidth="0.8" opacity="0.2" strokeDasharray="3 5" />
+                                    <circle cx={cx} cy={cy} r="30" fill="url(#pulseRing)" className="animate-pulse" />
+                                    
+                                    <circle cx={cx} cy={cy} r="18" fill="#ffffff" stroke="#d93025" strokeWidth="2.5" />
+                                    <circle cx={cx} cy={cy} r="11" fill="#d93025" />
+                                    
                                     {/* Initials */}
-                                    <text x={cx} y={cy - 3} textAnchor="middle" fill="#fff"
-                                      fontSize="8.5" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
+                                    <text x={cx} y={cy} textAnchor="middle" fill="#ffffff"
+                                      fontSize="7.5" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
                                       {m.graphData!.criminal.split(" ").map(w => w[0]).join("").slice(0, 3).toUpperCase()}
                                     </text>
-                                    <text x={cx} y={cy + 9} textAnchor="middle" fill="#ffb3b0"
-                                      fontSize="5" fontWeight="900" fontFamily="monospace" letterSpacing="1">
+                                    
+                                    {/* Target labels */}
+                                    <text x={cx} y={cy + 28} textAnchor="middle" fill="#d93025"
+                                      fontSize="7" fontWeight="900" fontFamily="sans-serif" letterSpacing="1">
                                       TARGET
                                     </text>
-                                    {/* Name label below */}
-                                    <text x={cx} y={cy + 31} textAnchor="middle" fill="#ffffff"
-                                      fontSize="7.5" fontWeight="bold" fontFamily="sans-serif">
+                                    <text x={cx} y={cy + 39} textAnchor="middle" fill="#0f172a"
+                                      fontSize="8" fontWeight="bold" fontFamily="sans-serif">
                                       {m.graphData!.criminal.split(" ")[0]}
                                     </text>
 
-                                    {/* Orbit nodes */}
+                                    {/* Orbit nodes matching network.tsx style */}
                                     {conns.map((c, i) => {
                                       const angle = (i * 2 * Math.PI) / conns.length - Math.PI / 2;
                                       const tx = cx + r * Math.cos(angle);
                                       const ty = cy + r * Math.sin(angle);
                                       const color = c.role === "Co-Accused" ? "#f59e0b" : "#3b82f6";
-                                      const ringColor = c.role === "Co-Accused" ? "#fcd34d" : "#93c5fd";
+                                      const ringColor = c.role === "Co-Accused" ? "#d97706" : "#2563eb";
                                       const initials = c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                                       const nameParts = c.name.trim().split(" ");
                                       const firstName = nameParts[0] ?? "";
                                       const restName = nameParts.slice(1).join(" ");
+                                      const isCoAccused = c.role === "Co-Accused";
+
                                       return (
                                         <g key={`node-${i}`} className="cursor-pointer" onClick={() => handleSearch(c.name)}>
-                                          {/* Outer strength ring */}
-                                          <circle cx={tx} cy={ty} r="20" fill="none"
-                                            stroke={ringColor} strokeWidth="1" opacity="0.35" strokeDasharray="3 3" />
-                                          {/* Node body */}
-                                          <circle cx={tx} cy={ty} r="15"
-                                            fill={color} stroke="#ffffff" strokeWidth="1.5"
-                                            filter="url(#nodeGlow)" opacity="0.95" />
+                                          {/* Outer dotted orbit ring */}
+                                          <circle cx={tx} cy={ty} r="18" fill="none"
+                                            stroke={color} strokeWidth="0.8" opacity="0.15" strokeDasharray="3 3" />
+                                          
+                                          {/* Node body shape */}
+                                          {isCoAccused ? (
+                                            <g>
+                                              <circle cx={tx} cy={ty} r="14" fill="#ffffff" stroke="#f59e0b" strokeWidth="2" />
+                                              <circle cx={tx} cy={ty} r="8" fill="#f59e0b" />
+                                            </g>
+                                          ) : (
+                                            <circle cx={tx} cy={ty} r="12" fill="#3b82f6" stroke="#ffffff" strokeWidth="1.5" />
+                                          )}
+
                                           {/* Initials */}
-                                          <text x={tx} y={ty + 1} textAnchor="middle" fill="#fff"
-                                            fontSize="7" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
+                                          <text x={tx} y={ty} textAnchor="middle" fill="#fff"
+                                            fontSize="6.5" fontWeight="bold" dominantBaseline="middle" fontFamily="monospace">
                                             {initials}
                                           </text>
+                                          
                                           {/* Name labels */}
-                                          <text x={tx} y={ty + 24} textAnchor="middle" fill="#e2e8f0"
-                                            fontSize="7" fontWeight="bold" fontFamily="sans-serif">
+                                          <text x={tx} y={ty + 22} textAnchor="middle" fill="#0f172a"
+                                            fontSize="7.5" fontWeight="bold" fontFamily="sans-serif">
                                             {firstName}
                                           </text>
                                           {restName && (
-                                            <text x={tx} y={ty + 33} textAnchor="middle" fill="#94a3b8"
+                                            <text x={tx} y={ty + 30} textAnchor="middle" fill="#64748b"
                                               fontSize="6" fontFamily="sans-serif">
                                               {restName}
                                             </text>
                                           )}
                                           {/* Role badge */}
-                                          <text x={tx} y={ty + (restName ? 43 : 34)} textAnchor="middle"
+                                          <text x={tx} y={ty + (restName ? 40 : 31)} textAnchor="middle"
                                             fill={ringColor} fontSize="5.5" fontWeight="900" fontFamily="monospace" letterSpacing="0.8">
                                             {c.role === "Co-Accused" ? "CO-ACCUSED" : "VICTIM"}
                                           </text>
@@ -1522,18 +1519,18 @@ export function CopilotDrawer() {
 
                                     {/* Legend — bottom left */}
                                     <g transform={`translate(10, ${H - 42})`}>
-                                      <rect x="-4" y="-6" width="120" height="46" rx="3" fill="#0d1117" opacity="0.75" />
-                                      <circle cx="6" cy="6" r="5" fill="#f59e0b" opacity="0.95" />
-                                      <text x="16" y="10" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Co-Accused</text>
-                                      <circle cx="6" cy="20" r="5" fill="#3b82f6" opacity="0.95" />
-                                      <text x="16" y="24" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Victim</text>
-                                      <circle cx="6" cy="34" r="5" fill="#d93025" opacity="0.95" />
-                                      <text x="16" y="38" fill="#e2e8f0" fontFamily="monospace" fontSize="6.5" fontWeight="bold">Target Accused</text>
+                                      <rect x="-4" y="-6" width="105" height="46" rx="6" fill="#ffffff" stroke="#e2e8f0" strokeWidth="1" />
+                                      <circle cx="6" cy="6" r="4.5" fill="#f59e0b" />
+                                      <text x="16" y="9" fill="#475569" fontFamily="sans-serif" fontSize="6.5" fontWeight="bold">Co-Accused</text>
+                                      <circle cx="6" cy="20" r="4.5" fill="#3b82f6" />
+                                      <text x="16" y="23" fill="#475569" fontFamily="sans-serif" fontSize="6.5" fontWeight="bold">Victim</text>
+                                      <circle cx="6" cy="34" r="4.5" fill="#d93025" />
+                                      <text x="16" y="37" fill="#475569" fontFamily="sans-serif" fontSize="6.5" fontWeight="bold">Target Accused</text>
                                     </g>
                                   </svg>
                                 );
                               })()}
-                              <p className="text-[8px] text-center text-slate-400 tracking-wider py-2 bg-[#111827] border-t border-white/10 font-mono font-bold">
+                              <p className="text-[8px] text-center text-slate-500 tracking-wider py-2 bg-slate-100/60 border-t border-slate-200/80 font-sans font-semibold">
                                 {systemText.clickToInterrogate}
                               </p>
                             </div>
@@ -1556,16 +1553,16 @@ export function CopilotDrawer() {
             // ── Generic system text bubble — Elegant Cards ──────────────────────────────
             return (
               <div key={m.id} className="flex gap-2.5 animate-in fade-in duration-200">
-                <div className="h-7.5 w-7.5 rounded-sm bg-white border-2 border-ink flex items-center justify-center shrink-0 mt-0.5 shadow-sm animate-in zoom-in-50 duration-200">
-                  <BotIcon className="h-4.5 w-4.5 text-ink animate-bot-wobble" />
+                <div className="flex h-7.5 w-7.5 items-center justify-center shrink-0 mt-0.5 animate-in zoom-in-50 duration-200">
+                  <BotIcon className="h-7.5 w-7.5 drop-shadow-sm animate-bot-wobble" />
                 </div>
                 <div className="flex flex-col gap-1 max-w-[90%] w-full">
-                  <div className="bg-paper border-2 border-ink text-ink px-4 py-3 rounded-sm shadow-[2px_2px_0_0_#202124] w-full">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-800 dark:text-slate-100 px-4.5 py-3.5 rounded-2xl rounded-tl-xs shadow-sm w-full">
                     <p className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed font-medium">{m.text}</p>
                     
                     {/* Inline Form Bubble Rendering */}
                     {m.formType === "name" && (
-                      <div className="mt-3.5 pt-3 border-t border-ink/10 space-y-2.5 font-sans">
+                      <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5 font-sans">
                         <input
                           type="text"
                           value={inlineName}
@@ -1574,13 +1571,13 @@ export function CopilotDrawer() {
                             if (e.key === "Enter") handleInlineNameSubmit(inlineName);
                           }}
                           placeholder={language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು..." : "e.g., Vijay Bhat"}
-                          className="w-full bg-paper border border-ink rounded-xs px-2 py-1 text-[11px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] font-sans"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-[11.5px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] focus:ring-1 focus:ring-[#0b57d0]/30 font-sans transition-all duration-200"
                           autoFocus
                         />
                         <div className="flex justify-end">
                           <button
                             onClick={() => handleInlineNameSubmit(inlineName)}
-                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-mono text-[9px] uppercase tracking-widest font-extrabold px-3 py-1.5 rounded-xs border border-ink shadow-[1px_1px_0_0_#202124] cursor-pointer"
+                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-sans text-[10px] font-semibold px-4.5 py-1.8 rounded-lg shadow-sm shadow-blue-500/10 cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                           >
                             {language === "kn" ? "ಸಲ್ಲಿಸು" : "Submit"}
                           </button>
@@ -1589,7 +1586,7 @@ export function CopilotDrawer() {
                     )}
 
                     {m.formType === "fir" && (
-                      <div className="mt-3.5 pt-3 border-t border-ink/10 space-y-2.5 font-sans">
+                      <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5 font-sans">
                         <input
                           type="text"
                           value={inlineFir}
@@ -1598,13 +1595,13 @@ export function CopilotDrawer() {
                             if (e.key === "Enter") handleInlineFirSubmit(inlineFir);
                           }}
                           placeholder={language === "kn" ? "FIR ಸಂಖ್ಯೆ..." : "e.g., FIR/BAG/2026/001"}
-                          className="w-full bg-paper border border-ink rounded-xs px-2 py-1 text-[11px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] font-mono"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-[11.5px] placeholder-slate-400 focus:outline-none focus:border-[#0b57d0] focus:ring-1 focus:ring-[#0b57d0]/30 font-mono transition-all duration-200"
                           autoFocus
                         />
                         <div className="flex justify-end">
                           <button
                             onClick={() => handleInlineFirSubmit(inlineFir)}
-                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-mono text-[9px] uppercase tracking-widest font-extrabold px-3 py-1.5 rounded-xs border border-ink shadow-[1px_1px_0_0_#202124] cursor-pointer"
+                            className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white font-sans text-[10px] font-semibold px-4.5 py-1.8 rounded-lg shadow-sm shadow-blue-500/10 cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                           >
                             {language === "kn" ? "ಸಲ್ಲಿಸು" : "Submit"}
                           </button>
@@ -1622,8 +1619,8 @@ export function CopilotDrawer() {
 
         {/* ── Suggestion Pills — High-Contrast Clean Layout ── */}
         {suggestions.length > 0 && (
-          <div className="px-5 py-3 border-t-2 border-ink bg-surface-2 shrink-0">
-            <span className="text-[9px] uppercase tracking-widest text-[#5f6368] font-bold font-mono">
+          <div className="px-5 py-3 border-t border-slate-150 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
+            <span className="text-[9px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold font-sans">
               {systemText.suggestionsTitle}
             </span>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -1631,7 +1628,7 @@ export function CopilotDrawer() {
                 <button
                   key={idx}
                   onClick={() => handleSearch(s.value)}
-                  className="text-[9.5px] text-[#0b57d0] bg-paper border-2 border-ink hover:bg-[#0b57d0] hover:text-white px-3 py-1 rounded-sm shadow-[2px_2px_0_0_#202124] hover:shadow-[3px_3px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer font-bold"
+                  className="text-[10px] text-[#0b57d0] dark:text-blue-400 bg-white dark:bg-slate-900 border border-blue-200/50 dark:border-slate-850 hover:bg-[#0b57d0] dark:hover:bg-blue-600 hover:text-white dark:hover:text-white px-3.5 py-1 rounded-full shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-250 cursor-pointer font-semibold"
                 >
                   {s.type === "fir" ? "FIR: " : s.type === "name" ? "Accused: " : ""}{s.value}
                 </button>
@@ -1641,13 +1638,13 @@ export function CopilotDrawer() {
         )}
 
         {/* ── Input Panel ── */}
-        <div className="p-4 border-t-2 border-ink bg-paper shrink-0">
+        <div className="p-4 border-t border-slate-150 dark:border-slate-800/80 bg-white dark:bg-slate-900 shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSearch(input);
             }}
-            className="flex gap-2.5 items-center"
+            className="flex gap-3 items-center"
           >
             <div className="flex-1 relative flex items-center">
               <input
@@ -1655,7 +1652,7 @@ export function CopilotDrawer() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={systemText.placeholder}
-                className="w-full bg-paper border-2 border-ink rounded-sm pl-4 pr-12 py-3 text-[12px] text-ink font-sans focus:outline-none focus:border-[#0b57d0] placeholder-[#5f6368] transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-4 pr-12 py-3 text-[12px] text-slate-800 dark:text-slate-100 font-sans focus:outline-none focus:border-[#0b57d0] focus:ring-2 focus:ring-[#0b57d0]/10 placeholder-slate-400 transition-all duration-200"
               />
 
               {/* Mic button */}
@@ -1674,7 +1671,7 @@ export function CopilotDrawer() {
 
               {/* Listening soundwave overlay */}
               {isListening && (
-                <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950 flex items-center justify-between px-4 rounded-2xl pointer-events-none">
+                <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950 flex items-center justify-between px-4 rounded-xl pointer-events-none">
                   <div className="flex items-center gap-2 text-rose-500 animate-pulse">
                     <Mic className="h-4.5 w-4.5 fill-rose-500" />
                     <span className="text-[9.5px] font-mono uppercase tracking-widest font-extrabold">
@@ -1693,7 +1690,7 @@ export function CopilotDrawer() {
 
             <button
               type="submit"
-              className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white p-3 rounded-sm border-2 border-ink flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 shadow-[2px_2px_0_0_#202124] hover:shadow-[3px_3px_0_0_#202124] hover:-translate-x-0.5 hover:-translate-y-0.5"
+              className="bg-[#0b57d0] hover:bg-[#0b57d0]/90 text-white p-3 rounded-xl flex items-center justify-center transition-all duration-300 cursor-pointer active:scale-95 shadow-md shadow-blue-500/10 hover:shadow-lg hover:shadow-blue-500/15 hover:-translate-y-0.5"
             >
               <Send className="h-4 w-4" />
             </button>

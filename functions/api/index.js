@@ -6,10 +6,18 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
+// Reflect the request's own Origin to avoid conflicts with the Catalyst API
+// Gateway which also sets Access-Control-Allow-Origin. Sending two values
+// ('https://kspcrimeintelligence.onslate.in, *') causes browsers to block the
+// request with ERR_FAILED. By echoing the incoming Origin we produce exactly
+// one valid value and the gateway header becomes redundant.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers['origin'] || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Catalyst-Token,X-CATALYST-AUTH');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
