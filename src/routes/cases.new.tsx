@@ -123,12 +123,12 @@ function NewCasePage() {
   // SECTION 1: COMPLAINANT DETAILS
   // ==========================================
   const [complainantName, setComplainantName] = useState("");
-  const [complainantAge, setComplainantAge] = useState("35");
+  const [complainantAge, setComplainantAge] = useState("");
   const [complainantGender, setComplainantGender] = useState("M");
   const [complainantOccupation, setComplainantOccupation] = useState("Business");
   const [complainantReligion, setComplainantReligion] = useState("Hindu");
   const [complainantCaste, setComplainantCaste] = useState("General");
-  const [complainantPhone, setComplainantPhone] = useState("+91 98765 43210");
+  const [complainantPhone, setComplainantPhone] = useState("");
   const [complainantAddress, setComplainantAddress] = useState("MG Road, Bengaluru");
   const [complainantDistrict, setComplainantDistrict] = useState(DISTRICTS[0].name);
   const [complainantSubArea, setComplainantSubArea] = useState(AREA_NAMES[DISTRICTS[0].name][0]);
@@ -687,6 +687,15 @@ function NewCasePage() {
         toast.error("Please enter complainant name in Step 1.");
         return;
       }
+      if (!complainantAge.trim()) {
+        toast.error("Please enter complainant age in Step 1.");
+        return;
+      }
+      const ageVal = Number(complainantAge);
+      if (isNaN(ageVal) || ageVal <= 0 || ageVal > 100) {
+        toast.error("Complainant age must be between 1 and 100.");
+        return;
+      }
       if (!complainantPhone.trim()) {
         toast.error("Please enter complainant contact phone.");
         return;
@@ -778,6 +787,17 @@ function NewCasePage() {
     e.preventDefault();
     if (!complainantName.trim()) {
       toast.error("Please enter complainant name.");
+      setStep(1);
+      return;
+    }
+    if (!complainantAge.trim()) {
+      toast.error("Please enter complainant age.");
+      setStep(1);
+      return;
+    }
+    const ageVal = Number(complainantAge);
+    if (isNaN(ageVal) || ageVal <= 0 || ageVal > 100) {
+      toast.error("Complainant age must be between 1 and 100.");
       setStep(1);
       return;
     }
