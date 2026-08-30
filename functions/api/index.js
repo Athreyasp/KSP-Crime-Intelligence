@@ -265,6 +265,90 @@ const TABLE_METADATA = [
 const memoryTableStore = {};
 TABLE_METADATA.forEach(t => { memoryTableStore[t.name] = []; });
 
+// ── FILE STORE PERSISTENCE ────────────────────────────────────────────────────
+// Persists all case data as a single JSON file in Catalyst File Store.
+// This requires NO Datastore table creation — works immediately out of the box.
+const DB_FILE_NAME = 'ksp_cases_db.json';
+let fileStoreDbFileId = null;
+let fileStoreInitialized = false;
+
+async function getDbFolder(catalystApp) {
+  try {
+    const filestore = catalystApp.filestore();
+    return await getFolderByNameOrId(filestore, 'photos');
+  } catch (e) {
+    return null;
+  }
+}
+
+async function loadFromFileStore(catalystApp) {
+  if (!catalystApp) return false;
+  try {
+    const folder = await getDbFolder(catalystApp);
+    if (!folder) return false;
+
+    const files = await folder.getFiles().catch(() => []);
+    const dbFile = (files || []).find(f =>
+      (f.file_name || f.fileName || '').toLowerCase() === DB_FILE_NAME.toLowerCase()
+    );
+    if (!dbFile) return false;
+
+    const fid = dbFile.id || dbFile.file_id || dbFile.fileId;
+    fileStoreDbFileId = fid;
+
+    const stream = await folder.downloadFile(fid);
+    const chunks = [];
+    await new Promise((resolve, reject) => {
+      stream.on('data', d => chunks.push(d));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+
+    // Populate memoryTableStore from file
+    if (json && typeof json === 'object') {
+      Object.keys(json).forEach(k => {
+        if (Array.isArray(json[k])) memoryTableStore[k] = json[k];
+      });
+    }
+    console.log(`[FileStore] Loaded DB from ${DB_FILE_NAME}: ${(memoryTableStore['CaseMaster'] || []).length} cases`);
+    return true;
+  } catch (e) {
+    console.log('[FileStore] Load failed:', e.message);
+    return false;
+  }
+}
+
+async function saveToFileStore(catalystApp) {
+  if (!catalystApp) return;
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    const folder = await getDbFolder(catalystApp);
+    if (!folder) return;
+
+    const jsonStr = JSON.stringify(memoryTableStore);
+    const tmpPath = path.join(os.tmpdir(), DB_FILE_NAME);
+    fs.writeFileSync(tmpPath, jsonStr, 'utf8');
+
+    // Delete old file if exists
+    if (fileStoreDbFileId) {
+      await folder.deleteFile(fileStoreDbFileId).catch(() => {});
+      fileStoreDbFileId = null;
+    }
+
+    const uploaded = await folder.uploadFile({ name: DB_FILE_NAME, path: tmpPath });
+    fileStoreDbFileId = uploaded?.id || uploaded?.file_id || uploaded?.fileId || null;
+
+    try { fs.unlinkSync(tmpPath); } catch (e) {}
+    console.log(`[FileStore] Saved DB: ${(memoryTableStore['CaseMaster'] || []).length} cases`);
+  } catch (e) {
+    console.error('[FileStore] Save failed:', e.message);
+  }
+}
+
 // Health check / root endpoint
 router.get('/health', (req, res) => {
   res.status(200).json({
@@ -395,7 +479,13 @@ const getCasesHandler = async (req, res) => {
     }
   }
 
-  // If SDK init failed, return in-memory store immediately (mock data or previously seeded data)
+  // Try to load persisted data from File Store on first request
+  if (!fileStoreInitialized) {
+    fileStoreInitialized = true;
+    await loadFromFileStore(catalystApp).catch(() => {});
+  }
+
+  // If SDK init failed, return in-memory store (may have been pre-loaded from File Store)
   if (!catalystApp) {
     return res.status(200).json({
       status: 'success',
@@ -742,6 +832,9 @@ const postCasesHandler = async (req, res) => {
       writeMasterEntry('UnitType', { UnitTypeID: 1, UnitTypeName: 'Law and Order PS', CityDistState: 'Bengaluru District', Hierarchy: 1, Active: 1 }),
       writeMasterEntry('CrimeHeadActSection', { CrimeHeadID: crimeHeadId, ActCode: 'BNS', SectionCode: '103' })
     ]);
+
+    // Persist the updated memoryTableStore to File Store so data survives restarts
+    saveToFileStore(catalystAppPost).catch(() => {});
 
     res.status(200).json({
       status: 'success',
