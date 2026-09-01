@@ -560,14 +560,16 @@ function Predictive() {
               <div key={c.caseMasterId} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 flex flex-col justify-between hover:border-rose-500/40 transition-all shadow-sm">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-rose-500 font-bold">FIR {c.crimeNo}</span>
+                    <span className="font-mono text-xs text-rose-500 font-bold">
+                      {c.crimeNo.startsWith("FIR") ? c.crimeNo : `FIR ${c.crimeNo}`}
+                    </span>
                     <Badge className="bg-rose-500/10 text-rose-600 border border-rose-500/30 text-[10px] font-mono">{t("Score")} · {c.score}</Badge>
                   </div>
                   <p className="mt-2.5 text-xs font-bold text-ink uppercase tracking-tight">{t(c.crimeHead)} — {t(c.districtName)}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-normal line-clamp-2">{t(c.briefFacts)}</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-rose-500/25 flex flex-wrap gap-1.5">
-                  {c.reasons.map((r, rIdx) => (
+                  {c.reasons.map((r: string, rIdx: number) => (
                     <Badge key={rIdx} variant="outline" className="text-[9.5px] border-rose-500/20 text-rose-600 bg-rose-500/5 font-medium px-2 py-0.5 rounded-full">
                       {t(r)}
                     </Badge>

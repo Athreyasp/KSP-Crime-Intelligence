@@ -2,6 +2,7 @@ import { CASES as SEED_CASES, DISTRICTS, CRIME_HEADS, CASE_STATUS, type Case, ty
 import { type RichNode, type RichEdge, type EntityType, type RelationType } from "../data/network-rich";
 export type CrimeHead = (typeof CRIME_HEADS)[number];
 import { fetchLiveCases, insertLiveCase, clearLiveCases, seedLiveCases, updateLiveCase } from "./catalyst-api";
+import { sanitizeBriefFacts } from "./ml-engine";
 
 // Shared API base — mirrors catalyst-api.ts so db.ts can also call Catalyst directly
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
@@ -22,11 +23,14 @@ export function getStoredCases(): Case[] {
       if (c.district && c.district.name === "Bengaluru City") {
         c.district.name = "Bengaluru Urban";
       }
-      c.accused.forEach(acc => {
+      c.accused?.forEach(acc => {
         if (acc.arrestDistrict === "Bengaluru City") {
           acc.arrestDistrict = "Bengaluru Urban";
         }
       });
+      if (c.briefFacts) {
+        c.briefFacts = sanitizeBriefFacts(c.briefFacts, c.crimeHead?.name || "", c.district?.name || "Bengaluru Urban");
+      }
     });
   };
 

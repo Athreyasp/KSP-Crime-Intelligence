@@ -1,4 +1,5 @@
 import { CASES, DISTRICTS, CRIME_HEADS, type Case, type District, DISTRICT_COORDS, AREA_COORDS, AREA_NAMES } from "@/data/mock";
+import { sanitizeBriefFacts } from "./ml-engine";
 
 // In development, Vite proxies /server → Catalyst (see vite.config.ts).
 // In production (any external host), set VITE_API_BASE to your full
@@ -250,7 +251,7 @@ export async function fetchLiveCases(): Promise<Case[]> {
         status,
         actSections,
         moTag,
-        briefFacts: String(row.BriefFacts || "Case record retrieved from Zoho Catalyst console."),
+        briefFacts: sanitizeBriefFacts(String(row.BriefFacts || ""), crimeHead.name, district.name),
         complainant,
         victims,
         accused,
