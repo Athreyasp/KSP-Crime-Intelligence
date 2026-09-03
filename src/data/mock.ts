@@ -111,7 +111,7 @@ export type Case = {
     address?: string;
   };
   victims: { name: string; age: number; gender: string; isPolice?: boolean; photo?: string; phone?: string }[];
-  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string; photo?: string; phone?: string; vehicleUsed?: boolean; vehicleNo?: string }[];
+  accused: { id: string; name: string; age: number; gender: string; arrestId?: number; arrestDate?: string; arrestDistrict?: string; ioName?: string; courtName?: string; photo?: string; phone?: string; vehicleUsed?: boolean; vehicleNo?: string; physicalMarkers?: { x: number; y: number; part: string; desc: string }[] }[];
   latitude: number;
   longitude: number;
   incidentToDate?: string;

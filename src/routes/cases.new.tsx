@@ -19,7 +19,7 @@ import {
 import { DISTRICTS, CRIME_HEADS, MO_TAGS, DISTRICT_COORDS, AREA_NAMES, AREA_COORDS } from "@/data/mock";
 import { addCase, clearDb, getStoredCases } from "@/lib/db";
 import {
-  ShieldAlert, User, ShieldCheck, Plus, Trash2, Calendar, FileText, MapPin, Scale, Database, RefreshCcw, Landmark, CheckCircle2, AlertCircle, Edit3, ArrowRight, Clock, Phone, Home, Check
+  ShieldAlert, User, ShieldCheck, Plus, Trash2, Calendar, FileText, MapPin, Scale, Database, RefreshCcw, Landmark, CheckCircle2, AlertCircle, Edit3, ArrowRight, Clock, Phone, Home, Check, Fingerprint
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -101,6 +101,214 @@ function PhotoUploadWidget({
             className="hidden"
           />
         </label>
+      </div>
+    </div>
+  );
+}
+
+function PhysicalMarkersPicker({
+  markers,
+  onChange,
+}: {
+  markers: { x: number; y: number; part: string; desc: string }[];
+  onChange: (markers: { x: number; y: number; part: string; desc: string }[]) => void;
+}) {
+  const [selectedPart, setSelectedPart] = useState("Neck");
+  const [description, setDescription] = useState("");
+  const [hoveredMarker, setHoveredMarker] = useState<string | null>(null);
+
+  const BODY_PARTS: Record<string, { x: number; y: number; label: string }> = {
+    "Neck": { x: 128, y: 65, label: "Neck" },
+    "Left Wrist": { x: 100, y: 145, label: "Left Wrist" },
+    "Right Wrist": { x: 156, y: 145, label: "Right Wrist" },
+    "Face / Head": { x: 128, y: 40, label: "Face / Head" },
+    "Chest / Torso": { x: 128, y: 105, label: "Chest / Torso" },
+    "Right Arm": { x: 160, y: 125, label: "Right Arm" },
+    "Left Arm": { x: 96, y: 125, label: "Left Arm" },
+    "Back": { x: 128, y: 140, label: "Back" },
+    "Left Leg": { x: 110, y: 240, label: "Left Leg" },
+    "Right Leg": { x: 146, y: 240, label: "Right Leg" },
+  };
+
+  const handleAddMarker = () => {
+    if (!description.trim()) {
+      toast.error("Please enter a description for the physical marker.");
+      return;
+    }
+    const partInfo = BODY_PARTS[selectedPart] || { x: 128, y: 100, label: selectedPart };
+    const newMarker = {
+      x: partInfo.x,
+      y: partInfo.y,
+      part: selectedPart,
+      desc: description.trim()
+    };
+    onChange([...markers, newMarker]);
+    setDescription("");
+    toast.success(`Added physical marker for ${selectedPart}`);
+  };
+
+  const handleRemoveMarker = (index: number) => {
+    onChange(markers.filter((_, i) => i !== index));
+  };
+
+  const handleSvgClick = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = ((e.clientX - rect.left) / rect.width) * 256;
+    const clickY = ((e.clientY - rect.top) / rect.height) * 300;
+    
+    let closestPart = "Chest / Torso";
+    if (clickY < 55) closestPart = "Face / Head";
+    else if (clickY < 80) closestPart = "Neck";
+    else if (clickY < 170) {
+      if (clickX < 110) closestPart = clickY > 130 ? "Left Wrist" : "Left Arm";
+      else if (clickX > 146) closestPart = clickY > 130 ? "Right Wrist" : "Right Arm";
+      else closestPart = "Chest / Torso";
+    } else {
+      if (clickX < 128) closestPart = "Left Leg";
+      else closestPart = "Right Leg";
+    }
+    
+    setSelectedPart(closestPart);
+  };
+
+  return (
+    <div className="w-full mt-4 p-4 bg-surface-1 border border-border/80 rounded-xl shadow-xs space-y-4">
+      <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex items-center gap-2">
+          <Fingerprint className="h-4 w-4 text-primary" />
+          <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
+            Distinguishing Physical Markers (Moles, Tattoos, Scars, Restraints)
+          </h4>
+        </div>
+        <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+          {markers.length} Identified
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Left Side: Body Silhouette SVG */}
+        <div className="flex flex-col items-center">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase mb-2">
+            Interactive Body Map Blueprint (Click location to select)
+          </span>
+          <div className="relative h-[240px] w-[190px] bg-surface-2 rounded-xl border border-border flex items-center justify-center p-2 shadow-inner">
+            <div className="absolute inset-0 bg-[radial-gradient(#dadce0_1px,transparent_1px)] [background-size:12px_12px] opacity-25" />
+            
+            <svg 
+              viewBox="0 0 256 300" 
+              className="h-full w-full relative z-10 text-muted-foreground/60 cursor-crosshair"
+              onClick={handleSvgClick}
+            >
+              <path 
+                d="M128 35 C118 35, 115 50, 115 55 C115 65, 120 70, 128 70 C136 70, 141 65, 141 55 C141 50, 138 35, 128 35 Z M128 70 L128 80 M110 80 C95 85, 90 100, 90 115 L90 160 C90 170, 95 170, 95 160 L95 125 L105 125 L105 210 L105 280 C105 288, 118 288, 118 280 L118 215 L128 215 L128 280 C128 288, 141 288, 141 280 L141 210 L141 125 L151 125 L151 160 C151 170, 156 170, 156 160 L156 115 C156 100, 151 85, 136 80 Z" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth={2}
+              />
+              
+              {/* Hotspot Markers */}
+              {markers.map((m, i) => (
+                <g 
+                  key={i} 
+                  transform={`translate(${m.x}, ${m.y})`}
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredMarker(`${m.part}: ${m.desc}`)}
+                  onMouseLeave={() => setHoveredMarker(null)}
+                >
+                  <circle r={8} fill="var(--signal)" opacity={0.35} className="animate-pulse" />
+                  <circle r={3.5} fill="var(--signal)" />
+                </g>
+              ))}
+            </svg>
+
+            {/* Hover Tooltip */}
+            {hoveredMarker && (
+              <div className="absolute inset-x-2 bottom-2 bg-surface-3 text-ink text-[10.5px] p-2 rounded-lg border border-border leading-tight text-center z-20 shadow-md font-medium">
+                {hoveredMarker}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Add Form & Identified Blueprints List */}
+        <div className="space-y-4">
+          <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-3">
+            <span className="text-[11px] font-bold text-ink uppercase tracking-wider block">
+              Record Physical Marker
+            </span>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Body Location
+              </label>
+              <select 
+                value={selectedPart}
+                onChange={e => setSelectedPart(e.target.value)}
+                className="w-full bg-paper border border-border text-xs rounded-lg px-3 py-2 text-ink font-semibold outline-none focus:ring-1 focus:ring-primary"
+              >
+                {Object.keys(BODY_PARTS).map(part => (
+                  <option key={part} value={part}>{part}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Marker Description
+              </label>
+              <Input 
+                placeholder="e.g. Small moles on left side of neck"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="bg-paper border-border text-xs"
+              />
+            </div>
+
+            <Button 
+              type="button" 
+              onClick={handleAddMarker}
+              className="w-full h-8 text-xs font-semibold gap-1 bg-primary text-white hover:bg-primary/90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Physical Marker
+            </Button>
+          </div>
+
+          {/* Identified Blueprints List */}
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold font-mono block">
+              IDENTIFIED BLUEPRINTS ({markers.length})
+            </span>
+
+            {markers.length === 0 ? (
+              <div className="p-4 border border-dashed border-border rounded-lg text-center text-xs text-muted-foreground italic">
+                No distinguishing physical markers added yet.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                {markers.map((m, i) => (
+                  <div key={i} className="p-2.5 bg-surface-2 border border-border/80 rounded-lg flex items-start justify-between gap-2 shadow-2xs">
+                    <div>
+                      <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 block font-mono">
+                        {m.part}:
+                      </span>
+                      <span className="text-xs text-muted-foreground leading-normal block">
+                        {m.desc}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => handleRemoveMarker(i)}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-signal hover:bg-transparent"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -208,8 +416,9 @@ function NewCasePage() {
     phone: string;
     vehicleUsed: boolean;
     vehicleNo: string;
+    physicalMarkers: { x: number; y: number; part: string; desc: string }[];
   }[]>([
-    { name: "", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0], photo: "", phone: "", vehicleUsed: false, vehicleNo: "" }
+    { name: "", age: 28, gender: "M", arrested: false, arrestDate: formatDateLocal(new Date()).slice(0, 10), arrestDistrict: DISTRICTS[0].name, ioName: REGISTERING_OFFICERS[0], courtName: COURTS[0], photo: "", phone: "", vehicleUsed: false, vehicleNo: "", physicalMarkers: [] }
   ]);
 
   const handleAddAccused = () => setAccused([...accused, {
@@ -224,7 +433,8 @@ function NewCasePage() {
     photo: "",
     phone: "",
     vehicleUsed: false,
-    vehicleNo: ""
+    vehicleNo: "",
+    physicalMarkers: []
   }]);
   const handleRemoveAccused = (index: number) => setAccused(accused.filter((_, i) => i !== index));
   const handleUpdateAccused = (index: number, field: string, value: any) => {
@@ -975,7 +1185,8 @@ function NewCasePage() {
         photo: a.photo,
         phone: a.phone.trim(),
         vehicleUsed: a.vehicleUsed,
-        vehicleNo: a.vehicleUsed ? a.vehicleNo.trim() : ""
+        vehicleNo: a.vehicleUsed ? a.vehicleNo.trim() : "",
+        physicalMarkers: a.physicalMarkers || []
       })),
       latitude: Number(lat) || 12.9716,
       longitude: Number(lng) || 77.5946
@@ -1675,6 +1886,12 @@ function NewCasePage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Interactive Distinguishing Physical Markers Picker */}
+                    <PhysicalMarkersPicker
+                      markers={acc.physicalMarkers || []}
+                      onChange={(newMarkers) => handleUpdateAccused(idx, "physicalMarkers", newMarkers)}
+                    />
 
                     {/* Behavioral DNA preview if offender is found in the database */}
                     {(() => {

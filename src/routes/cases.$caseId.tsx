@@ -464,6 +464,16 @@ function CaseDetail() {
                             🚗 Vehicle Used: <span className="font-mono bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] text-amber-800">{a.vehicleNo}</span>
                           </p>
                         )}
+                        {a.physicalMarkers && a.physicalMarkers.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-border/40 flex flex-wrap gap-1.5 items-center">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Physical Markers:</span>
+                            {a.physicalMarkers.map((m: { part: string; desc: string }, mIdx: number) => (
+                              <Badge key={mIdx} variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                                <strong>{m.part}:</strong> {m.desc}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div>
