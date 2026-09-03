@@ -412,11 +412,14 @@ export function computeOffenders(cases: Case[]): Offender[] {
     const uniqueDistricts = Array.from(new Set(data.cases.map(c => c.district.name)));
     const uniqueMo = Array.from(new Set(data.cases.map(c => c.moTag)));
     const incidentCount = data.cases.length;
+    const accusedPhoto = data.cases.flatMap(c => c.accused).find(a => a.name.trim().toLowerCase() === key && a.photo)?.photo || "";
+
     return {
       id: `OFF-${1000 + idx}`,
       name: data.name,
       age: data.age,
       gender: data.gender,
+      photo: accusedPhoto,
       incidentCount,
       jurisdictions: uniqueDistricts,
       moTags: uniqueMo,

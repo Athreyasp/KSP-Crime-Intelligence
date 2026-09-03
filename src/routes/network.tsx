@@ -140,7 +140,6 @@ export function NetworkPage() {
   const navigate = useNavigate();
   const { networkRich, cases } = useDb();
   const { nodes, links } = useForceLayout(networkRich);
-  const { geoNodes, geoLinks } = useGeoLayout(nodes, links);
   const { t, language } = useLanguage();
 
   const [selected, setSelected] = useState<string | null>(null);
@@ -148,7 +147,7 @@ export function NetworkPage() {
   const [hover, setHover] = useState<string | null>(null);
   const [hoverEdge, setHoverEdge] = useState<SimLink | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"graph" | "geomap" | "directory">("graph");
+  const [viewMode, setViewMode] = useState<"graph" | "directory">("graph");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
@@ -161,24 +160,20 @@ export function NetworkPage() {
     }
   }, []);
 
-  // Active pool based on viewMode
-  const activeNodesPool = viewMode === "geomap" ? geoNodes : nodes;
-  const activeLinksPool = viewMode === "geomap" ? geoLinks : links;
-
   // Filter nodes strictly by State Overview or Selected District Hub
   const filteredNodes = useMemo(() => {
-    return activeNodesPool.filter(n => {
+    return nodes.filter(n => {
       if (selectedDistrict === "all") return true;
       const nodeDist = (n.meta.district || "").toLowerCase();
       return nodeDist === selectedDistrict.toLowerCase();
     });
-  }, [activeNodesPool, selectedDistrict]);
+  }, [nodes, selectedDistrict]);
 
   const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(n => n.id)), [filteredNodes]);
 
   const filteredLinks = useMemo(() => {
-    return activeLinksPool.filter(l => filteredNodeIds.has(l.source.id) && filteredNodeIds.has(l.target.id));
-  }, [activeLinksPool, filteredNodeIds]);
+    return links.filter(l => filteredNodeIds.has(l.source.id) && filteredNodeIds.has(l.target.id));
+  }, [links, filteredNodeIds]);
 
   const deg = useMemo(() => {
     const m = new Map<string, number>();
@@ -219,11 +214,11 @@ export function NetworkPage() {
     return set;
   }, [activeFocusId, filteredLinks]);
 
-  const selectedNode = selected ? activeNodesPool.find(n => n.id === selected) : null;
+  const selectedNode = selected ? nodes.find(n => n.id === selected) : null;
 
   const getSuspectRelations = () => {
     if (!selectedNode) return [];
-    const directLinks = activeLinksPool.filter(l => l.source.id === selectedNode.id || l.target.id === selectedNode.id);
+    const directLinks = links.filter(l => l.source.id === selectedNode.id || l.target.id === selectedNode.id);
     const relations: { name: string; id: string; type: string; relation: string; photo?: string }[] = [];
     
     // Find all cases this suspect is in
@@ -242,7 +237,7 @@ export function NetworkPage() {
 
     // Find other suspects who are co-accused in the same cases
     const seenCoAccused = new Set<string>();
-    activeLinksPool.forEach(l => {
+    links.forEach(l => {
       const isCaseSource = l.source.type === "case";
       const isCaseTarget = l.target.type === "case";
       if (!isCaseSource && !isCaseTarget) return;
@@ -301,16 +296,7 @@ export function NetworkPage() {
                   viewMode === "graph" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
                 )}
               >
-                <NetworkIcon className="h-3.5 w-3.5" /> {t("Force Graph")}
-              </button>
-              <button
-                onClick={() => setViewMode("geomap")}
-                className={cn(
-                  "px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5",
-                  viewMode === "geomap" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
-                )}
-              >
-                <PinIcon className="h-3.5 w-3.5 text-amber-500" /> {t("Spatial Geo-Map")}
+                <NetworkIcon className="h-3.5 w-3.5" /> {t("Interactive Graph")}
               </button>
               <button
                 onClick={() => setViewMode("directory")}
@@ -386,19 +372,11 @@ export function NetworkPage() {
       </Card>
 
       {/* MAIN CONTENT AREA */}
-      {viewMode === "graph" || viewMode === "geomap" ? (
-        /* MODE A & B: INTERACTIVE GRAPH CANVAS OR SPATIAL GEO-MAP CANVAS */
+      {viewMode === "graph" ? (
+        /* MODE A: INTERACTIVE GRAPH CANVAS WITH ACCUSED MUGSHOTS & LINK POPOVERS */
         <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm overflow-hidden relative flex flex-col h-[640px]">
           
           {/* Zoom controls & Mode Indicator */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-            {viewMode === "geomap" && (
-              <Badge className="bg-[#188038] text-white border-0 font-bold px-3 py-1 text-xs flex items-center gap-1.5 shadow-md animate-pulse">
-                <Navigation className="h-3.5 w-3.5" /> 🗺️ SPATIAL CROSS-DISTRICT CORRIDORS
-              </Badge>
-            )}
-          </div>
-
           <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-md border border-[#dadce0] rounded-2xl p-1 shadow-sm">
             <Button size="sm" variant="ghost" onClick={() => setZoom(z => Math.min(2.5, z + 0.2))} className="h-7 w-7 p-0 text-[#5f6368]">
               +
@@ -442,26 +420,6 @@ export function NetworkPage() {
 
               <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
                 
-                {/* GEOGRAPHIC MAP BACKDROP (FOR SPATIAL GEOMAP MODE) */}
-                {viewMode === "geomap" && (
-                  <g className="select-none opacity-40">
-                    {/* District Map Markers */}
-                    {DISTRICTS.map(d => {
-                      const dx = d.x * (W - 220) + 110;
-                      const dy = d.y * (H - 160) + 80;
-                      return (
-                        <g key={d.id} transform={`translate(${dx} ${dy})`}>
-                          <circle r={32} fill="#f1f3f4" stroke="#dadce0" strokeWidth={1} strokeDasharray="3 3" />
-                          <circle r={4} fill="#9aa0a6" />
-                          <text y={44} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#5f6368" fontFamily="DM Sans, sans-serif">
-                            {d.name.toUpperCase()}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </g>
-                )}
-
                 {/* LINKS / CONNECTIONS */}
                 {svgLinks.map((l, i) => {
                   const isFocused = activeFocusId && (l.source.id === activeFocusId || l.target.id === activeFocusId);
@@ -469,80 +427,39 @@ export function NetworkPage() {
                   const isHoveredLink = hoverEdge && hoverEdge.source.id === l.source.id && hoverEdge.target.id === l.target.id;
                   const isDimmed = activeFocusId && !isFocused;
                   const isCoAccused = l.relation === "co-accused";
-                  const isCrossDistrict = l.source.meta?.district !== l.target.meta?.district;
-
-                  // Curved quadratic bezier arc for cross-district corridors in Spatial Geo-Map mode
-                  const isCurved = viewMode === "geomap" && isCrossDistrict;
-                  let pathD = "";
-                  if (isCurved) {
-                    const dx = l.target.x - l.source.x;
-                    const dy = l.target.y - l.source.y;
-                    const midX = (l.source.x + l.target.x) / 2 - dy * 0.22;
-                    const midY = (l.source.y + l.target.y) / 2 + dx * 0.22;
-                    pathD = `M ${l.source.x} ${l.source.y} Q ${midX} ${midY} ${l.target.x} ${l.target.y}`;
-                  }
 
                   return (
                     <g key={i} className="group">
                       {/* Wide Invisible Hit Target for Link Clicking */}
-                      {isCurved ? (
-                        <path
-                          d={pathD}
-                          stroke="transparent"
-                          strokeWidth={16}
-                          fill="none"
-                          className="cursor-pointer"
-                          onMouseEnter={() => setHoverEdge(l)}
-                          onMouseLeave={() => setHoverEdge(null)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEdge(l);
-                            setSelected(null);
-                          }}
-                        />
-                      ) : (
-                        <line
-                          x1={l.source.x}
-                          y1={l.source.y}
-                          x2={l.target.x}
-                          y2={l.target.y}
-                          stroke="transparent"
-                          strokeWidth={14}
-                          className="cursor-pointer"
-                          onMouseEnter={() => setHoverEdge(l)}
-                          onMouseLeave={() => setHoverEdge(null)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEdge(l);
-                            setSelected(null);
-                          }}
-                        />
-                      )}
+                      <line
+                        x1={l.source.x}
+                        y1={l.source.y}
+                        x2={l.target.x}
+                        y2={l.target.y}
+                        stroke="transparent"
+                        strokeWidth={14}
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoverEdge(l)}
+                        onMouseLeave={() => setHoverEdge(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEdge(l);
+                          setSelected(null);
+                        }}
+                      />
 
-                      {/* Visible Link Path or Line */}
-                      {isCurved ? (
-                        <path
-                          d={pathD}
-                          fill="none"
-                          stroke={isSelectedLink ? "#0b57d0" : isFocused || isHoveredLink ? (isCoAccused ? "#d93025" : "#0b57d0") : isCoAccused ? "#d93025" : "#188038"}
-                          strokeOpacity={isDimmed ? 0.08 : isSelectedLink || isFocused || isHoveredLink ? 1 : 0.6}
-                          strokeWidth={isSelectedLink ? 3.5 : isHoveredLink || isFocused ? 2.8 : 2}
-                          strokeDasharray={isCrossDistrict ? "6 4" : "none"}
-                          className="pointer-events-none transition-all duration-200"
-                        />
-                      ) : (
-                        <line
-                          x1={l.source.x}
-                          y1={l.source.y}
-                          x2={l.target.x}
-                          y2={l.target.y}
-                          stroke={isSelectedLink ? "#0b57d0" : isFocused || isHoveredLink ? (isCoAccused ? "#d93025" : "#0b57d0") : isCoAccused ? "#d93025" : "#94a3b8"}
-                          strokeOpacity={isDimmed ? 0.08 : isSelectedLink || isFocused || isHoveredLink ? 1 : 0.4}
-                          strokeWidth={isSelectedLink ? 3.5 : isHoveredLink || isFocused ? 2.8 : isCoAccused ? 1.8 : 1.2}
-                          strokeDasharray={l.relation === "drove" || l.relation === "called" ? "5 3" : "none"}
-                          className="pointer-events-none transition-all duration-200"
-                        />
-                      )}
+                      {/* Visible Link Line */}
+                      <line
+                        x1={l.source.x}
+                        y1={l.source.y}
+                        x2={l.target.x}
+                        y2={l.target.y}
+                        stroke={isSelectedLink ? "#0b57d0" : isFocused || isHoveredLink ? (isCoAccused ? "#d93025" : "#0b57d0") : isCoAccused ? "#d93025" : "#94a3b8"}
+                        strokeOpacity={isDimmed ? 0.08 : isSelectedLink || isFocused || isHoveredLink ? 1 : 0.4}
+                        strokeWidth={isSelectedLink ? 3.5 : isHoveredLink || isFocused ? 2.8 : isCoAccused ? 1.8 : 1.2}
+                        strokeDasharray={l.relation === "drove" || l.relation === "called" ? "5 3" : "none"}
+                        className="pointer-events-none transition-all duration-200"
+                      />
                     </g>
                   );
                 })}
