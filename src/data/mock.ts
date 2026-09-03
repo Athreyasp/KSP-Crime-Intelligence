@@ -141,6 +141,7 @@ export type Offender = {
   moTags: string[];
   cases: number[]; // caseMasterId
   riskScore: number; // 0..100
+  photo?: string;
 };
 
 export const OFFENDERS: Offender[] = CASES.length > 0 ? Array.from({ length: 24 }, (_, i) => {

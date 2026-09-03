@@ -541,6 +541,13 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
 
   const VEHICLE_PLATES = ["KA-01-XX-4421", "KA-05-MJ-9013", "KA-19-BZ-7702", "KA-09-AP-3388", "KA-51-KL-1147"];
   const PHONE_NUMBERS  = ["+91 98450 ●●●32", "+91 96632 ●●●08", "+91 90080 ●●●17", "+91 99011 ●●●94"];
+  const DEFAULT_ACCUSED_PHOTOS = [
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop&q=80"
+  ];
 
   // 1. Process all cases from Zoho DB
   cases.forEach((kase, cIdx) => {
@@ -560,6 +567,9 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
         moTags: [kase.moTag || kase.crimeHead.name],
         activeFIRs: 1,
         riskScore: kase.gravity === "Heinous" ? 85 : 50,
+        caseMasterId: kase.caseMasterId,
+        crimeNo: kase.crimeNo,
+        briefFacts: kase.briefFacts
       }
     });
 
@@ -582,7 +592,7 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
         label: v.name,
         type: "victim",
         cluster,
-        meta: { age: v.age, district: kase.district.name }
+        meta: { age: v.age, district: kase.district.name, photo: v.photo || "" }
       });
       addEdge({ source: victimNodeId, target: caseNodeId, relation: "victim-of", weight: 1 });
     });
@@ -596,12 +606,15 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       const accusedNodeId = matchingOffender ? matchingOffender.id : `ACC-${a.name.replace(/\s+/g, "-")}-${aIdx}`;
       accusedNodeIdsInCase.push(accusedNodeId);
 
+      const accusedPhoto = a.photo || matchingOffender?.photo || DEFAULT_ACCUSED_PHOTOS[(cIdx + aIdx) % DEFAULT_ACCUSED_PHOTOS.length];
+
       addNode({
         id: accusedNodeId,
         label: a.name,
         type: "accused",
         cluster,
         meta: {
+          photo: accusedPhoto,
           aliases: [`"${a.name.split(" ")[0]} alias"`],
           age: a.age,
           district: kase.district.name,

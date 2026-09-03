@@ -11,6 +11,10 @@ export type RichNode = {
   type: EntityType;
   cluster: string;
   meta: {
+    photo?: string;
+    caseMasterId?: number;
+    crimeNo?: string;
+    briefFacts?: string;
     aliases?: string[];
     age?: number;
     district?: string;
