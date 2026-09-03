@@ -45,7 +45,7 @@ const TYPE_META: Record<EntityType, { color: string; bg: string; border: string;
 };
 
 /* ------------------------------------------------------------------ */
-/* Force Layout Hook                                                  */
+/* Force Layout Hook (Spacious Anti-Congestion Physics)               */
 /* ------------------------------------------------------------------ */
 function useForceLayout(networkRich: any) {
   return useMemo(() => {
@@ -54,8 +54,8 @@ function useForceLayout(networkRich: any) {
     }
     const nodes: SimNode[] = networkRich.nodes.map((n: any) => ({
       ...n,
-      x: W / 2 + (Math.random() - 0.5) * 380,
-      y: H / 2 + (Math.random() - 0.5) * 280
+      x: W / 2 + (Math.random() - 0.5) * 450,
+      y: H / 2 + (Math.random() - 0.5) * 320
     }));
     const idx = new Map(nodes.map(n => [n.id, n]));
     const links = networkRich.edges
@@ -68,10 +68,10 @@ function useForceLayout(networkRich: any) {
       .filter((l: any) => l.source && l.target) as SimLink[];
 
     const sim = forceSimulation(nodes)
-      .force("link", forceLink<SimNode, SimLink>(links).id((d: SimNode) => d.id).distance(125).strength(0.5))
-      .force("charge", forceManyBody<SimNode>().strength(-280))
+      .force("link", forceLink<SimNode, SimLink>(links).id((d: SimNode) => d.id).distance(155).strength(0.45))
+      .force("charge", forceManyBody<SimNode>().strength(-460))
       .force("center", forceCenter(W / 2, H / 2))
-      .force("collide", forceCollide<SimNode>().radius(30).strength(0.8))
+      .force("collide", forceCollide<SimNode>().radius(42).strength(0.85))
       .stop();
 
     for (let i = 0; i < 350; i++) sim.tick();
@@ -90,8 +90,8 @@ function useGeoLayout(nodes: SimNode[], links: SimLink[]) {
     const districtMap = new Map<string, { x: number; y: number }>();
     DISTRICTS.forEach(d => {
       districtMap.set(d.name.toLowerCase(), {
-        x: d.x * (W - 220) + 110,
-        y: d.y * (H - 160) + 80,
+        x: d.x * (W - 240) + 120,
+        y: d.y * (H - 180) + 90,
       });
     });
 
@@ -116,7 +116,7 @@ function useGeoLayout(nodes: SimNode[], links: SimLink[]) {
       let gy = base.y;
 
       if (totalInGroup > 1) {
-        const radius = Math.min(42, 18 + totalInGroup * 4);
+        const radius = Math.min(48, 22 + totalInGroup * 5);
         const angle = (idxInGroup * 2 * Math.PI) / totalInGroup;
         gx += radius * Math.cos(angle);
         gy += radius * Math.sin(angle);
@@ -148,6 +148,7 @@ export function NetworkPage() {
   const [hover, setHover] = useState<string | null>(null);
   const [hoverEdge, setHoverEdge] = useState<SimLink | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | EntityType>("all");
+  const [densityMode, setDensityMode] = useState<"primary" | "syndicate" | "all">("primary");
   const [caseFilter, setCaseFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<"graph" | "geomap" | "directory">("graph");
@@ -179,15 +180,25 @@ export function NetworkPage() {
     return set;
   }, [caseFilter, activeLinksPool]);
 
-  // Filter nodes
+  // Anti-Congestion Filter: Filter nodes by Density Mode
   const filteredNodes = useMemo(() => {
     return activeNodesPool.filter(n => {
       if (caseIsolatedNodeIds && !caseIsolatedNodeIds.has(n.id)) return false;
       if (typeFilter !== "all" && n.type !== typeFilter) return false;
       if (query && !n.label.toLowerCase().includes(query.toLowerCase())) return false;
+      
+      // Anti-congestion mode filtering:
+      if (densityMode === "primary") {
+        // Show primary accused, key cases, and entities with high risk or active connections
+        if (n.type === "accused" && (n.meta.riskScore || 0) < 60) return false;
+        if (n.type === "location") return false; // Hide standalone location clutter in primary view
+      } else if (densityMode === "syndicate") {
+        if (n.type === "location") return false;
+      }
+
       return true;
     });
-  }, [activeNodesPool, caseIsolatedNodeIds, typeFilter, query]);
+  }, [activeNodesPool, caseIsolatedNodeIds, typeFilter, query, densityMode]);
 
   const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(n => n.id)), [filteredNodes]);
 
@@ -381,6 +392,40 @@ export function NetworkPage() {
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
             </select>
+          </div>
+
+          {/* Anti-Congestion Density Mode Selector */}
+          <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-[#5f6368] px-2 flex items-center gap-1">
+              <Eye className="h-3 w-3 text-[#0b57d0]" /> View Mode:
+            </span>
+            <button
+              onClick={() => setDensityMode("primary")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
+                densityMode === "primary" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+              )}
+            >
+              ✨ Clean Focus
+            </button>
+            <button
+              onClick={() => setDensityMode("syndicate")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
+                densityMode === "syndicate" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+              )}
+            >
+              👑 Syndicates
+            </button>
+            <button
+              onClick={() => setDensityMode("all")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
+                densityMode === "all" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+              )}
+            >
+              ⚡ Full Network
+            </button>
           </div>
 
           {/* Type Filter Chips */}
