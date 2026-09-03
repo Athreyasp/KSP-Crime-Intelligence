@@ -147,10 +147,7 @@ export function NetworkPage() {
   const [selectedEdge, setSelectedEdge] = useState<SimLink | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [hoverEdge, setHoverEdge] = useState<SimLink | null>(null);
-  const [typeFilter, setTypeFilter] = useState<"all" | EntityType>("all");
-  const [densityMode, setDensityMode] = useState<"primary" | "syndicate" | "all">("primary");
-  const [caseFilter, setCaseFilter] = useState<string>("all");
-  const [query, setQuery] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"graph" | "geomap" | "directory">("graph");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -164,41 +161,18 @@ export function NetworkPage() {
     }
   }, []);
 
-  // Determine active nodes & links depending on view mode
+  // Active pool based on viewMode
   const activeNodesPool = viewMode === "geomap" ? geoNodes : nodes;
   const activeLinksPool = viewMode === "geomap" ? geoLinks : links;
 
-  // Filter nodes by case isolation if case filter active ("cases only" mode)
-  const caseIsolatedNodeIds = useMemo(() => {
-    if (caseFilter === "all") return null;
-    const set = new Set<string>();
-    set.add(caseFilter);
-    activeLinksPool.forEach(l => {
-      if (l.source.id === caseFilter) set.add(l.target.id);
-      if (l.target.id === caseFilter) set.add(l.source.id);
-    });
-    return set;
-  }, [caseFilter, activeLinksPool]);
-
-  // Anti-Congestion Filter: Filter nodes by Density Mode
+  // Filter nodes strictly by State Overview or Selected District Hub
   const filteredNodes = useMemo(() => {
     return activeNodesPool.filter(n => {
-      if (caseIsolatedNodeIds && !caseIsolatedNodeIds.has(n.id)) return false;
-      if (typeFilter !== "all" && n.type !== typeFilter) return false;
-      if (query && !n.label.toLowerCase().includes(query.toLowerCase())) return false;
-      
-      // Anti-congestion mode filtering:
-      if (densityMode === "primary") {
-        // Show primary accused, key cases, and entities with high risk or active connections
-        if (n.type === "accused" && (n.meta.riskScore || 0) < 60) return false;
-        if (n.type === "location") return false; // Hide standalone location clutter in primary view
-      } else if (densityMode === "syndicate") {
-        if (n.type === "location") return false;
-      }
-
-      return true;
+      if (selectedDistrict === "all") return true;
+      const nodeDist = (n.meta.district || "").toLowerCase();
+      return nodeDist === selectedDistrict.toLowerCase();
     });
-  }, [activeNodesPool, caseIsolatedNodeIds, typeFilter, query, densityMode]);
+  }, [activeNodesPool, selectedDistrict]);
 
   const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(n => n.id)), [filteredNodes]);
 
@@ -299,13 +273,10 @@ export function NetworkPage() {
   };
   const onPointerUp = () => (dragRef.current = null);
 
-  // Available case options for the Case-Only Filter
-  const caseOptions = useMemo(() => {
-    return cases.map(c => ({
-      id: `C-${c.caseMasterId}`,
-      label: `FIR ${c.crimeNo.slice(-8)} · ${c.crimeHead.name} (${c.district.name})`
-    }));
-  }, [cases]);
+  // Top high-activity Karnataka districts for quick pill selection
+  const TOP_DISTRICTS = [
+    "Bengaluru Urban", "Mysuru", "Dharwad", "Belagavi", "Ballari", "Dakshina Kannada", "Kalaburagi", "Tumakuru"
+  ];
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -314,12 +285,12 @@ export function NetworkPage() {
         section="03"
         eyebrow={t("Link Intelligence & Relational Graph")}
         title={t("Criminal Association Network")}
-        description={t("Interactive co-accused association atlas with Spatial Cross-District Syndicate Corridors")}
+        description={t("Statewide and District-Wise Relational Intelligence Atlas")}
         actions={
           <div className="flex items-center gap-2">
             <Badge className="bg-[#e8f0fe] text-[#0b57d0] border border-[#0b57d0]/20 font-bold px-3 py-1 flex items-center gap-1.5 shadow-sm">
               <Database className="h-3.5 w-3.5 text-[#0b57d0]" />
-              {t("Live Association Map")} ({filteredNodes.length} {t("Entities")})
+              {selectedDistrict === "all" ? "Statewide Overview" : selectedDistrict} ({filteredNodes.length} Entities)
             </Badge>
 
             <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-full">
@@ -355,7 +326,7 @@ export function NetworkPage() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { setSelected(null); setSelectedEdge(null); setPan({ x: 0, y: 0 }); setZoom(1); setQuery(""); setTypeFilter("all"); setCaseFilter("all"); }}
+              onClick={() => { setSelected(null); setSelectedEdge(null); setPan({ x: 0, y: 0 }); setZoom(1); setSelectedDistrict("all"); }}
               className="h-8 border-[#dadce0] text-xs font-bold rounded-full bg-white text-[#202124] hover:bg-[#f8f9fa] shadow-sm"
             >
               <RotateCcw className="mr-1 h-3.5 w-3.5 text-[#0b57d0]" /> {t("Reset")}
@@ -364,86 +335,52 @@ export function NetworkPage() {
         }
       />
 
-      {/* PROMINENT GOOGLE SEARCH & CASE FILTER BAR */}
-      <Card className="bg-white border-[#dadce0] rounded-2xl p-3.5 shadow-sm space-y-3">
+      {/* STREAMLINED STATE & DISTRICT-WISE DRILL-DOWN BAR */}
+      <Card className="bg-white border-[#dadce0] rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[280px]">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#5f6368]" />
-            <Input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={t("Search suspect name, FIR crime number, vehicle plate, phone...")}
-              className="h-10 pl-10 text-xs bg-[#f8f9fa] border-[#dadce0] focus:bg-white rounded-xl text-[#202124]"
-            />
-          </div>
-
-          {/* Case-Only Filter Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#5f6368] flex items-center gap-1">
-              <FileText className="h-3.5 w-3.5 text-[#0b57d0]" /> Filter FIR Case:
-            </span>
-            <select
-              value={caseFilter}
-              onChange={e => { setCaseFilter(e.target.value); setSelected(null); setSelectedEdge(null); }}
-              className="h-10 px-3 py-1 text-xs font-bold bg-[#f8f9fa] border border-[#dadce0] rounded-xl text-[#202124] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]"
-            >
-              <option value="all">⚡ All Cases in Database ({cases.length})</option>
-              {caseOptions.map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
+            <Globe className="h-4 w-4 text-[#0b57d0]" />
+            <span className="text-xs font-bold text-[#202124]">District Network Hub:</span>
           </div>
 
-          {/* Anti-Congestion Density Mode Selector */}
-          <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-xl">
-            <span className="text-[10px] uppercase font-bold text-[#5f6368] px-2 flex items-center gap-1">
-              <Eye className="h-3 w-3 text-[#0b57d0]" /> View Mode:
-            </span>
+          <div className="flex flex-wrap items-center gap-1.5 flex-1">
             <button
-              onClick={() => setDensityMode("primary")}
+              onClick={() => { setSelectedDistrict("all"); setSelected(null); setSelectedEdge(null); }}
               className={cn(
-                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
-                densityMode === "primary" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
+                "px-3.5 py-1.5 text-xs font-bold rounded-full border transition-all flex items-center gap-1",
+                selectedDistrict === "all"
+                  ? "bg-[#0b57d0] text-white border-[#0b57d0] shadow-sm"
+                  : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
               )}
             >
-              ✨ Clean Focus
+              🌐 All Karnataka State
             </button>
-            <button
-              onClick={() => setDensityMode("syndicate")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
-                densityMode === "syndicate" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
-              )}
-            >
-              👑 Syndicates
-            </button>
-            <button
-              onClick={() => setDensityMode("all")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all",
-                densityMode === "all" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
-              )}
-            >
-              ⚡ Full Network
-            </button>
-          </div>
 
-          {/* Type Filter Chips */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(["all", "accused", "victim", "case", "location", "vehicle", "phone"] as const).map(k => (
+            {TOP_DISTRICTS.map(dName => (
               <button
-                key={k}
-                onClick={() => setTypeFilter(k)}
+                key={dName}
+                onClick={() => { setSelectedDistrict(dName); setSelected(null); setSelectedEdge(null); }}
                 className={cn(
-                  "px-3 py-1.5 text-xs font-bold rounded-full border transition-all uppercase tracking-wider",
-                  typeFilter === k
+                  "px-3 py-1.5 text-xs font-bold rounded-full border transition-all flex items-center gap-1",
+                  selectedDistrict.toLowerCase() === dName.toLowerCase()
                     ? "bg-[#0b57d0] text-white border-[#0b57d0] shadow-sm"
                     : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
                 )}
               >
-                {t(k)}
+                📍 {dName}
               </button>
             ))}
+
+            <select
+              value={selectedDistrict}
+              onChange={e => { setSelectedDistrict(e.target.value); setSelected(null); setSelectedEdge(null); }}
+              className="h-8 px-3 text-xs font-bold bg-[#f8f9fa] border border-[#dadce0] rounded-full text-[#202124] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]"
+            >
+              <option value="all">More Districts ({DISTRICTS.length})...</option>
+              {DISTRICTS.map(d => (
+                <option key={d.id} value={d.name}>📍 {d.name}</option>
+              ))}
+            </select>
           </div>
         </div>
       </Card>
