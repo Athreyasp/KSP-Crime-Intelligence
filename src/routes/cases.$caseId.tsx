@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStoredCases, updateCaseDetails, recordAccusedArrest } from "@/lib/db";
+import { useDb } from "@/hooks/use-db";
 import { DISTRICTS } from "@/data/mock";
 import kspLogo from "@/assets/karnataka-police-logo.png";
 import {
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/cases/$caseId")({
 function CaseDetail() {
   const { caseId } = Route.useParams();
   const router = useRouter();
-  const cases = getStoredCases();
+  const { cases } = useDb();
   const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
   const [activeTab, setActiveTab] = useState<"overview" | "legal" | "complainant" | "accused" | "logs">("overview");
   const [printLang, setPrintLang] = useState<"en" | "kn" | "bilingual">("bilingual");

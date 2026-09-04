@@ -103,14 +103,7 @@ export function NetworkPage() {
   const [trackingVehicleNode, setTrackingVehicleNode] = useState<SimNode | null>(null);
   const [trackingPhoneNode, setTrackingPhoneNode] = useState<SimNode | null>(null);
 
-  // Proactively clear any legacy local storage data if needed
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.clear();
-      } catch (e) {}
-    }
-  }, []);
+
 
   // Filter nodes strictly by State Overview or Selected District Hub
   const filteredNodes = useMemo(() => {
@@ -895,32 +888,32 @@ export function NetworkPage() {
           : createTravelHistory(targetPlate, trackingVehicleNode.meta.district || "Bengaluru Urban", undefined, trackingVehicleNode.meta.photo);
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-            <div className="bg-white border border-[#dadce0] rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-white border border-[#dadce0] rounded-2xl max-w-4xl w-full p-6 shadow-xl space-y-6 relative max-h-[90vh] overflow-y-auto">
               
               {/* Modal Header */}
-              <div className="flex items-start justify-between border-b pb-4">
+              <div className="flex items-start justify-between border-b border-[#dadce0] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#f3e8fd] text-[#a142f4] flex items-center justify-center font-bold text-2xl border border-[#d7aefb] shadow-sm">
-                    {vehCategory === "Motorcycle" ? "🏍️" : vehCategory === "Scooter" ? "🛵" : vehCategory === "Auto Rickshaw" ? "🛺" : "🚘"}
+                  <div className="w-10 h-10 rounded-xl bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center font-semibold text-lg border border-[#aecbfa]">
+                    <Car className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-[#a142f4] text-white text-xs font-mono px-3 py-0.5 font-bold shadow-sm">
+                      <Badge className="bg-[#1a73e8] text-white text-xs font-mono px-2.5 py-0.5 font-bold">
                         {targetPlate}
                       </Badge>
-                      <Badge className="bg-[#f3e8fd] text-[#a142f4] border border-[#d7aefb] text-[10px] font-bold uppercase">
+                      <Badge variant="outline" className="bg-[#f1f3f4] text-[#3c4043] border-[#dadce0] text-[10px] font-semibold uppercase">
                         {vehCategory}
                       </Badge>
-                      <Badge className="bg-[#fce8e6] text-[#d93025] border border-[#f8b4b0] text-[10px] font-bold">
-                        ANPR HOTLISTED
+                      <Badge variant="outline" className="bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0] text-[10px] font-semibold">
+                        ANPR Hotlisted
                       </Badge>
                     </div>
-                    <h2 className="text-xl font-display font-bold text-[#202124] mt-1">
-                      Travel & Movement Tracking Log for <span className="text-[#a142f4] font-mono">{targetPlate}</span>
+                    <h2 className="text-lg font-display font-semibold text-[#202124] mt-1">
+                      Vehicle Telemetry & ANPR Scans
                     </h2>
                     <p className="text-xs text-[#5f6368]">
-                      Real-time Automatic License Plate Recognition & CCTV Toll Plaza Scan Path strictly for registration <span className="font-mono font-bold text-[#202124]">{targetPlate}</span> across Karnataka
+                      License Plate: <span className="font-mono font-semibold text-[#202124]">{targetPlate}</span> · Real-Time ANPR Camera Surveillance Feed
                     </p>
                   </div>
                 </div>
@@ -930,121 +923,115 @@ export function NetworkPage() {
                   onClick={() => setTrackingVehicleNode(null)}
                   className="h-8 w-8 p-0 rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Vehicle Specs & Snapshot Overview Banner */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f8f9fa] border border-[#dadce0] rounded-2xl p-4">
-                {/* Image Preview */}
-                <div className="relative rounded-xl overflow-hidden border border-[#dadce0] h-36 bg-slate-900 flex items-center justify-center">
+              {/* Vehicle Specs Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f8f9fa] border border-[#dadce0] rounded-xl p-4">
+                {/* Image Snapshot */}
+                <div className="relative rounded-lg overflow-hidden border border-[#dadce0] h-32 bg-slate-900 flex items-center justify-center">
                   {trackingVehicleNode.meta.photo ? (
                     <img src={trackingVehicleNode.meta.photo} alt={targetPlate} className="w-full h-full object-cover" />
                   ) : (
-                    <Car className="h-16 w-16 text-slate-500" />
+                    <Car className="h-12 w-12 text-slate-500" />
                   )}
-                  <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-md text-white font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1">
-                    <Eye className="h-3 w-3 text-[#a142f4]" /> CCTV Snapshot ({targetPlate})
+                  <div className="absolute bottom-2 left-2 bg-black/75 text-white font-mono text-[9px] font-medium px-2 py-0.5 rounded flex items-center gap-1">
+                    <Eye className="h-3 w-3 text-[#1a73e8]" /> CCTV Snapshot
                   </div>
                 </div>
 
                 {/* Specs */}
-                <div className="space-y-1.5 text-xs text-[#202124]">
-                  <span className="text-[10px] font-bold uppercase text-[#5f6368] block">Registered Vehicle Details</span>
-                  <p className="font-bold text-sm text-[#0b57d0]">
+                <div className="space-y-1 text-xs text-[#202124]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#5f6368] block">Registered Vehicle Details</span>
+                  <p className="font-semibold text-sm text-[#1a73e8]">
                     {vehMakeModel}
                   </p>
-                  <p><span className="text-[#5f6368]">Category:</span> <span className="font-bold text-[#a142f4]">{vehCategory}</span></p>
-                  <p><span className="text-[#5f6368]">License Plate:</span> <span className="font-mono font-bold text-[#a142f4]">{targetPlate}</span></p>
+                  <p><span className="text-[#5f6368]">Category:</span> <span className="font-medium text-[#202124]">{vehCategory}</span></p>
+                  <p><span className="text-[#5f6368]">Plate Number:</span> <span className="font-mono font-semibold text-[#202124]">{targetPlate}</span></p>
                   <p><span className="text-[#5f6368]">Color:</span> {vehColor}</p>
-                  <p><span className="text-[#5f6368]">Registered Owner:</span> {vehOwner}</p>
+                  <p><span className="text-[#5f6368]">Owner:</span> {vehOwner}</p>
                 </div>
 
                 {/* Quick Metrics */}
-                <div className="space-y-2 bg-white border border-[#dadce0] rounded-xl p-3 flex flex-col justify-between text-xs">
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Scanned Vehicle:</span>
-                    <span className="font-mono font-bold text-[#a142f4]">{targetPlate}</span>
+                <div className="space-y-2 bg-white border border-[#dadce0] rounded-lg p-3 flex flex-col justify-between text-xs">
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Scanned Plate:</span>
+                    <span className="font-mono font-semibold text-[#1a73e8]">{targetPlate}</span>
                   </div>
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Total Scans Today:</span>
-                    <span className="font-mono font-bold text-[#0b57d0]">{travelLogs.length} Checkpoints</span>
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Camera Scans:</span>
+                    <span className="font-mono font-semibold text-[#202124]">{travelLogs.length} Checkpoints</span>
                   </div>
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Distance Covered:</span>
-                    <span className="font-mono font-bold text-[#0b57d0]">184 km</span>
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Distance Covered:</span>
+                    <span className="font-mono font-semibold text-[#202124]">184 km</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[#5f6368] font-bold">Active Status:</span>
-                    <Badge className="bg-[#fce8e6] text-[#d93025] text-[9px] font-bold">ANPR TRACKING</Badge>
+                    <span className="text-[#5f6368] font-medium">Active Status:</span>
+                    <Badge variant="outline" className="bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0] text-[9px] font-medium">ANPR TRACKING</Badge>
                   </div>
                 </div>
               </div>
 
-              {/* Travel Path Visual Timeline Bar */}
+              {/* Travel Path Sequence */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase text-[#202124] flex items-center gap-1.5">
-                    <Activity className="h-4 w-4 text-[#0b57d0]" /> Karnataka Travel Route Path for {targetPlate}
-                  </h3>
-                  <span className="text-[10px] text-[#5f6368] font-mono">Target Plate: {targetPlate}</span>
-                </div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-[#1a73e8]" /> Travel Sequence Path
+                </h3>
                 
-                <div className="bg-[#e8f0fe]/40 border border-[#aecbfa] rounded-2xl p-4 flex items-center justify-between overflow-x-auto gap-2">
+                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded-xl p-3.5 flex items-center justify-between overflow-x-auto gap-3">
                   {travelLogs.map((cp, idx) => (
-                    <div key={idx} className="flex items-center gap-2 shrink-0">
+                    <div key={idx} className="flex items-center gap-3 shrink-0">
                       <div className="flex flex-col items-center text-center">
-                        <div className="w-8 h-8 rounded-full bg-[#0b57d0] text-white flex items-center justify-center font-bold text-xs shadow-md">
+                        <div className="w-7 h-7 rounded-full bg-[#1a73e8] text-white flex items-center justify-center font-semibold text-xs shadow-xs">
                           {idx + 1}
                         </div>
-                        <span className="font-bold text-[10px] text-[#202124] mt-1 max-w-[90px] truncate">{cp.district}</span>
-                        <span className="font-mono text-[8px] text-[#5f6368]">{cp.timestamp.split(" ")[1]}</span>
+                        <span className="font-medium text-xs text-[#202124] mt-1 max-w-[100px] truncate">{cp.district}</span>
+                        <span className="font-mono text-[9px] text-[#5f6368]">{cp.timestamp.split(" ")[1]}</span>
                       </div>
                       {idx < travelLogs.length - 1 && (
-                        <ArrowRight className="h-4 w-4 text-[#0b57d0] shrink-0" />
+                        <ArrowRight className="h-3.5 w-3.5 text-[#1a73e8] shrink-0" />
                       )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Detailed ANPR Checkpoint Scan Logs */}
+              {/* ANPR Camera Scans List */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase text-[#202124] flex items-center gap-1.5">
-                  <Radio className="h-4 w-4 text-[#a142f4]" /> ANPR Camera Scans for Vehicle {targetPlate} ({travelLogs.length})
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
+                  <Radio className="h-3.5 w-3.5 text-[#1a73e8]" /> ANPR Camera Scans ({travelLogs.length})
                 </h3>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
                   {travelLogs.map((cp: TravelCheckpoint, idx: number) => (
                     <div
                       key={idx}
-                      className="p-3.5 bg-white border border-[#dadce0] hover:border-[#a142f4] rounded-2xl transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="p-3 bg-white border border-[#dadce0] hover:border-[#1a73e8] rounded-xl transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
                     >
                       {/* Left Info */}
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#f3e8fd] text-[#a142f4] flex items-center justify-center font-bold text-sm shrink-0 border border-[#d7aefb]">
+                        <div className="w-8 h-8 rounded-lg bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center font-semibold text-xs shrink-0 border border-[#aecbfa]">
                           #{idx + 1}
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-sm text-[#202124]">{cp.locationName}</span>
-                            <Badge className="bg-[#a142f4] text-white font-mono text-[9px] font-bold">
-                              PLATE: {targetPlate}
-                            </Badge>
-                            <Badge className="bg-[#e6f4ea] text-[#188038] border border-[#a8dab5] text-[9px] font-mono">
+                            <span className="font-semibold text-sm text-[#202124]">{cp.locationName}</span>
+                            <Badge variant="outline" className="bg-[#f1f3f4] text-[#3c4043] border-[#dadce0] text-[9px] font-mono font-medium">
                               {cp.cameraType}
                             </Badge>
-                            <Badge className="bg-[#fce8e6] text-[#d93025] text-[9px] font-mono">
+                            <Badge variant="outline" className="bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0] text-[9px] font-medium">
                               {cp.flagStatus}
                             </Badge>
                           </div>
                           <p className="text-xs text-[#5f6368]">
-                            📍 District: <span className="font-bold text-[#202124]">{cp.district}</span> · Timestamp: <span className="font-mono text-[#0b57d0] font-bold">{cp.timestamp}</span> · Camera ID: <span className="font-mono text-[#202124]">{cp.checkpointId}</span>
+                            District: <span className="font-semibold text-[#202124]">{cp.district}</span> · Timestamp: <span className="font-mono text-[#1a73e8] font-semibold">{cp.timestamp}</span> · Camera ID: <span className="font-mono text-[#5f6368]">{cp.checkpointId}</span>
                           </p>
                           {cp.occupantsDetected && cp.occupantsDetected.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-[#d93025] font-bold pt-0.5">
-                              <span>👥 Vehicle {targetPlate} Occupants:</span>
-                              <span className="bg-[#fce8e6] px-2 py-0.5 rounded-full border border-[#f8b4b0]">{cp.occupantsDetected.join(", ")}</span>
+                            <div className="flex items-center gap-1.5 text-[11px] text-[#5f6368] pt-0.5">
+                              <span className="font-medium text-[#202124]">Occupants:</span>
+                              <span className="bg-[#f1f3f4] text-[#3c4043] px-2 py-0.5 rounded border border-[#dadce0] font-mono text-[10px]">{cp.occupantsDetected.join(", ")}</span>
                             </div>
                           )}
                         </div>
@@ -1053,18 +1040,15 @@ export function NetworkPage() {
                       {/* Right Specs & Snapshot */}
                       <div className="flex items-center gap-4 shrink-0 justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-[#dadce0]">
                         <div className="text-right text-xs">
-                          <p className="font-mono font-bold text-[#0b57d0] text-sm">{cp.speedKmph} km/h</p>
+                          <p className="font-mono font-semibold text-[#1a73e8] text-sm">{cp.speedKmph} km/h</p>
                           <p className="text-[10px] text-[#5f6368] font-mono">ANPR Match: {cp.anprConfidence}%</p>
                         </div>
                         <div className="relative">
                           <img
                             src={cp.imageSnapshot}
                             alt={`ANPR scan for ${targetPlate}`}
-                            className="w-16 h-12 rounded-lg object-cover border border-[#dadce0] shadow-sm shrink-0"
+                            className="w-14 h-10 rounded object-cover border border-[#dadce0] shrink-0"
                           />
-                          <span className="absolute bottom-0.5 right-0.5 bg-black/80 text-white font-mono text-[7px] px-1 rounded">
-                            {targetPlate.slice(-4)}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -1072,19 +1056,19 @@ export function NetworkPage() {
                 </div>
               </div>
 
-              {/* Police Intelligence Command Bar */}
+              {/* Police Action Bar */}
               <div className="pt-4 border-t border-[#dadce0] flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    className="bg-[#d93025] hover:bg-[#b31d13] text-white font-bold text-xs rounded-xl h-9 px-4 shadow-sm"
+                    className="bg-[#c5221f] hover:bg-[#a50e0c] text-white font-medium text-xs rounded-lg h-9 px-4 shadow-2xs"
                     onClick={() => toast.success(`Hotlist Alert for vehicle ${targetPlate} broadcast to all PCR Vans & Checkposts!`)}
                   >
-                    <Radio className="mr-1.5 h-4 w-4" /> Broadcast Hotlist Alert for {targetPlate}
+                    <Radio className="mr-1.5 h-3.5 w-3.5" /> Broadcast Hotlist Alert
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-[#0b57d0] hover:bg-[#0842a0] text-white font-bold text-xs rounded-xl h-9 px-4 shadow-sm flex items-center gap-1.5"
+                    className="bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium text-xs rounded-lg h-9 px-4 shadow-2xs flex items-center gap-1.5"
                     onClick={() => {
                       const headers = [
                         "Checkpoint ID",
@@ -1116,15 +1100,15 @@ export function NetworkPage() {
                       toast.success(`Exported ANPR Travel CSV for ${targetPlate}`);
                     }}
                   >
-                    <Download className="h-4 w-4" /> Export ANPR Logs (CSV)
+                    <Download className="h-3.5 w-3.5" /> Export ANPR Logs (CSV)
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-[#dadce0] text-[#202124] font-bold text-xs rounded-xl h-9 px-4"
+                    className="border-[#dadce0] text-[#3c4043] hover:bg-[#f1f3f4] font-medium text-xs rounded-lg h-9 px-4"
                     onClick={() => toast.info(`ANPR Travel Log PDF for vehicle ${targetPlate} exported!`)}
                   >
-                    <FileText className="mr-1.5 h-4 w-4 text-[#0b57d0]" /> Export Travel Log PDF
+                    <FileText className="mr-1.5 h-3.5 w-3.5 text-[#1a73e8]" /> Export PDF Report
                   </Button>
                 </div>
 
@@ -1132,9 +1116,9 @@ export function NetworkPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => setTrackingVehicleNode(null)}
-                  className="text-xs font-bold text-[#5f6368] hover:text-[#202124]"
+                  className="text-xs font-medium text-[#5f6368] hover:text-[#202124]"
                 >
-                  Close Tracker Window
+                  Close Window
                 </Button>
               </div>
 
@@ -1163,34 +1147,34 @@ export function NetworkPage() {
         const totalDurationMin = Math.round(totalDurationSec / 60);
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-            <div className="bg-white border border-[#dadce0] rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-white border border-[#dadce0] rounded-2xl max-w-4xl w-full p-6 shadow-xl space-y-6 relative max-h-[90vh] overflow-y-auto">
               
               {/* Modal Header */}
-              <div className="flex items-start justify-between border-b pb-4">
+              <div className="flex items-start justify-between border-b border-[#dadce0] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center font-bold text-2xl border border-[#7dd3fc] shadow-sm">
-                    📞
+                  <div className="w-10 h-10 rounded-xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center font-semibold text-lg border border-[#bae6fd]">
+                    <PhoneCall className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-[#0284c7] text-white text-xs font-mono px-3 py-0.5 font-bold shadow-sm">
+                      <Badge className="bg-[#0284c7] text-white text-xs font-mono px-2.5 py-0.5 font-bold">
                         {targetPhone}
                       </Badge>
-                      <Badge className="bg-[#e0f2fe] text-[#0284c7] border border-[#7dd3fc] text-[10px] font-bold uppercase">
-                        10-DIGIT CDR INTERCEPT
+                      <Badge variant="outline" className="bg-[#e0f2fe] text-[#0284c7] border-[#bae6fd] text-[10px] font-semibold uppercase">
+                        10-Digit CDR Intercept
                       </Badge>
                       {flaggedCallsCount > 0 && (
-                        <Badge className="bg-[#fce8e6] text-[#d93025] border border-[#f8b4b0] text-[10px] font-bold flex items-center gap-1">
-                          <ShieldAlert className="h-3 w-3" /> {flaggedCallsCount} FLAG INTERCEPT(S)
+                        <Badge variant="outline" className="bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0] text-[10px] font-semibold flex items-center gap-1">
+                          <ShieldAlert className="h-3 w-3" /> {flaggedCallsCount} Flagged Intercept(s)
                         </Badge>
                       )}
                     </div>
-                    <h2 className="text-xl font-display font-bold text-[#202124] mt-1">
-                      Call Detail Records (CDR) & Tower Dump Log for <span className="text-[#0284c7] font-mono">{targetPhone}</span>
+                    <h2 className="text-lg font-display font-semibold text-[#202124] mt-1">
+                      Call Detail Records (CDR) & Intercept Feed
                     </h2>
                     <p className="text-xs text-[#5f6368]">
-                      Real-time Telecom Tower Intercept & Call Detail Record timeline strictly for 10-digit number <span className="font-mono font-bold text-[#202124]">{targetPhone}</span> across Karnataka
+                      Subscriber Number: <span className="font-mono font-semibold text-[#202124]">{targetPhone}</span> · Real-Time Telecom Tower Intercept Logs
                     </p>
                   </div>
                 </div>
@@ -1200,51 +1184,51 @@ export function NetworkPage() {
                   onClick={() => setTrackingPhoneNode(null)}
                   className="h-8 w-8 p-0 rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
 
               {/* Phone Subscriber Specs & Overview Banner */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f8f9fa] border border-[#dadce0] rounded-2xl p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f8f9fa] border border-[#dadce0] rounded-xl p-4">
                 {/* Card Info */}
-                <div className="bg-[#e0f2fe]/40 border border-[#7dd3fc] rounded-xl p-3 flex flex-col justify-between">
+                <div className="bg-white border border-[#dadce0] rounded-lg p-3 flex flex-col justify-between">
                   <div>
-                    <span className="text-[10px] font-bold uppercase text-[#0284c7] block mb-1">Subscriber Identity</span>
-                    <h3 className="font-bold text-sm text-[#202124]">{subscriber}</h3>
-                    <p className="font-mono font-bold text-xs text-[#0284c7] mt-0.5">{targetPhone}</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#0284c7] block mb-1">Subscriber Identity</span>
+                    <h3 className="font-semibold text-sm text-[#202124]">{subscriber}</h3>
+                    <p className="font-mono font-semibold text-xs text-[#0284c7] mt-0.5">{targetPhone}</p>
                   </div>
-                  <div className="pt-2 border-t border-[#7dd3fc]/50 flex items-center justify-between text-[10px] text-[#5f6368]">
-                    <span>Operator: <strong className="text-[#202124]">{operator}</strong></span>
-                    <span>Status: <strong className="text-[#188038]">ACTIVE SIM</strong></span>
+                  <div className="pt-2 border-t border-[#f1f3f4] flex items-center justify-between text-[10px] text-[#5f6368]">
+                    <span>Operator: <strong className="text-[#202124] font-medium">{operator}</strong></span>
+                    <span>Status: <strong className="text-[#137333] font-medium">Active SIM</strong></span>
                   </div>
                 </div>
 
                 {/* Technical Hardware Specs */}
-                <div className="space-y-1.5 text-xs text-[#202124]">
-                  <span className="text-[10px] font-bold uppercase text-[#5f6368] block">Hardware & Telemetry Info</span>
-                  <p><span className="text-[#5f6368]">Target Line:</span> <span className="font-mono font-bold text-[#0284c7]">{targetPhone}</span></p>
-                  <p><span className="text-[#5f6368]">IMEI Identifier:</span> <span className="font-mono font-bold text-[#0b57d0]">{imei}</span></p>
+                <div className="space-y-1 text-xs text-[#202124]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#5f6368] block">Hardware & Network Info</span>
+                  <p><span className="text-[#5f6368]">Target Line:</span> <span className="font-mono font-semibold text-[#0284c7]">{targetPhone}</span></p>
+                  <p><span className="text-[#5f6368]">IMEI Identifier:</span> <span className="font-mono font-semibold text-[#1a73e8]">{imei}</span></p>
                   <p><span className="text-[#5f6368]">Circle / Hub:</span> {circle}</p>
                   <p><span className="text-[#5f6368]">District Tower:</span> {districtName}</p>
                 </div>
 
                 {/* Quick Metrics */}
-                <div className="space-y-2 bg-white border border-[#dadce0] rounded-xl p-3 flex flex-col justify-between text-xs">
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Total CDR Events:</span>
-                    <span className="font-mono font-bold text-[#0284c7]">{callLogs.length} Records</span>
+                <div className="space-y-2 bg-white border border-[#dadce0] rounded-lg p-3 flex flex-col justify-between text-xs">
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Total CDR Records:</span>
+                    <span className="font-mono font-semibold text-[#0284c7]">{callLogs.length} Records</span>
                   </div>
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Total Talk Time:</span>
-                    <span className="font-mono font-bold text-[#0b57d0]">{totalDurationMin} mins ({totalDurationSec}s)</span>
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Total Talk Time:</span>
+                    <span className="font-mono font-semibold text-[#1a73e8]">{totalDurationMin} mins</span>
                   </div>
-                  <div className="flex items-center justify-between border-b pb-1.5">
-                    <span className="text-[#5f6368] font-bold">Flagged / Encrypted:</span>
-                    <span className="font-mono font-bold text-[#d93025]">{flaggedCallsCount} Intercepts</span>
+                  <div className="flex items-center justify-between border-b border-[#f1f3f4] pb-1.5">
+                    <span className="text-[#5f6368] font-medium">Flagged Intercepts:</span>
+                    <span className="font-mono font-semibold text-[#c5221f]">{flaggedCallsCount} Intercepts</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[#5f6368] font-bold">Tower Intercept:</span>
-                    <Badge className="bg-[#e0f2fe] text-[#0284c7] text-[9px] font-bold">CDR FEED SYNCED</Badge>
+                    <span className="text-[#5f6368] font-medium">Tower Intercept:</span>
+                    <Badge variant="outline" className="bg-[#e0f2fe] text-[#0284c7] border-[#bae6fd] text-[9px] font-medium">CDR Synced</Badge>
                   </div>
                 </div>
               </div>
@@ -1252,65 +1236,65 @@ export function NetworkPage() {
               {/* CDR Call Logs Table / List */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase text-[#202124] flex items-center gap-1.5">
-                    <PhoneCall className="h-4 w-4 text-[#0284c7]" /> Call Detail Records (CDR) Chronological Feed for {targetPhone}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
+                    <PhoneCall className="h-3.5 w-3.5 text-[#0284c7]" /> CDR Chronological Call Feed ({callLogs.length})
                   </h3>
-                  <span className="text-[10px] text-[#5f6368] font-mono">Total {callLogs.length} Records</span>
+                  <span className="text-[10px] text-[#5f6368] font-mono">{targetPhone}</span>
                 </div>
 
-                <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                   {callLogs.map((log) => (
                     <div
                       key={log.callId}
                       className={cn(
-                        "p-3 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs transition-all",
+                        "p-3 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs transition-all",
                         log.callStatus === "Intercept Flagged" || log.type === "Encrypted VOIP"
-                          ? "bg-[#fce8e6]/40 border-[#f8b4b0] hover:bg-[#fce8e6]/70"
-                          : "bg-[#f8f9fa] border-[#dadce0] hover:bg-white hover:border-[#0b57d0] shadow-2xs"
+                          ? "bg-[#fce8e6]/30 border-[#f8b4b0] hover:bg-[#fce8e6]/50"
+                          : "bg-white border-[#dadce0] hover:border-[#0284c7]"
                       )}
                     >
                       <div className="flex items-start gap-3">
                         <div className={cn(
-                          "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border mt-0.5",
-                          log.type === "Incoming" ? "bg-[#e6f4ea] text-[#188038] border-[#a8dab5]" :
+                          "w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-xs shrink-0 border mt-0.5",
+                          log.type === "Incoming" ? "bg-[#e6f4ea] text-[#137333] border-[#ceead6]" :
                           log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
-                          log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#d93025] border-[#f8b4b0]" :
-                          "bg-[#fef7e0] text-[#b06000] border-[#fde293]"
+                          log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" :
+                          "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
                         )}>
                           {log.type === "Incoming" ? "📥" : log.type === "Outgoing" ? "📤" : log.type === "Encrypted VOIP" ? "🔐" : "💬"}
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-sm text-[#202124]">{log.otherPartyNumber}</span>
-                            <Badge className="bg-[#f1f3f4] text-[#202124] border border-[#dadce0] text-[9px] font-bold">
+                            <span className="font-mono font-semibold text-sm text-[#202124]">{log.otherPartyNumber}</span>
+                            <Badge variant="outline" className="bg-[#f1f3f4] text-[#3c4043] border-[#dadce0] text-[9px] font-semibold">
                               {log.otherPartyName}
                             </Badge>
-                            <Badge className={cn(
-                              "text-[9px] font-mono font-bold",
-                              log.type === "Incoming" ? "bg-[#e6f4ea] text-[#188038]" :
-                              log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8]" :
-                              log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#d93025]" : "bg-[#fef7e0] text-[#b06000]"
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-mono font-semibold",
+                              log.type === "Incoming" ? "bg-[#e6f4ea] text-[#137333] border-[#ceead6]" :
+                              log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
+                              log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
                             )}>
                               {log.type}
                             </Badge>
                             {log.callStatus === "Intercept Flagged" && (
-                              <Badge className="bg-[#d93025] text-white text-[9px] font-bold">
-                                FLAGGED INTERCEPT
+                              <Badge className="bg-[#c5221f] text-white text-[9px] font-medium">
+                                Flagged Intercept
                               </Badge>
                             )}
                           </div>
 
                           <p className="text-xs text-[#5f6368]">
-                            📡 Cell Tower: <span className="font-bold text-[#202124]">{log.towerLocation}</span> ({log.towerId}) · District: <span className="font-bold text-[#202124]">{log.district}</span> · Timestamp: <span className="font-mono text-[#0b57d0] font-bold">{log.timestamp}</span>
+                            Cell Tower: <span className="font-medium text-[#202124]">{log.towerLocation}</span> ({log.towerId}) · District: <span className="font-medium text-[#202124]">{log.district}</span> · Timestamp: <span className="font-mono text-[#0284c7] font-semibold">{log.timestamp}</span>
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0 self-end md:self-center border-t md:border-t-0 pt-2 md:pt-0 border-[#dadce0] w-full md:w-auto justify-between md:justify-end">
                         <div className="text-right text-xs">
-                          <span className="font-mono font-bold text-xs text-[#0284c7]">
-                            {log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Ans)"}
+                          <span className="font-mono font-semibold text-xs text-[#0284c7]">
+                            {log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Answer)"}
                           </span>
                           <span className="text-[10px] text-[#5f6368] block font-mono">IMEI: {log.imei.slice(-6)}</span>
                         </div>
@@ -1320,12 +1304,12 @@ export function NetworkPage() {
                 </div>
               </div>
 
-              {/* Police CDR Action & Export Bar */}
+              {/* Police Action Bar */}
               <div className="pt-4 border-t border-[#dadce0] flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    className="bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold text-xs rounded-xl h-9 px-4 shadow-sm flex items-center gap-1.5"
+                    className="bg-[#0284c7] hover:bg-[#0369a1] text-white font-medium text-xs rounded-lg h-9 px-4 shadow-2xs flex items-center gap-1.5"
                     onClick={() => {
                       const headers = [
                         "Call ID",
@@ -1361,15 +1345,15 @@ export function NetworkPage() {
                       toast.success(`Exported CDR Call Detail Records CSV for ${targetPhone}`);
                     }}
                   >
-                    <Download className="h-4 w-4" /> Export CDR Logs (CSV)
+                    <Download className="h-3.5 w-3.5" /> Export CDR Logs (CSV)
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-[#dadce0] text-[#202124] font-bold text-xs rounded-xl h-9 px-4"
+                    className="border-[#dadce0] text-[#3c4043] hover:bg-[#f1f3f4] font-medium text-xs rounded-lg h-9 px-4"
                     onClick={() => toast.info(`CDR Telemetry PDF Forensic Report for number ${targetPhone} exported!`)}
                   >
-                    <FileText className="mr-1.5 h-4 w-4 text-[#0284c7]" /> Export CDR PDF Report
+                    <FileText className="mr-1.5 h-3.5 w-3.5 text-[#0284c7]" /> Export PDF Report
                   </Button>
                 </div>
 
@@ -1377,9 +1361,9 @@ export function NetworkPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => setTrackingPhoneNode(null)}
-                  className="text-xs font-bold text-[#5f6368] hover:text-[#202124]"
+                  className="text-xs font-medium text-[#5f6368] hover:text-[#202124]"
                 >
-                  Close CDR Window
+                  Close Window
                 </Button>
               </div>
 

@@ -60,6 +60,11 @@ export function getStoredCases(): Case[] {
 
   loadedCases = initCases();
   normalize(loadedCases);
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedCases));
+    } catch (e) {}
+  }
   return loadedCases;
 }
 
