@@ -55,6 +55,265 @@ type Message = {
   };
 };
 
+function generateBNSAdvisorReport(
+  userQuery: string,
+  allCases: any[],
+  offenders: any[],
+  language: string
+): string {
+  const query = userQuery.toLowerCase().trim();
+  const isKn = language === "kn";
+
+  // 1. SEARCH FOR SPECIFIC CASE OR OFFENDER IN DATABASE
+  let matchedCase: any = null;
+
+  // Search by exact FIR Number or Case ID
+  matchedCase = allCases.find((c: any) => {
+    const crimeNoStr = String(c.crimeNo || "").toLowerCase();
+    const caseIdStr = String(c.caseMasterId || "").toLowerCase();
+    return (
+      query.includes(crimeNoStr) ||
+      (c.crimeNo && query.includes(c.crimeNo.split("/")[0])) ||
+      query.includes(`case ${caseIdStr}`) ||
+      query.includes(`fir ${crimeNoStr}`) ||
+      (caseIdStr.length > 2 && query.includes(caseIdStr))
+    );
+  });
+
+  // Search by Accused Name if no case found yet
+  if (!matchedCase) {
+    matchedCase = allCases.find((c: any) =>
+      c.accused?.some((a: any) => a.name && query.includes(a.name.toLowerCase()))
+    );
+  }
+
+  // Search by Offender Name if no case found yet
+  if (!matchedCase) {
+    const matchedOffender = offenders.find((o: any) => o.name && query.includes(o.name.toLowerCase()));
+    if (matchedOffender && matchedOffender.cases && matchedOffender.cases.length > 0) {
+      matchedCase = allCases.find((c: any) => c.caseMasterId === matchedOffender.cases[0]);
+    }
+  }
+
+  // Search by Police Station / District Name if no case found yet
+  if (!matchedCase) {
+    matchedCase = allCases.find((c: any) =>
+      (c.policeStation && query.includes(c.policeStation.toLowerCase())) ||
+      (c.district?.name && query.includes(c.district.name.toLowerCase()))
+    );
+  }
+
+  // IF A SPECIFIC CASE MATCH WAS FOUND IN DATABASE:
+  if (matchedCase) {
+    const c = matchedCase;
+    const crimeHeadName = c.crimeHead?.name || "Offence";
+    const districtName = c.district?.name || "Karnataka District";
+    const stationName = c.policeStation || "PS";
+    const brief = c.briefFacts || "Case file under active investigation.";
+    const accusedNames = (c.accused || []).map((a: any) => `${a.name}${a.arrestId || a.isArrested ? " (In Custody)" : " (At Large)"}`).join(", ") || "Unidentified Suspects";
+
+    let bnsPrimary = "BNS Section 303(2) (Theft)";
+    let ipcLegacy = "IPC Section 379";
+    let penalty = isKn ? "3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್." : "Imprisonment up to 3 years, or fine, or both. Non-bailable, Cognizable.";
+    let secondarySections: string[] = [];
+
+    const textToScan = `${crimeHeadName} ${brief} ${c.moTag || ""}`.toLowerCase();
+
+    if (textToScan.includes("murder") || textToScan.includes("kill") || textToScan.includes("homicide")) {
+      bnsPrimary = "BNS Section 103(1) (Murder)";
+      ipcLegacy = "IPC Section 302";
+      penalty = isKn ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್." : "Death or Imprisonment for Life, and fine. Non-bailable, Cognizable.";
+      secondarySections.push("BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187 (Custody Remand Procedure)");
+    } else if (textToScan.includes("attempt to murder") || textToScan.includes("stabbing") || textToScan.includes("shoot") || textToScan.includes("gun")) {
+      bnsPrimary = "BNS Section 109 (Attempt to Murder)";
+      ipcLegacy = "IPC Section 307";
+      penalty = isKn ? "10 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ; ಗಾಯ ಉಂಟಾದರೆ ಜೀವಾವಧಿ. ಜಾಮೀನು ರಹಿತ." : "Imprisonment up to 10 years and fine; if hurt caused, up to Life. Non-bailable.";
+      secondarySections.push("BNS Section 118 (Grievous hurt by dangerous weapon)", "Arms Act Section 25/27");
+    } else if (textToScan.includes("robbery") || textToScan.includes("dacoity") || textToScan.includes("gang") || textToScan.includes("extortion")) {
+      bnsPrimary = textToScan.includes("dacoity") || textToScan.includes("gang") ? "BNS Section 310 (Dacoity / Gang Robbery)" : "BNS Section 309 (Robbery)";
+      ipcLegacy = textToScan.includes("dacoity") ? "IPC Section 395" : "IPC Section 392";
+      penalty = isKn ? "10 ರಿಂದ 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment 10 to 14 years and fine. Non-bailable.";
+      secondarySections.push("BNS Section 111 (Organized Crime Syndicate)", "BNS Section 308 (Extortion)");
+    } else if (textToScan.includes("burglary") || textToScan.includes("housebreak") || textToScan.includes("shutter") || textToScan.includes("night") || textToScan.includes("lock")) {
+      bnsPrimary = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
+      ipcLegacy = "IPC Section 457";
+      penalty = isKn ? "14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment up to 14 years and fine. Non-bailable.";
+      secondarySections.push("BNS Section 305 (Theft in dwelling house)", "BNS Section 317 (Receiving stolen property)");
+    } else if (textToScan.includes("snatch") || textToScan.includes("chain")) {
+      bnsPrimary = "BNS Section 307 (Snatching - New BNS Offence)";
+      ipcLegacy = "Legacy IPC Section 379A";
+      penalty = isKn ? "3 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment up to 3 years and fine. Non-bailable.";
+      secondarySections.push("BNS Section 317 (Stolen Property)");
+    } else if (textToScan.includes("cyber") || textToScan.includes("phish") || textToScan.includes("fraud") || textToScan.includes("online") || textToScan.includes("cheating") || textToScan.includes("bank")) {
+      bnsPrimary = "BNS Section 318(4) (Cheating & Dishonestly Inducing Delivery of Property)";
+      ipcLegacy = "IPC Section 420 / 419";
+      penalty = isKn ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ." : "Imprisonment up to 7 years and fine. Non-bailable, Cognizable.";
+      secondarySections.push("IT Act Section 66C (Identity Theft)", "IT Act Section 66D (Cheating by Computer Resource)");
+    } else if (textToScan.includes("assault") || textToScan.includes("hurt") || textToScan.includes("fight") || textToScan.includes("weapon")) {
+      bnsPrimary = "BNS Section 117 (Voluntarily Causing Grievous Hurt)";
+      ipcLegacy = "IPC Section 325 / 323";
+      penalty = isKn ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ/ಸಹಿತ." : "Imprisonment up to 7 years and fine. Non-bailable/Bailable.";
+      secondarySections.push("BNS Section 126 (Wrongful Restraint)", "BNS Section 189 (Unlawful Assembly)");
+    }
+
+    if (isKn) {
+      return `⚖️ [ಪ್ರಕರಣದ ನಿರ್ದಿಷ್ಟ BNS ಕಾನೂನು ಸಲಹಾ ವರದಿ - FIR #${c.crimeNo}]
+
+• ಪ್ರಕರಣ ಸಂಖ್ಯೆ: FIR No. ${c.crimeNo} (${c.policeStation}, ${districtName})
+• ಅಪರಾಧ ವರ್ಗೀಕರಣ: ${crimeHeadName} [ಗಾಂಭೀರ್ಯತೆ: ${c.gravity}]
+• ಆರೋಪಿಗಳ ಪಟ್ಟಿ: ${accusedNames}
+
+---------------------------------------------------
+📌 ಪ್ರಾಥಮಿಕ ಬಿಎನ್‌ಎಸ್ (BNS, 2023) ಸೆಕ್ಷನ್‌ಗಳು:
+• ಪ್ರಮುಖ BNS ಸೆಕ್ಷನ್: ${bnsPrimary}
+• ಹಳೆಯ IPC ಸಮಾನ ಸೆಕ್ಷನ್: ${ipcLegacy}
+• ಶಿಕ್ಷೆ ಮತ್ತು ಕಾನೂನು ಸ್ವರೂಪ: ${penalty}
+
+🛡️ ಹೆಚ್ಚುವರಿ ಲಗತ್ತಿಸಬೇಕಾದ ಬಿಎನ್‌ಎಸ್/ವಿಶೇಷ ಕಾಯ್ದೆಗಳು:
+${secondarySections.length > 0 ? secondarySections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
+
+📋 ಪ್ರಕರಣದ ನೈಜ ಸಾರಾಂಶ ವಿಶ್ಲೇಷಣೆ:
+"${brief}"
+
+💡 ತನಿಖಾಧಿಕಾರಿಗಳಿಗೆ (IO) ಕಾರ್ಯವಿಧಾನ ನಿರ್ದೇಶನ:
+1. ಎಫ್‌ಐಆರ್ ದಾಖಲಾತಿ ಫಾರ್ಮ್‌ನ ಹಂತ 3 ರಲ್ಲಿ ${bnsPrimary} ಮತ್ತು ${secondarySections[0] || "BNS 317"} ಸೆಕ್ಷನ್‌ಗಳನ್ನು ನೋಂದಾಯಿಸಿ.
+2. ಬಿಎನ್‌ಎಸ್‌ಎಸ್ (BNSS, 2023) ರ ಸೆಕ್ಷನ್ 176(3) ರ ಪ್ರಕಾರ ಫೊರೆನ್ಸಿಕ್ ಮತ್ತು ಡಿಜಿಟಲ್ ಪುರಾವೆಗಳನ್ನು ಕಡ್ಡಾಯವಾಗಿ ಸಂಗ್ರಹಿಸಿ.
+3. ಬಂಧಿತ ಆರೋಪಿಗಳ ವಿಚಾರಣೆಯನ್ನು BNSS ಸೆಕ್ಷನ್ 187 ರ ಪ್ರಕಾರ ನಡೆಸಿ.`;
+    } else {
+      return `⚖️ [CASE-SPECIFIC BNS LEGAL ADVISOR REPORT · FIR #${c.crimeNo}]
+
+• Case Identification: FIR No. ${c.crimeNo} (${c.policeStation}, ${districtName})
+• Crime Classification: ${crimeHeadName} [Gravity: ${c.gravity}]
+• Linked Suspects: ${accusedNames}
+
+---------------------------------------------------
+📌 PRIMARY BNS (2023) STATUTORY MAPPING:
+• Primary BNS Section: ${bnsPrimary}
+• Legacy IPC Equivalent: ${ipcLegacy}
+• Statutory Mandate & Penalty: ${penalty}
+
+🛡️ RECOMMENDED ADDITIONAL STATUTORY PROVISIONS:
+${secondarySections.length > 0 ? secondarySections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
+
+📋 FACTUAL CASE ANALYSIS:
+"${brief}"
+
+💡 INVESTIGATING OFFICER (IO) PROCEDURAL DIRECTIVES:
+1. Formally record ${bnsPrimary} and ${secondarySections[0] || "BNS Section 317"} inside Step 3 (Acts & Sections) of the FIR form.
+2. Mandatory collection of digital & physical evidence under BNSS Section 176(3).
+3. Follow strict custody & remand timelines under BNSS Section 187.`;
+    }
+  }
+
+  // 2. GENERAL DEEP BNS QUERY MAPPING FOR QUERY-BASED INPUTS
+  let bnsSec = "BNS Section 303(2) (Theft)";
+  let ipcSec = "IPC Section 379";
+  let details = isKn 
+    ? "3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ಅವರಿಂದ ವಿಚಾರಣೆ."
+    : "Punishment: Imprisonment up to 3 years, or fine, or both. Non-bailable, triable by any Magistrate.";
+  let addlSections: string[] = [];
+
+  if (query.includes("murder") || query.includes("kill") || query.includes("homicide") || query.includes("death") || query.includes("dead")) {
+    bnsSec = "BNS Section 103(1) (Murder)";
+    ipcSec = "IPC Section 302";
+    details = isKn 
+      ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಸೆಷನ್ಸ್ ನ್ಯಾಯಾಲಯ ವಿಚಾರಣೆ."
+      : "Punishment: Death or Imprisonment for Life, and fine. Non-bailable, Cognizable, triable by Court of Session.";
+    addlSections = ["BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187 (Custody Remand)"];
+  } else if (query.includes("attempt to murder") || query.includes("stabbing") || query.includes("shoot") || query.includes("gun")) {
+    bnsSec = "BNS Section 109 (Attempt to Murder)";
+    ipcSec = "IPC Section 307";
+    details = isKn 
+      ? "10 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ; ಗಾಯ ಸಂಭವಿಸಿದರೆ ಜೀವಾವಧಿ. ಜಾಮೀನು ರಹಿತ."
+      : "Punishment: Imprisonment up to 10 years and fine; up to Life if hurt is caused. Non-bailable.";
+    addlSections = ["BNS Section 118 (Grievous hurt with weapon)", "Arms Act Section 25/27"];
+  } else if (query.includes("robbery") || query.includes("dacoity") || query.includes("extortion") || query.includes("gang")) {
+    bnsSec = query.includes("dacoity") || query.includes("gang") ? "BNS Section 310 (Dacoity / Gang Robbery)" : "BNS Section 309 (Robbery)";
+    ipcSec = query.includes("dacoity") ? "IPC Section 395" : "IPC Section 392";
+    details = isKn 
+      ? "10 ರಿಂದ 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
+      : "Punishment: Rigorous imprisonment up to 10 to 14 years and fine. Non-bailable.";
+    addlSections = ["BNS Section 111 (Organized Crime Syndicate)", "BNS Section 308 (Extortion)"];
+  } else if (query.includes("trespass") || query.includes("break") || query.includes("night") || query.includes("window") || query.includes("shutter") || query.includes("house")) {
+    bnsSec = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
+    ipcSec = "IPC Section 457";
+    details = isKn 
+      ? "14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+      : "Punishment: Rigorous imprisonment up to 14 years and fine. Non-bailable, triable by Magistrate of First Class.";
+    addlSections = ["BNS Section 305 (Theft in dwelling house)", "BNS Section 317 (Receiving stolen property)"];
+  } else if (query.includes("snatch") || query.includes("chain")) {
+    bnsSec = "BNS Section 307 (Snatching)";
+    ipcSec = "Legacy IPC Section 379A";
+    details = isKn 
+      ? "3 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್."
+      : "Punishment: Rigorous imprisonment up to 3 years and fine. Non-bailable, Cognizable.";
+    addlSections = ["BNS Section 317 (Receiving stolen property)"];
+  } else if (query.includes("cyber") || query.includes("hack") || query.includes("online") || query.includes("phish") || query.includes("fraud") || query.includes("phone") || query.includes("bank") || query.includes("cheating")) {
+    bnsSec = "BNS Section 318(4) (Cheating & Dishonestly Inducing Delivery of Property)";
+    ipcSec = "IPC Section 420 / 419";
+    details = isKn 
+      ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+      : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, Cognizable, triable by Magistrate of First Class.";
+    addlSections = ["IT Act Section 66C (Identity Theft)", "IT Act Section 66D (Cheating by Computer Resource)"];
+  } else if (query.includes("hurt") || query.includes("beat") || query.includes("assault") || query.includes("hit") || query.includes("fight")) {
+    bnsSec = "BNS Section 115 (Voluntarily Causing Hurt)";
+    ipcSec = "IPC Section 323";
+    details = isKn 
+      ? "1 ವರ್ಷದವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ಸಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
+      : "Punishment: Imprisonment up to 1 year or fine. Bailable, triable by any Magistrate.";
+    addlSections = ["BNS Section 117 (Grievous Hurt)", "BNS Section 126 (Wrongful Restraint)"];
+  } else if (query.includes("kidnap") || query.includes("abduct") || query.includes("ransom")) {
+    bnsSec = query.includes("ransom") ? "BNS Section 140 (Kidnapping for Ransom)" : "BNS Section 137 (Kidnapping)";
+    ipcSec = query.includes("ransom") ? "IPC Section 364A" : "IPC Section 363";
+    details = isKn 
+      ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಕಾರಾಗೃಹ ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
+      : "Punishment: Death or Life Imprisonment, and fine. Non-bailable, Cognizable.";
+    addlSections = ["BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187"];
+  } else if (query.includes("drug") || query.includes("ganja") || query.includes("narcotic") || query.includes("substance")) {
+    bnsSec = "NDPS Act Section 20/22 (Possession of Psychotropic Substances)";
+    ipcSec = "NDPS Act, 1985";
+    details = isKn 
+      ? "10 ರಿಂದ 20 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
+      : "Punishment: Rigorous imprisonment 10 to 20 years and fine. Non-bailable.";
+    addlSections = ["BNS Section 111 (Organized Crime Syndicate)"];
+  } else if (query.includes("weapon") || query.includes("gun") || query.includes("pistol") || query.includes("arms") || query.includes("sword")) {
+    bnsSec = "Arms Act Section 25(1B) / Section 27 (Illegal Arms Possession/Use)";
+    ipcSec = "Arms Act, 1959";
+    details = isKn 
+      ? "3 ರಿಂದ 7 ವರ್ಷಗಳ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
+      : "Punishment: Imprisonment 3 to 7 years and fine. Non-bailable.";
+    addlSections = ["BNS Section 192 (Rioting with deadly weapon)"];
+  }
+
+  if (isKn) {
+    return `⚖️ [BNS ಕ್ರಾಸ್-ಮ್ಯಾಪಿಂಗ್ ಹಾಗೂ ಕಾನೂನು ಸಲಹಾ ವರದಿ]
+
+• ಹೊಸ ಬಿಎನ್‌ಎಸ್ ಸೆಕ್ಷನ್: ${bnsSec}
+• ಹಳೆಯ ಐಪಿಸಿ ಸಮಾನ ಸೆಕ್ಷನ್: ${ipcSec}
+• ಶಾಸನಬದ್ಧ ಶಿಕ್ಷೆ ವಿವರಗಳು: ${details}
+
+🛡️ ಹೆಚ್ಚುವರಿ ಲಗತ್ತಿಸಬೇಕಾದ ಬಿಎನ್‌ಎಸ್/ವಿಶೇಷ ಕಾಯ್ದೆಗಳು:
+${addlSections.length > 0 ? addlSections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
+
+💡 ತನಿಖಾಧಿಕಾರಿಗಳಿಗೆ (IO) ಕಾರ್ಯವಿಧಾನ ಸೂಚನೆ:
+1. ಎಫ್‌ಐಆರ್ ನ ಹಂತ 3 (ಕಾಯ್ದೆಗಳು ಮತ್ತು ಸೆಕ್ಷನ್‌ಗಳು) ರ ಅಡಿಯಲ್ಲಿ ಈ ಸೆಕ್ಷನ್ಗಳನ್ನು ದಾಖಲಿಸಿ.
+2. ಬಿಎನ್‌ಎಸ್‌ಎಸ್ (BNSS, 2023) ಶಾಸನಬದ್ಧ ನಿಯಮಗಳ ಪ್ರಕಾರ ತನಿಖಾ ಪುರಾವೆಗಳನ್ನು ಸಂಗ್ರಹಿಸಿ.`;
+  } else {
+    return `⚖️ [BNS LEGAL STATUTORY ADVISORY REPORT]
+
+• New BNS Section: ${bnsSec}
+• Legacy IPC Equivalent: ${ipcSec}
+• Statutory Penalty Details: ${details}
+
+🛡️ RECOMMENDED COMPONENT SECTIONS:
+${addlSections.length > 0 ? addlSections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
+
+💡 INVESTIGATING OFFICER (IO) PROCEDURAL DIRECTIVES:
+1. Map these sections inside Step 3 (Acts & Sections) of the FIR Filing form.
+2. Ensure compliance with evidence recording guidelines under BNSS (2023).`;
+  }
+}
+
 export function CopilotDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -76,6 +335,73 @@ export function CopilotDrawer() {
   const [inlineName, setInlineName] = useState("");
   const [inlineFir, setInlineFir] = useState("");
 
+  const systemText = useMemo(() => {
+    const isKn = language === "kn";
+    return {
+      title: isKn ? "KSP ಅಪರಾಧ ತನಿಖಾ AI ಸಹಾಯಕ" : "KSP Crime Intelligence Assistant",
+      statusOnline: isKn ? "ಆನ್‌ಲೈನ್" : "ONLINE",
+      suggestionsTitle: isKn ? "ಸಲಹೆಗಳು" : "SUGGESTED QUERIES",
+      clickToInterrogate: isKn ? "ನೆಟ್‌ವರ್ಕ್ ನೋಡ್ ಕ್ಲಿಕ್ ಮಾಡಿ" : "Click network node to inspect connections",
+      placeholder: isKn ? "ಸಂದೇಶ ಅಥವಾ ಎಫ್‌ಐಆರ್ ನಮೂದಿಸಿ..." : "Ask a question, enter FIR, or type suspect name...",
+    };
+  }, [language]);
+
+  const suggestions = useMemo(() => {
+    if (mode === "simulator") {
+      return [
+        { type: "name", value: "Vijay Bhat" },
+        { type: "name", value: "Darshan" },
+        { type: "name", value: "Ramesh" }
+      ];
+    }
+    if (mode === "advisor") {
+      return [
+        { type: "fir", value: "FIR/BAG/2026/204" },
+        { type: "query", value: "BNS penalty for robbery & dacoity" },
+        { type: "query", value: "Cyber cheating & bank fraud sections" }
+      ];
+    }
+    return [
+      { type: "name", value: "Vijay Bhat" },
+      { type: "name", value: "Darshan" },
+      { type: "fir", value: "FIR/BAG/2026/204" }
+    ];
+  }, [mode]);
+
+  const getWelcomeMessage = (currentMode: "standard" | "simulator" | "advisor") => {
+    const isKn = language === "kn";
+    if (currentMode === "simulator") {
+      return isKn
+        ? "[ತನಿಖಾ ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್] ಶಂಕಿತರನ್ನು ವಿಚಾರಣೆ ಮಾಡುವ ಅಭ್ಯಾಸ ವಲಯಕ್ಕೆ ಸುಸ್ವಾಗತ. ದಯವಿಟ್ಟು ವಿಚಾರಣೆ ಮಾಡಲು ಶಂಕಿತನ ಹೆಸರನ್ನು ನಮೂದಿಸಿ (ಉದಾ: Vijay Bhat ಅಥವಾ Darshan):"
+        : "[INTERROGATION SANDBOX] Welcome to Suspect Interrogation Practice. Please enter a suspect name to interrogate (e.g. Vijay Bhat or Darshan):";
+    }
+    if (currentMode === "advisor") {
+      return isKn
+        ? "[ಬಿಎನ್‌ಎಸ್ ಕಾನೂನು ಸಲಹೆಗಾರ] ಬಿಎನ್‌ಎಸ್ (BNS, 2023) ಶಾಸನಬದ್ಧ ಮ್ಯಾಪಿಂಗ್ ಮತ್ತು ಎಫ್‌ಐಆರ್ ಪ್ರಕರಣದ ಕಾನೂನು ಸಲಹೆಗಾಗಿ ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆ, ಆರೋಪಿಯ ಹೆಸರು ಅಥವಾ ಕಾನೂನು ಪ್ರಶ್ನೆಯನ್ನು ನಮೂದಿಸಿ:"
+        : "[BNS STATUTORY LEGAL ADVISOR] Enter FIR Number, Accused Name, or Legal Question for automated BNS / BNSS 2023 statutory mapping & case advisory report:";
+    }
+    return isKn
+      ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:"
+      : "Enter Accused / Suspect Name:";
+  };
+
+  const handleModeChange = (newMode: "standard" | "simulator" | "advisor") => {
+    setMode(newMode);
+    setSearchState({ step: 1, name: "", fir: "" });
+    setSimulatorState({ activeSuspect: "", turnCount: 0 });
+    setActiveCaseContext(null);
+    const welcomeMsg = getWelcomeMessage(newMode);
+    setMessages([
+      {
+        id: "init_mode_" + Date.now(),
+        sender: "system",
+        text: welcomeMsg,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        formType: newMode === "standard" ? "name" : undefined
+      }
+    ]);
+  };
+
   const handleInlineNameSubmit = (val: string) => {
     if (!val.trim()) return;
 
@@ -96,7 +422,7 @@ export function CopilotDrawer() {
     const targetName = val.trim();
     
     // Try to auto-suggest matched FIR if possible to save typing
-    const matchedCase = allCases.find(c => c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase())));
+    const matchedCase = allCases.find((c: any) => c.accused.some((a: any) => a.name.toLowerCase().includes(targetName.toLowerCase())));
     const suggestedFir = matchedCase ? matchedCase.crimeNo : "";
 
     setSearchState({ step: 2, name: targetName, fir: suggestedFir });
@@ -152,11 +478,11 @@ export function CopilotDrawer() {
     const queryFormatted = formattedSearchTerm.toLowerCase();
     
     // Match case by crimeNo/caseId AND check if target criminal is listed in accused list
-    const matchedCase = allCases.find(c => 
+    const matchedCase = allCases.find((c: any) => 
       (c.crimeNo.toLowerCase().includes(queryFormatted) || 
        c.crimeNo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanedInput) ||
        String(c.caseMasterId).includes(queryFormatted)) &&
-      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+      c.accused.some((a: any) => a.name.toLowerCase().includes(targetName.toLowerCase()))
     );
 
     if (!matchedCase) {
@@ -187,8 +513,8 @@ export function CopilotDrawer() {
     }
 
     // ── Prediction Engine ──
-    const allCriminalCases = allCases.filter(c =>
-      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    const allCriminalCases = allCases.filter((c: any) =>
+      c.accused.some((a: any) => a.name.toLowerCase().includes(targetName.toLowerCase()))
     );
 
     const crimeTypeFreq: Record<string, number> = {};
@@ -197,7 +523,7 @@ export function CopilotDrawer() {
     const hourBuckets: number[] = [];
     let heinousCount = 0;
 
-    allCriminalCases.forEach(c => {
+    allCriminalCases.forEach((c: any) => {
       const ct = c.crimeHead.name;
       crimeTypeFreq[ct] = (crimeTypeFreq[ct] || 0) + 1;
       districtFreq[c.district.name] = (districtFreq[c.district.name] || 0) + 1;
@@ -211,7 +537,7 @@ export function CopilotDrawer() {
     const topDistricts = Object.entries(districtFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
     const topMo = Object.entries(moFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.moTag;
     const avgHour = hourBuckets.length ? Math.round(hourBuckets.reduce((a, b) => a + b, 0) / hourBuckets.length) : 14;
-    const coAccusedCount = new Set(allCriminalCases.flatMap(c => c.accused.map(a => a.name))).size - 1;
+    const coAccusedCount = new Set(allCriminalCases.flatMap((c: any) => c.accused.map((a: any) => a.name))).size - 1;
 
     let riskScore = 30;
     riskScore += Math.min(totalCases * 8, 30);
@@ -229,8 +555,8 @@ export function CopilotDrawer() {
       avgHour < 12 ? "morning (06:00–12:00)" :
       avgHour < 18 ? "afternoon (12:00–18:00)" : "evening/night (18:00–24:00)";
 
-    const recentHeinous = allCriminalCases.slice(-3).filter(c => c.gravity === "Heinous").length;
-    const olderHeinous  = allCriminalCases.slice(0, 3).filter(c => c.gravity === "Heinous").length;
+    const recentHeinous = allCriminalCases.slice(-3).filter((c: any) => c.gravity === "Heinous").length;
+    const olderHeinous  = allCriminalCases.slice(0, 3).filter((c: any) => c.gravity === "Heinous").length;
     const escalationTrend: PredictionData["escalationTrend"] =
       recentHeinous > olderHeinous ? "ESCALATING" :
       recentHeinous < olderHeinous ? "DE-ESCALATING" : "STABLE";
@@ -269,20 +595,20 @@ export function CopilotDrawer() {
       date: matchedCase.registeredDate,
       acts: matchedCase.actSections.join(", "),
       officer: matchedCase.registeringOfficer || "N/A",
-      victims: matchedCase.victims.map(v => v.name),
-      accused: matchedCase.accused.map(a => a.name),
+      victims: matchedCase.victims.map((v: any) => v.name),
+      accused: matchedCase.accused.map((a: any) => a.name),
       briefFacts: matchedCase.briefFacts,
       done: language === "kn" ? "ಅಪರಾಧಿ ಪ್ರೊಫೈಲ್ ಲೋಡ್ ಆಗಿದೆ." : "Accused profile loaded successfully.",
       prediction
     };
 
     const connections: { name: string; role: "Co-Accused" | "Victim"; strength: number }[] = [
-      ...matchedCase.accused.map(a => ({
+      ...matchedCase.accused.map((a: any) => ({
         name: a.name,
         role: "Co-Accused" as const,
         strength: 80
       })),
-      ...matchedCase.victims.map(v => ({
+      ...matchedCase.victims.map((v: any) => ({
         name: v.name,
         role: "Victim" as const,
         strength: 50
@@ -349,11 +675,11 @@ export function CopilotDrawer() {
     const queryFormatted = formattedSearchTerm.toLowerCase();
     
     // Match case by crimeNo/caseId AND check if target criminal is listed in accused list
-    const matchedCase = allCases.find(c => 
+    const matchedCase = allCases.find((c: any) => 
       (c.crimeNo.toLowerCase().includes(queryFormatted) || 
        c.crimeNo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanedInput) ||
        String(c.caseMasterId).includes(queryFormatted)) &&
-      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+      c.accused.some((a: any) => a.name.toLowerCase().includes(targetName.toLowerCase()))
     );
 
     if (!matchedCase) {
@@ -369,8 +695,8 @@ export function CopilotDrawer() {
     }
 
     // ── Prediction Engine ──
-    const allCriminalCases = allCases.filter(c =>
-      c.accused.some(a => a.name.toLowerCase().includes(targetName.toLowerCase()))
+    const allCriminalCases = allCases.filter((c: any) =>
+      c.accused.some((a: any) => a.name.toLowerCase().includes(targetName.toLowerCase()))
     );
 
     const crimeTypeFreq: Record<string, number> = {};
@@ -379,7 +705,7 @@ export function CopilotDrawer() {
     const hourBuckets: number[] = [];
     let heinousCount = 0;
 
-    allCriminalCases.forEach(c => {
+    allCriminalCases.forEach((c: any) => {
       const ct = c.crimeHead.name;
       crimeTypeFreq[ct] = (crimeTypeFreq[ct] || 0) + 1;
       districtFreq[c.district.name] = (districtFreq[c.district.name] || 0) + 1;
@@ -393,7 +719,7 @@ export function CopilotDrawer() {
     const topDistricts = Object.entries(districtFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
     const topMo = Object.entries(moFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? matchedCase.moTag;
     const avgHour = hourBuckets.length ? Math.round(hourBuckets.reduce((a, b) => a + b, 0) / hourBuckets.length) : 14;
-    const coAccusedCount = new Set(allCriminalCases.flatMap(c => c.accused.map(a => a.name))).size - 1;
+    const coAccusedCount = new Set(allCriminalCases.flatMap((c: any) => c.accused.map((a: any) => a.name))).size - 1;
 
     let riskScore = 30;
     riskScore += Math.min(totalCases * 8, 30);
@@ -411,8 +737,8 @@ export function CopilotDrawer() {
       avgHour < 12 ? "morning (06:00–12:00)" :
       avgHour < 18 ? "afternoon (12:00–18:00)" : "evening/night (18:00–24:00)";
 
-    const recentHeinous = allCriminalCases.slice(-3).filter(c => c.gravity === "Heinous").length;
-    const olderHeinous  = allCriminalCases.slice(0, 3).filter(c => c.gravity === "Heinous").length;
+    const recentHeinous = allCriminalCases.slice(-3).filter((c: any) => c.gravity === "Heinous").length;
+    const olderHeinous  = allCriminalCases.slice(0, 3).filter((c: any) => c.gravity === "Heinous").length;
     const escalationTrend: PredictionData["escalationTrend"] =
       recentHeinous > olderHeinous ? "ESCALATING" :
       recentHeinous < olderHeinous ? "DE-ESCALATING" : "STABLE";
@@ -451,20 +777,20 @@ export function CopilotDrawer() {
       date: matchedCase.registeredDate,
       acts: matchedCase.actSections.join(", "),
       officer: matchedCase.registeringOfficer || "N/A",
-      victims: matchedCase.victims.map(v => v.name),
-      accused: matchedCase.accused.map(a => a.name),
+      victims: matchedCase.victims.map((v: any) => v.name),
+      accused: matchedCase.accused.map((a: any) => a.name),
       briefFacts: matchedCase.briefFacts,
       done: language === "kn" ? "ಹೊಸ ಹುಡುಕಾಟಕ್ಕಾಗಿ ಮೇಲಿನ ಫಾರ್ಮ್ ಬಳಸಿ" : "Search complete — use the form above to run a new search",
       prediction
     };
 
     const connections: { name: string; role: "Co-Accused" | "Victim"; strength: number }[] = [
-      ...matchedCase.accused.map(a => ({
+      ...matchedCase.accused.map((a: any) => ({
         name: a.name,
         role: "Co-Accused" as const,
         strength: 80
       })),
-      ...matchedCase.victims.map(v => ({
+      ...matchedCase.victims.map((v: any) => ({
         name: v.name,
         role: "Victim" as const,
         strength: 50
@@ -584,127 +910,6 @@ export function CopilotDrawer() {
     return `FIR/${station}/${year}/${num}`;
   };
 
-  const getWelcomeMessage = (currentMode: "standard" | "simulator" | "advisor") => {
-    const isKn = language === "kn";
-    if (currentMode === "simulator") {
-      return isKn
-        ? "[ತನಿಖಾ ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್] ಶಂಕಿತರನ್ನು ವಿಚಾರಣೆ ಮಾಡುವ ಅಭ್ಯಾಸ ವಲಯಕ್ಕೆ ಸುಸ್ವಾಗತ. ದಯವಿಟ್ಟು ವಿಚಾರಣೆ ಮಾಡಲು ಶಂಕಿತನ ಹೆಸರನ್ನು ನಮೂದಿಸಿ (ಉದಾ: Vijay Bhat ಅಥವಾ Darshan):"
-        : "[INTERROGATION SANDBOX] Welcome to the suspect interrogation simulation. Prepare your questions, check contradictions, and practice statements.\n\nPlease enter the suspect's name to begin (e.g., Vijay Bhat or Darshan):";
-    }
-    if (currentMode === "advisor") {
-      return isKn
-        ? "[BNS ಕಾನೂನು ಸಲಹೆಗಾರ] ಅಪರಾಧದ ಸಾರಾಂಶವನ್ನು ನಮೂದಿಸಿ (ಉದಾ: ರಾತ್ರಿ ಮನೆ ಕಳ್ಳತನ). ನಾನು ಅದನ್ನು ಹೊಸ ಬಿಎನ್‌ಎಸ್ (BNS) ಸೆಕ್ಷನ್‌ಗಳಿಗೆ ಮ್ಯಾಪ್ ಮಾಡುತ್ತೇನೆ:"
-        : "[BNS LEGAL ADVISOR] Describe the crime scene or modus or operandi in plain words. I will map it to the corresponding Bharatiya Nyaya Sanhita (BNS) and legacy IPC sections instantly:";
-    }
-    return isKn 
-      ? "[ಆರೋಪಿ ಶೋಧಕ] ದಯವಿಟ್ಟು ಆರೋಪಿಯ ಹೆಸರು ಮತ್ತು FIR ಸಂಖ್ಯೆಯನ್ನು ಮೇಲಿನ ಫಾರ್ಮ್‌ನಲ್ಲಿ ಭರ್ತಿ ಮಾಡಿ ಮತ್ತು 'ಶೋಧನೆ ಪ್ರಾರಂಭಿಸಿ' ಕ್ಲಿಕ್ ಮಾಡಿ:"
-      : "[ACCUSED CASE INTERROGATOR] Please fill in both the Accused Name and FIR Number in the form box above, then click 'Run Intel Search' to interrogate the database:";
-  };
-
-  const handleModeChange = (newMode: "standard" | "simulator" | "advisor") => {
-    setMode(newMode);
-    setSearchState({ step: 1, name: "", fir: "" });
-    setSimulatorState({ activeSuspect: "", turnCount: 0 });
-    setActiveCaseContext(null);
-    setInlineName("");
-    setInlineFir("");
-    
-    if (newMode === "standard") {
-      setMessages([
-        {
-          id: "init_name",
-          sender: "system",
-          text: language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Enter Accused / Suspect Name:",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          formType: "name"
-        }
-      ]);
-    } else {
-      const welcome = getWelcomeMessage(newMode);
-      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setMessages([
-        {
-          id: "welcome_" + newMode,
-          sender: "system",
-          text: welcome,
-          timestamp
-        }
-      ]);
-    }
-  };
-
-  // System dictionary for local bilingual prompts
-  const systemText = useMemo(() => {
-    const isKn = language === "kn";
-    return {
-      title: isKn ? "ಎಸ್‌ಸಿಆರ್‌ಬಿ ಇಂಟೆಲ್ ಅಸಿಸ್ಟೆಂಟ್" : "SCRB Intel Assistant",
-      statusOnline: isKn ? "ಆನ್‌ಲೈನ್" : "AI ONLINE",
-      placeholder: mode === "standard"
-        ? (isKn ? "ಆರೋಪಿ ಬಗ್ಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿ (ಉದಾ: ಸಹಚರರು)..." : "Ask about accused (e.g., associates)...")
-        : (mode === "simulator"
-          ? (simulatorState.activeSuspect 
-            ? (isKn ? "ಪ್ರಶ್ನೆ ಕೇಳಿ ಅಥವಾ ಸಾಕ್ಷ್ಯವನ್ನು ಮಂಡಿಸಿ..." : "Ask suspect a question or present evidence...")
-            : (isKn ? "ವಿಚಾರಣೆ ನಡೆಸಬೇಕಾದ ಶಂಕಿತನ ಹೆಸರು..." : "Enter suspect's name to interrogate..."))
-          : (isKn ? "ಅಪರಾಧದ ವಿವರಣೆ ನಮೂದಿಸಿ..." : "Describe the crime for legal mapping...")),
-      securityAlert: isKn
-        ? "[ಭದ್ರತಾ ಪರಿಶೀಲನೆ] ಅನಧಿಕೃತ ವಿನಂತಿ. ಈ ಟರ್ಮಿನಲ್ ಅಪರಾಧ ದಾಖಲೆಗಳು ಮತ್ತು ನೆಟ್‌ವರ್ಕ್ ಲಿಂಕ್ ಅನ್ವೇಷಣೆಗೆ ಮಾತ್ರ ಸೀಮಿತವಾಗಿದೆ."
-        : "[SECURITY CHECK] Unauthorized prompt. This terminal is restricted strictly to profile querying and network link discovery.",
-      suggestionsTitle: isKn ? "ತ್ವರಿತ ಪ್ರಶ್ಗಳು:" : "Quick Queries:",
-      casesFound: isKn ? "ಪತ್ತೆಯಾದ ಪ್ರಕರಣಗಳು" : "Matched Cases",
-      associatesFound: isKn ? "ಅಸೋಸಿಯೇಟ್ಸ್ / ಸಂಪರ್ಕಗಳು" : "Accused Associates & Connections",
-      clickToInterrogate: isKn ? "ನೆಟ್‌ವರ್ಕ್ ತನಿಖೆ ಮಾಡಲು ಹೆಸರನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ" : "Click node to interrogate associate"
-    };
-  }, [language, searchState.step, mode, simulatorState.activeSuspect]);
-
-  // Initialize welcome message
-  useEffect(() => {
-    if (mode === "standard") {
-      setSearchState({ step: 1, name: "", fir: "" });
-      setInlineName("");
-      setInlineFir("");
-      setActiveCaseContext(null);
-      setMessages([
-        {
-          id: "init_name",
-          sender: "system",
-          text: language === "kn" ? "ಆರೋಪಿಯ ಹೆಸರು ನಮೂದಿಸಿ:" : "Enter Accused / Suspect Name:",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          formType: "name"
-        }
-      ]);
-      return;
-    }
-    const welcome = getWelcomeMessage(mode);
-    setMessages([
-      {
-        id: "welcome_" + mode,
-        sender: "system",
-        text: welcome,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
-  }, [language, mode]);
-
-  // Fetch quick suggestions from active cases/offenders database based on step
-  const suggestions = useMemo(() => {
-    const list: { type: "name" | "fir"; value: string }[] = [];
-    if (mode === "standard") {
-      if (offenders && offenders.length > 0) {
-        list.push({ type: "name", value: offenders[0].name });
-        if (offenders[1]) list.push({ type: "name", value: offenders[1].name });
-      }
-    } else if (mode === "simulator" && !simulatorState.activeSuspect) {
-      list.push({ type: "name", value: "Vijay Bhat" });
-      list.push({ type: "name", value: "Darshan" });
-    } else if (mode === "advisor") {
-      list.push({ type: "fir", value: "Theft of gold necklace at night" });
-      list.push({ type: "fir", value: "Suspect hit victim with stick" });
-      list.push({ type: "fir", value: "Online bank account phishing" });
-    }
-    return list;
-  }, [searchState, offenders, allCases, mode, simulatorState.activeSuspect]);
-
-  // Execute database search matching criminal name or FIR number
   const handleSearch = (searchTerm: string) => {
     if (!searchTerm.trim()) return;
 
@@ -717,10 +922,25 @@ export function CopilotDrawer() {
     };
 
     setInput("");
-
     const query = searchTerm.trim().toLowerCase();
 
-    // 1. STANDARD MODE
+    // 1. ADVISOR MODE (Case-specific & statutory BNS Legal Advisor)
+    if (mode === "advisor") {
+      setMessages(prev => [...prev, userMsg]);
+      const responseText = generateBNSAdvisorReport(query, allCases, offenders, language);
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          sender: "system",
+          text: responseText,
+          timestamp
+        }]);
+      }, 400);
+      return;
+    }
+
+    // 2. STANDARD MODE
     if (mode === "standard") {
       const isFir = /fir/i.test(searchTerm) || searchTerm.split("/").length > 2 || /^\d+$/.test(searchTerm);
       const isQuestion = query.split(" ").length > 3 || 
@@ -739,7 +959,6 @@ export function CopilotDrawer() {
         return;
       }
 
-      // If they click on another offender when already in step 3 (dossier loaded), reset to start new search
       if (searchState.step === 3 && !isFir && !isQuestion) {
         setMessages([]);
         setSearchState({ step: 1, name: "", fir: "" });
@@ -764,12 +983,11 @@ export function CopilotDrawer() {
       }
 
       if (!activeCaseContext) {
-        // Fallback responses for general queries before loading an accused dossier
         let reply = "";
         const isKn = language === "kn";
         
         if (query.includes("offender") || query.includes("suspect") || query.includes("criminal") || query.includes("ಆರೋಪಿ") || query.includes("ಅಪರಾಧಿ")) {
-          const offenderNames = offenders.slice(0, 4).map(o => o.name).join(", ");
+          const offenderNames = offenders.slice(0, 4).map((o: any) => o.name).join(", ");
           reply = isKn
             ? `ವ್ಯವಸ್ಥೆಯಲ್ಲಿ ನೋಂದಾಯಿಸಲಾದ ಕೆಲವು ಪ್ರಮುಖ ಅಪರಾಧಿಗಳು: ${offenderNames}. ಅವರ ವಿವರವಾದ ಪ್ರೊಫೈಲ್ ಮತ್ತು ನಡವಳಿಕೆಯ ಡಿಎನ್ಎ ವಿಶ್ಲೇಷಿಸಲು ಅವರ ಹೆಸರನ್ನು ಇಲ್ಲಿ ನಮೂದಿಸಿ.`
             : `Some active offenders in our records include: ${offenderNames}. Enter any of their names to load their behavioral DNA dossier.`;
@@ -780,7 +998,7 @@ export function CopilotDrawer() {
             : `Crime hotspots and spatial clusters are tracked dynamically. Visit the 'Hotspots' tab in the left sidebar to view the live interactive map.`;
         }
         else if (query.includes("case") || query.includes("fir") || query.includes("ಪ್ರಕರಣ") || query.includes("ಎಫ್‌ಐಆರ್")) {
-          const recentFirs = allCases.slice(0, 3).map(c => c.crimeNo).join(", ");
+          const recentFirs = allCases.slice(0, 3).map((c: any) => c.crimeNo).join(", ");
           reply = isKn
             ? `ಇತ್ತೀಚಿನ ಅಪರಾಧ ಪ್ರಕರಣಗಳು: ${recentFirs}. ನಿರ್ದಿಷ್ಟ ಪ್ರಕರಣದ ವಿವರಗಳಿಗಾಗಿ ಆರೋಪಿಯ ಹೆಸರು ಮತ್ತು ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ.`
             : `Recent registered cases: ${recentFirs}. Interrogate by providing a suspect's name to examine their specific files.`;
@@ -791,7 +1009,6 @@ export function CopilotDrawer() {
             : `Hello, I am the SCRB Intelligence Assistant. Please enter an Accused / Suspect Name to begin querying the crime database:`;
         }
 
-        // Add user message to feed
         setMessages(prev => [...prev, userMsg]);
 
         setTimeout(() => {
@@ -806,17 +1023,7 @@ export function CopilotDrawer() {
         return;
       }
 
-      // Add user message to feed
-      const userMsg: Message = {
-        id: Math.random().toString(),
-        sender: "user",
-        text: searchTerm,
-        timestamp
-      };
       setMessages(prev => [...prev, userMsg]);
-      setInput("");
-
-      // Analyze question
       let reply = "";
       const text = searchTerm.toLowerCase();
       const isKn = language === "kn";
@@ -876,10 +1083,9 @@ export function CopilotDrawer() {
       return;
     }
 
-    setMessages(prev => [...prev, userMsg]);
-
-    // 2. SIMULATOR MODE
+    // 3. SIMULATOR MODE
     if (mode === "simulator") {
+      setMessages(prev => [...prev, userMsg]);
       if (!simulatorState.activeSuspect) {
         setSimulatorState({ activeSuspect: searchTerm.trim(), turnCount: 0 });
         setMessages(prev => [...prev, {
@@ -947,45 +1153,7 @@ export function CopilotDrawer() {
 
     // 3. ADVISOR MODE
     if (mode === "advisor") {
-      let bnsSec = "Section 303 (Theft)";
-      let ipcSec = "IPC Section 379";
-      let details = "Punishment: Imprisonment up to 3 years or fine. Non-bailable, triable by any Magistrate.";
-      
-      if (query.includes("theft") || query.includes("steal") || query.includes("stole") || query.includes("rob")) {
-        bnsSec = "BNS Section 303 (Theft)";
-        ipcSec = "IPC Section 379";
-        details = language === "kn"
-          ? "ಶಿಕ್ಷೆ: 3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ಅವರಿಂದ ವಿಚಾರಣೆ."
-          : "Punishment: Up to 3 years imprisonment, or fine, or both. Non-bailable, triable by any Magistrate.";
-      } else if (query.includes("trespass") || query.includes("break") || query.includes("night") || query.includes("window")) {
-        bnsSec = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
-        ipcSec = "IPC Section 457";
-        details = language === "kn"
-          ? "ಶಿಕ್ಷೆ: 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-          : "Punishment: Rigorous imprisonment up to 14 years and fine. Non-bailable, triable by Magistrate of First Class.";
-      } else if (query.includes("hurt") || query.includes("beat") || query.includes("assault") || query.includes("hit")) {
-        bnsSec = "BNS Section 115 (Voluntarily causing hurt)";
-        ipcSec = "IPC Section 323";
-        details = language === "kn"
-          ? "ಶಿಕ್ಷೆ: 1 ವರ್ಷದವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ಸಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-          : "Punishment: Imprisonment up to 1 year or fine. Bailable, triable by any Magistrate.";
-      } else if (query.includes("cyber") || query.includes("hack") || query.includes("online") || query.includes("phish") || query.includes("phone")) {
-        bnsSec = "BNS Section 318 (Cheating by impersonation & cyber fraud)";
-        ipcSec = "IPC Section 419 / 420";
-        details = language === "kn"
-          ? "ಶಿಕ್ಷೆ: 3 ರಿಂದ 7 ವರ್ಷಗಳ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಸೈಬರ್ ಪೊಲೀಸ್ ವ್ಯಾಪ್ತಿ."
-          : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, triable by Magistrate of First Class.";
-      } else {
-        bnsSec = "BNS Section 318(4) (Cheating and dishonestly inducing delivery of property)";
-        ipcSec = "IPC Section 420";
-        details = language === "kn"
-          ? "ಶಿಕ್ಷೆ: 7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-          : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, triable by Magistrate of First Class.";
-      }
-
-      const responseText = language === "kn"
-        ? `⚖️ [BNS ಕ್ರಾಸ್-ಮ್ಯಾಪಿಂಗ್ ವರದಿ]\n\n• ಹೊಸ ಬಿಎನ್‌ಎಸ್ ಸೆಕ್ಷನ್: ${bnsSec}\n• ಹಳೆಯ ಐಪಿಸಿ ಸೆಕ್ಷನ್: ${ipcSec}\n\n• ಕಾನೂನು ವಿವರಗಳು: ${details}\n\nಸಲಹೆ: ಈ ಸೆಕ್ಷನ್ಗಳನ್ನು ಎಫ್‌ಐಆರ್ ನ ಹಂತ 3 ರಲ್ಲಿ ನಮೂದಿಸಬೇಕು.`
-        : `⚖️ [LEGAL CROSS-MAPPING ANALYSIS]\n\n• New BNS Section: ${bnsSec}\n• Legacy IPC Section: ${ipcSec}\n\n• Procedural Details: ${details}\n\nOfficer Action: Map these sections inside Step 3 (Acts & Sections) of the FIR Filing form.`;
+      const responseText = generateBNSAdvisorReport(query, allCases, offenders, language);
 
       setTimeout(() => {
         setMessages(prev => [...prev, {
@@ -1624,7 +1792,7 @@ export function CopilotDrawer() {
               {systemText.suggestionsTitle}
             </span>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {suggestions.map((s, idx) => (
+              {suggestions.map((s: { type: string; value: string }, idx: number) => (
                 <button
                   key={idx}
                   onClick={() => handleSearch(s.value)}
