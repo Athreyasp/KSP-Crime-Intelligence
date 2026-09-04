@@ -219,6 +219,8 @@ export async function recordAccusedArrest(caseMasterId: number, accusedName: str
 
 let isCatalystSynced = false;
 let catalystSyncCount = 0;
+let isCatalystSyncing = false;
+let lastCatalystSyncTime = 0;
 
 export function getCatalystSyncInfo() {
   return {
@@ -229,6 +231,9 @@ export function getCatalystSyncInfo() {
 
 export async function syncWithCatalyst() {
   if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (isCatalystSyncing || (now - lastCatalystSyncTime < 60000 && isCatalystSynced)) return;
+  isCatalystSyncing = true;
   try {
     const liveCases = await fetchLiveCases();
     if (liveCases && Array.isArray(liveCases) && liveCases.length > 0) {
@@ -299,6 +304,9 @@ export async function syncWithCatalyst() {
     if (loadedCases.length === 0) {
       saveCases([...SEED_CASES]);
     }
+  } finally {
+    isCatalystSyncing = false;
+    lastCatalystSyncTime = Date.now();
   }
 }
 
@@ -781,9 +789,16 @@ export function computeAlerts(cases: Case[]) {
   });
 }
 
+let cachedCasesRef: Case[] | null = null;
+let cachedDbState: any = null;
+
 // Main global DB state getter
 export function getDbState() {
   const cases = getStoredCases();
+  if (cachedDbState && cachedCasesRef === cases) {
+    return cachedDbState;
+  }
+
   const kpis = computeKpis(cases);
   const dailyTrend = computeDailyTrend(cases);
   const districtStats = computeDistrictStats(cases);
@@ -797,7 +812,8 @@ export function getDbState() {
   const networkRich = computeNetworkRich(offenders, cases);
   const alerts = computeAlerts(cases);
 
-  return {
+  cachedCasesRef = cases;
+  cachedDbState = {
     cases,
     kpis,
     dailyTrend,
@@ -811,6 +827,8 @@ export function getDbState() {
     networkRich,
     alerts,
   };
+
+  return cachedDbState;
 }
 
 export function computeSubAreas(districtId: number, districtStats: any[]): SubArea[] {

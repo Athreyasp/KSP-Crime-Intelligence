@@ -79,7 +79,7 @@ function useForceLayout(networkRich: any) {
       .force("collide", forceCollide<SimNode>().radius(42).strength(0.85))
       .stop();
 
-    for (let i = 0; i < 350; i++) sim.tick();
+    for (let i = 0; i < 120; i++) sim.tick();
     return { nodes, links };
   }, [networkRich]);
 }
