@@ -41,12 +41,12 @@ const W = 1000;
 const H = 620;
 
 const TYPE_META: Record<EntityType, { color: string; bg: string; border: string; label: string; Icon: typeof Users }> = {
-  accused:  { color: "#c5221f", bg: "#fce8e6", border: "#f8b4b0", label: "Suspect", Icon: Fingerprint },
-  victim:   { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Victim",  Icon: Users },
-  case:     { color: "#b06000", bg: "#fef7e0", border: "#feefc3", label: "FIR Case", Icon: FileText },
+  accused: { color: "#c5221f", bg: "#fce8e6", border: "#f8b4b0", label: "Suspect", Icon: Fingerprint },
+  victim: { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Victim", Icon: Users },
+  case: { color: "#b06000", bg: "#fef7e0", border: "#feefc3", label: "FIR Case", Icon: FileText },
   location: { color: "#137333", bg: "#e6f4ea", border: "#ceead6", label: "Location", Icon: PinIcon },
-  vehicle:  { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Vehicle", Icon: Car },
-  phone:    { color: "#0284c7", bg: "#e0f2fe", border: "#bae6fd", label: "Phone",   Icon: Phone },
+  vehicle: { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Vehicle", Icon: Car },
+  phone: { color: "#0284c7", bg: "#e0f2fe", border: "#bae6fd", label: "Phone", Icon: Phone },
 };
 
 /* ------------------------------------------------------------------ */
@@ -455,7 +455,7 @@ export function NetworkPage() {
     if (!selectedNode) return [];
     const directLinks = links.filter(l => l.source.id === selectedNode.id || l.target.id === selectedNode.id);
     const relations: { name: string; id: string; type: string; relation: string; photo?: string }[] = [];
-    
+
     // Find all cases this suspect/entity is in
     const myCaseIds = new Set<string>();
     directLinks.forEach(l => {
@@ -505,103 +505,102 @@ export function NetworkPage() {
   };
   const onPointerUp = () => (dragRef.current = null);
 
-  // Top high-activity Karnataka districts for quick pill selection
-  const TOP_DISTRICTS = [
-    "Bengaluru Urban", "Mysuru", "Dharwad", "Belagavi", "Ballari", "Dakshina Kannada", "Kalaburagi", "Tumakuru"
-  ];
-
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* GOOGLE MATERIAL CLEAN HEADER */}
-      <PageHeader
-        section="03"
-        eyebrow={t("Link Intelligence & Relational Graph")}
-        title={t("Criminal Association Network")}
-        description={t("Statewide and District-Wise Relational Intelligence Atlas")}
-        actions={
-          <div className="flex items-center gap-2">
-            <Badge className="bg-[#e8f0fe] text-[#0b57d0] border border-[#0b57d0]/20 font-bold px-3 py-1 flex items-center gap-1.5 shadow-sm">
-              <Database className="h-3.5 w-3.5 text-[#0b57d0]" />
-              {selectedDistrict === "all" ? "Statewide Overview" : selectedDistrict} ({filteredNodes.length} Entities)
-            </Badge>
-
-            <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-full">
-              <button
-                onClick={() => setViewMode("graph")}
-                className={cn(
-                  "px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5",
-                  viewMode === "graph" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
-                )}
-              >
-                <NetworkIcon className="h-3.5 w-3.5" /> {t("Interactive Graph")}
-              </button>
-              <button
-                onClick={() => setViewMode("directory")}
-                className={cn(
-                  "px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5",
-                  viewMode === "directory" ? "bg-[#0b57d0] text-white shadow-sm" : "text-[#5f6368] hover:text-[#202124]"
-                )}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> {t("Link Directory")}
-              </button>
-            </div>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { setSelected(null); setSelectedEdge(null); setPan({ x: 0, y: 0 }); setZoom(1); setSelectedDistrict("all"); }}
-              className="h-8 border-[#dadce0] text-xs font-bold rounded-full bg-white text-[#202124] hover:bg-[#f8f9fa] shadow-sm"
-            >
-              <RotateCcw className="mr-1 h-3.5 w-3.5 text-[#0b57d0]" /> {t("Reset")}
-            </Button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#dadce0] pb-5">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#1a73e8] bg-[#e8f0fe] px-2.5 py-0.5 rounded-md border border-[#aecbfa]">
+              Link Intelligence
+            </span>
+            <span className="text-xs text-[#5f6368] font-mono">| {selectedDistrict === "all" ? "Statewide Overview" : selectedDistrict} ({filteredNodes.length} Entities)</span>
           </div>
-        }
-      />
+          <h1 className="text-2xl md:text-3xl font-semibold text-[#202124] tracking-tight">
+            {t("Criminal Association Network")}
+          </h1>
+          <p className="text-xs md:text-sm text-[#5f6368] mt-1">
+            {t("Statewide and District-Wise Relational Intelligence Atlas")}
+          </p>
+        </div>
 
-      {/* STREAMLINED STATE & DISTRICT-WISE DRILL-DOWN BAR */}
-      <Card className="bg-white border-[#dadce0] rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-[#0b57d0]" />
-            <span className="text-xs font-bold text-[#202124]">District Network Hub:</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 flex-1">
+        <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+          <div className="flex items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-lg">
             <button
-              onClick={() => { setSelectedDistrict("all"); setSelected(null); setSelectedEdge(null); }}
+              onClick={() => setViewMode("graph")}
               className={cn(
-                "px-3.5 py-1.5 text-xs font-bold rounded-full border transition-all flex items-center gap-1",
-                selectedDistrict === "all"
-                  ? "bg-[#0b57d0] text-white border-[#0b57d0] shadow-sm"
-                  : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                viewMode === "graph" ? "bg-[#1a73e8] text-white font-semibold shadow-2xs" : "text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]"
               )}
             >
-              🌐 All Karnataka State
+              <NetworkIcon className="h-3.5 w-3.5" /> {t("Interactive Graph")}
             </button>
+            <button
+              onClick={() => setViewMode("directory")}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                viewMode === "directory" ? "bg-[#1a73e8] text-white font-semibold shadow-2xs" : "text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]"
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> {t("Link Directory")}
+            </button>
+          </div>
 
-            {TOP_DISTRICTS.map(dName => (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setSelected(null); setSelectedEdge(null); setPan({ x: 0, y: 0 }); setZoom(1); setSelectedDistrict("all"); }}
+            className="h-9 border-[#dadce0] text-xs font-medium rounded-lg bg-white text-[#3c4043] hover:bg-[#f1f3f4]"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5 text-[#1a73e8]" /> {t("Reset View")}
+          </Button>
+        </div>
+      </div>
+
+      {/* CLEAN GOOGLE MATERIAL DISTRICT JURISDICTION FILTER BAR */}
+      <Card className="bg-white border-[#dadce0] rounded-xl p-3 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-[#5f6368] uppercase tracking-wider">District Jurisdiction:</span>
+            <div className="flex flex-wrap items-center gap-1 bg-[#f8f9fa] border border-[#dadce0] p-1 rounded-lg">
               <button
-                key={dName}
-                onClick={() => { setSelectedDistrict(dName); setSelected(null); setSelectedEdge(null); }}
+                onClick={() => { setSelectedDistrict("all"); setSelected(null); setSelectedEdge(null); }}
                 className={cn(
-                  "px-3 py-1.5 text-xs font-bold rounded-full border transition-all flex items-center gap-1",
-                  selectedDistrict.toLowerCase() === dName.toLowerCase()
-                    ? "bg-[#0b57d0] text-white border-[#0b57d0] shadow-sm"
-                    : "bg-[#f8f9fa] text-[#5f6368] border-[#dadce0] hover:bg-[#e8f0fe] hover:text-[#0b57d0]"
+                  "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                  selectedDistrict === "all"
+                    ? "bg-[#1a73e8] text-white font-semibold shadow-2xs"
+                    : "text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]"
                 )}
               >
-                📍 {dName}
+                All Karnataka State
               </button>
-            ))}
+              {["Bengaluru Urban", "Mysuru", "Dharwad", "Belagavi"].map(dName => (
+                <button
+                  key={dName}
+                  onClick={() => { setSelectedDistrict(dName); setSelected(null); setSelectedEdge(null); }}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-all hidden sm:inline-block",
+                    selectedDistrict.toLowerCase() === dName.toLowerCase()
+                      ? "bg-[#1a73e8] text-white font-semibold shadow-2xs"
+                      : "text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]"
+                  )}
+                >
+                  {dName}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-[#5f6368]">Select District:</span>
             <select
               value={selectedDistrict}
               onChange={e => { setSelectedDistrict(e.target.value); setSelected(null); setSelectedEdge(null); }}
-              className="h-8 px-3 text-xs font-bold bg-[#f8f9fa] border border-[#dadce0] rounded-full text-[#202124] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]"
+              className="h-8 px-3 text-xs font-medium bg-[#f8f9fa] border border-[#dadce0] rounded-lg text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
             >
-              <option value="all">More Districts ({DISTRICTS.length})...</option>
+              <option value="all">All Karnataka Districts ({DISTRICTS.length})</option>
               {DISTRICTS.map(d => (
-                <option key={d.id} value={d.name}>📍 {d.name}</option>
+                <option key={d.id} value={d.name}>{d.name}</option>
               ))}
             </select>
           </div>
@@ -612,7 +611,7 @@ export function NetworkPage() {
       {viewMode === "graph" ? (
         /* MODE A: INTERACTIVE GRAPH CANVAS WITH ACCUSED, VICTIM & VEHICLE MUGSHOTS */
         <Card className="bg-white border-[#dadce0] rounded-2xl shadow-sm overflow-hidden relative flex flex-col h-[640px]">
-          
+
           {/* Zoom controls & Mode Indicator */}
           <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-md border border-[#dadce0] rounded-2xl p-1 shadow-sm">
             <Button size="sm" variant="ghost" onClick={() => setZoom(z => Math.min(2.5, z + 0.2))} className="h-7 w-7 p-0 text-[#5f6368]">
@@ -663,7 +662,7 @@ export function NetworkPage() {
               </defs>
 
               <g transform={`translate(${pan.x * zoom} ${pan.y * zoom}) scale(${zoom})`}>
-                
+
                 {/* LINKS / CONNECTIONS */}
                 {svgLinks.map((l, i) => {
                   const isFocused = activeFocusId && (l.source.id === activeFocusId || l.target.id === activeFocusId);
@@ -864,7 +863,7 @@ export function NetworkPage() {
           {/* FLOATING DOSSIER DRAWER ON NODE CLICK */}
           {selectedNode && (
             <div className="absolute top-3 right-3 bottom-3 left-3 sm:left-auto z-20 w-auto sm:w-80 bg-white border border-[#dadce0] rounded-2xl p-4 shadow-xl flex flex-col overflow-y-auto space-y-4 text-xs animate-in fade-in slide-in-from-right-2">
-              
+
               <div className="flex items-center justify-between border-b border-[#dadce0] pb-2">
                 <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: TYPE_META[selectedNode.type].bg, color: TYPE_META[selectedNode.type].color }}>
                   {TYPE_META[selectedNode.type].label}
@@ -976,8 +975,8 @@ export function NetworkPage() {
                       {(deg.get(selectedNode.id) || 0) >= 5
                         ? "🔴 SYNDICATE LEADER"
                         : (deg.get(selectedNode.id) || 0) >= 2
-                        ? "🟡 GANG ASSOCIATE"
-                        : "🟢 FIELD RUNNER"}
+                          ? "🟡 GANG ASSOCIATE"
+                          : "🟢 FIELD RUNNER"}
                     </span>
                   </div>
                 </div>
@@ -1180,7 +1179,7 @@ export function NetworkPage() {
         return (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
             <div className="bg-white border border-[#dadce0] rounded-2xl max-w-4xl w-full p-6 shadow-xl space-y-6 relative max-h-[90vh] overflow-y-auto">
-              
+
               {/* Modal Header */}
               <div className="flex items-start justify-between border-b border-[#dadce0] pb-4">
                 <div className="flex items-center gap-3">
@@ -1269,7 +1268,7 @@ export function NetworkPage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
                   <Activity className="h-3.5 w-3.5 text-[#1a73e8]" /> Travel Sequence Path
                 </h3>
-                
+
                 <div className="bg-[#f8f9fa] border border-[#dadce0] rounded-xl p-3.5 flex items-center justify-between overflow-x-auto gap-3">
                   {travelLogs.map((cp, idx) => (
                     <div key={idx} className="flex items-center gap-3 shrink-0">
@@ -1434,7 +1433,7 @@ export function NetworkPage() {
         return (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
             <div className="bg-white border border-[#dadce0] rounded-2xl max-w-4xl w-full p-6 shadow-xl space-y-6 relative max-h-[90vh] overflow-y-auto">
-              
+
               {/* Modal Header */}
               <div className="flex items-start justify-between border-b border-[#dadce0] pb-4">
                 <div className="flex items-center gap-3">
@@ -1554,8 +1553,8 @@ export function NetworkPage() {
                             <Badge variant="outline" className={cn(
                               "text-[9px] font-mono font-medium px-2 py-0.5",
                               log.type === "Incoming" ? "bg-[#e6f4ea] text-[#137333] border-[#ceead6]" :
-                              log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
-                              log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
+                                log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
+                                  log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
                             )}>
                               {log.type}
                             </Badge>
