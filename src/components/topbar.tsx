@@ -50,11 +50,11 @@ export function Topbar() {
   useEffect(() => {
     if (allCases.length > 0 && !hasInitialized) {
       // Find number of active notifications
-      const sortedCases = [...allCases].sort((a, b) => new Date(b.registeredDate).getTime() - new Date(a.registeredDate).getTime());
+      const sortedCases = [...allCases].sort((a: any, b: any) => new Date(b.registeredDate).getTime() - new Date(a.registeredDate).getTime());
       let count = 0;
-      sortedCases.forEach((c) => {
+      sortedCases.forEach((c: any) => {
         if (c.gravity === "Heinous") count++;
-        c.accused.forEach((a) => { if (a.arrestId) count++; });
+        c.accused?.forEach((a: any) => { if (a.arrestId) count++; });
         if (c.status !== "Under Investigation") count++;
         count++; // Default registration alerts
       });
@@ -80,13 +80,14 @@ export function Topbar() {
       }
 
       // Display real-time toast notifications for newly indexed cases
-      const prevIds = new Set(prevCasesRef.current.map(c => c.caseMasterId));
-      const newCases = allCases.filter(c => !prevIds.has(c.caseMasterId));
+      const prevIds = new Set(prevCasesRef.current.map((c: any) => c.caseMasterId));
+      const newCases = allCases.filter((c: any) => !prevIds.has(c.caseMasterId));
 
-      newCases.forEach(c => {
+      newCases.forEach((c: any) => {
         const isHeinous = c.gravity === "Heinous";
-        const msg = isHeinous ? "🚨 HEINOUS CRIME REGISTERED" : "📋 CASE REGISTRY INDEXED";
-        const description = `${c.crimeHead.name} at ${c.policeStation} (Crime No. ${c.crimeNo})`;
+        const msg = isHeinous ? `🚨 HEINOUS INTEL · FIR ${c.crimeNo}` : `📋 CASE INTEL INDEXED · FIR ${c.crimeNo}`;
+        const shortBrief = c.briefFacts ? c.briefFacts.split(".")[0].trim() : `${c.crimeHead?.name || "Offence"} reported at ${c.policeStation}.`;
+        const description = `${c.district?.name || "Karnataka"} (${c.policeStation}) — ${shortBrief}`;
         if (isHeinous) {
           toast.error(msg, {
             description,
@@ -103,76 +104,114 @@ export function Topbar() {
     prevCasesRef.current = allCases;
   }, [allCases, showNotifications, hasInitialized]);
 
-  // Compile genuine intelligence notifications from cases
+  // Compile genuine short case intelligence analyses from database cases
   const notifications = useMemo(() => {
-    const list: { id: string; type: "heinous" | "arrest" | "status" | "info"; title: string; desc: string; time: string; caseId?: string }[] = [];
+    const list: { 
+      id: string; 
+      type: "heinous" | "arrest" | "status" | "info"; 
+      badgeText: string; 
+      badgeStyle: string; 
+      title: string; 
+      stationTag: string; 
+      analysis: string; 
+      time: string; 
+      caseId?: string 
+    }[] = [];
 
-    // Sort all cases by registration date descending to get recent activities
-    const sortedCases = [...allCases].sort((a, b) => new Date(b.registeredDate).getTime() - new Date(a.registeredDate).getTime());
+    // Sort cases chronologically descending
+    const sortedCases = [...allCases].sort((a, b) => new Date(b.registeredDate || b.incidentDate).getTime() - new Date(a.registeredDate || a.incidentDate).getTime());
 
     sortedCases.forEach((c) => {
-      const caseTime = new Date(c.registeredDate).toLocaleDateString("en-IN") + " " + (c.hour ? `${String(c.hour).padStart(2, "0")}:00` : "10:00");
+      const caseDate = new Date(c.registeredDate || c.incidentDate);
+      const caseTime = caseDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) + " " + (c.hour ? `${String(c.hour).padStart(2, "0")}:00` : "10:00");
+      const crimeName = c.crimeHead?.name || "Offence";
+      const districtName = c.district?.name || "Karnataka";
+      const stationName = c.policeStation || "PS";
+      const mo = c.moTag || "Standard MO";
+      const accusedList = c.accused || [];
+      const arrested = accusedList.filter((a: any) => a.arrestId || a.isArrested || a.arrestDate);
 
-      // 1. High-priority heinous alerts
+      // Clean 1-sentence brief facts summary
+      let shortFact = c.briefFacts ? c.briefFacts.split(".")[0].trim() : `${crimeName} incident reported.`;
+      if (shortFact.length > 85) {
+        shortFact = shortFact.substring(0, 82) + "...";
+      }
+
+      // 1. Heinous Cases Analytical Brief
       if (c.gravity === "Heinous") {
         list.push({
           id: `heinous-${c.caseMasterId}`,
           type: "heinous",
-          title: "🚨 HEINOUS CRIME REGISTERED",
-          desc: `${c.crimeHead.name} reported at ${c.policeStation} (Crime No. ${c.crimeNo})`,
+          badgeText: "HEINOUS INTEL",
+          badgeStyle: "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]",
+          title: `FIR ${c.crimeNo} · ${districtName}`,
+          stationTag: `${crimeName} (${stationName})`,
+          analysis: `🚨 ${shortFact} [MO: ${mo}]. ${accusedList.length > 0 ? `${accusedList.length} suspect(s) linked.` : "High risk priority."}`,
           time: caseTime,
           caseId: String(c.caseMasterId)
         });
       }
 
-      c.accused.forEach((a) => {
-        if (a.arrestId) {
-          list.push({
-            id: `arrest-${c.caseMasterId}-${a.name}`,
-            type: "arrest",
-            title: "🚔 SUSPECT IN CUSTODY",
-            desc: `Accused ${a.name} arrested & produced to court under Crime No. ${c.crimeNo}`,
-            time: caseTime,
-            caseId: String(c.caseMasterId)
-          });
-        }
-      });
+      // 2. Custody Arrest Brief
+      if (arrested.length > 0) {
+        const mainArrest = arrested[0];
+        list.push({
+          id: `arrest-${c.caseMasterId}-${mainArrest.name}`,
+          type: "arrest",
+          badgeText: "CUSTODY ARREST",
+          badgeStyle: "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]",
+          title: `FIR ${c.crimeNo} · ${districtName}`,
+          stationTag: `${crimeName} (${stationName})`,
+          analysis: `🚔 Accused ${mainArrest.name} in custody. Case brief: ${shortFact} [MO: ${mo}].`,
+          time: caseTime,
+          caseId: String(c.caseMasterId)
+        });
+      }
 
-      // 3. Status updates
+      // 3. Status Shift Brief
       if (c.status !== "Under Investigation") {
         list.push({
           id: `status-${c.caseMasterId}`,
           type: "status",
-          title: "📌 INVESTIGATION RECORD FILED",
-          desc: `FIR #${c.crimeNo} case file shifted to '${c.status}' status`,
+          badgeText: "RECORD FILED",
+          badgeStyle: "bg-[#fef7e0] text-[#b06000] border-[#feefc3]",
+          title: `FIR ${c.crimeNo} · ${districtName}`,
+          stationTag: `${crimeName} (${stationName})`,
+          analysis: `📌 Case status updated to '${c.status}'. Brief: ${shortFact}.`,
           time: caseTime,
           caseId: String(c.caseMasterId)
         });
       }
 
-      // 4. Default registration alerts
+      // 4. Default Case Brief
       list.push({
-        id: `reg-${c.caseMasterId}`,
+        id: `brief-${c.caseMasterId}`,
         type: "info",
-        title: "📋 CASE REGISTRY INDEXED",
-        desc: `New case registered under Crime Head: ${c.crimeHead.name} (PS: ${c.policeStation})`,
+        badgeText: "CASE BRIEF",
+        badgeStyle: "bg-[#e6f4ea] text-[#137333] border-[#ceead6]",
+        title: `FIR ${c.crimeNo} · ${districtName}`,
+        stationTag: `${crimeName} (${stationName})`,
+        analysis: `📊 ${shortFact} [MO: ${mo}]. Status: ${c.status}.`,
         time: caseTime,
         caseId: String(c.caseMasterId)
       });
     });
 
-    // Fallback if no cases exist
+    // Fallback
     if (list.length === 0) {
       list.push({
         id: "welcome",
         type: "info",
-        title: "⚡ LIVE LOG ACTIVE",
-        desc: "Crime Intelligence database live sync online. Awaiting new case registration reports.",
+        badgeText: "LIVE LOG",
+        badgeStyle: "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]",
+        title: "KSP SCRB Live Feed",
+        stationTag: "State Records Bureau",
+        analysis: "Crime Intelligence database sync online. Awaiting FIR registrations.",
         time: "Just Now"
       });
     }
 
-    return list.slice(0, 5); // Max 5 recent alerts
+    return list.slice(0, 5); // Display top 5 recent analytical briefs
   }, [allCases]);
 
   // Close notifications dropdown on click outside
@@ -316,33 +355,43 @@ export function Topbar() {
 
             {/* Dropdown Popover */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 rounded-sm border-2 border-ink bg-paper p-4 shadow-[4px_4px_0_0_oklch(0.19_0_0)] z-30 space-y-3">
-                <div className="flex items-center justify-between border-b border-ink/20 pb-2">
-                  <span className="font-mono text-xs uppercase tracking-wider font-bold text-ink flex items-center gap-1.5">
-                    <Radio className="h-3.5 w-3.5 text-signal animate-pulse" />
-                    Live Alerts Feed
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl border border-[#dadce0] bg-white p-3.5 shadow-xl z-30 space-y-3 font-sans max-w-[calc(100vw-24px)]">
+                <div className="flex items-center justify-between border-b border-[#dadce0] pb-2.5">
+                  <span className="text-xs font-bold text-[#202124] uppercase tracking-wider flex items-center gap-1.5">
+                    <Radio className="h-3.5 w-3.5 text-[#1a73e8] animate-pulse" />
+                    Case Intelligence Briefs
                   </span>
-                  <span className="text-[10px] font-bold text-muted-foreground font-mono">
-                    {notifications.length} Active
-                  </span>
+                  <Badge variant="outline" className="bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa] text-[10px] font-semibold">
+                    {notifications.length} {t("Alerts")}
+                  </Badge>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-ink/10 pr-1">
+                <div className="max-h-80 overflow-y-auto divide-y divide-[#dadce0] pr-1">
                   {notifications.map((n) => {
                     const content = (
-                      <>
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-ink block">
-                            {n.title}
-                          </span>
-                          <span className="text-[8px] font-mono text-muted-foreground shrink-0 mt-0.5">
+                      <div className="py-2.5 px-2 hover:bg-[#f8f9fa] rounded-lg transition-all space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Badge variant="outline" className={`text-[9px] font-semibold px-1.5 py-0.2 shrink-0 ${n.badgeStyle}`}>
+                              {n.badgeText}
+                            </Badge>
+                            <span className="font-mono text-xs font-bold text-[#202124] truncate">
+                              {n.title}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[9.5px] text-[#5f6368] shrink-0 font-medium">
                             {n.time}
                           </span>
                         </div>
-                        <p className="text-[10px] text-ink/85 leading-relaxed font-sans">
-                          {n.desc}
+
+                        <p className="text-[11px] font-semibold text-[#1a73e8] truncate">
+                          {n.stationTag}
                         </p>
-                      </>
+
+                        <p className="text-xs text-[#3c4043] leading-relaxed line-clamp-2">
+                          {n.analysis}
+                        </p>
+                      </div>
                     );
 
                     if (n.caseId) {
@@ -352,18 +401,14 @@ export function Topbar() {
                           to="/cases/$caseId"
                           params={{ caseId: n.caseId }}
                           onClick={() => setShowNotifications(false)}
-                          className="block py-2 px-1 text-inherit hover:no-underline hover:bg-surface-2 transition-colors duration-150 rounded cursor-pointer"
+                          className="block text-inherit hover:no-underline cursor-pointer"
                         >
                           {content}
                         </Link>
                       );
                     }
 
-                    return (
-                      <div key={n.id} className="py-2 px-1">
-                        {content}
-                      </div>
-                    );
+                    return <div key={n.id}>{content}</div>;
                   })}
                 </div>
               </div>
