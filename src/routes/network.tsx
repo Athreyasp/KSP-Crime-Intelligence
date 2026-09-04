@@ -982,7 +982,7 @@ export function NetworkPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 text-[#202124]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#202124]">
                 <div className="p-2.5 rounded-lg bg-[#f8f9fa] border border-[#dadce0]">
                   <span className="text-[9px] uppercase font-semibold text-[#5f6368] block">District</span>
                   <span className="font-semibold text-xs">{selectedNode.meta.district || "Karnataka"}</span>
@@ -1293,7 +1293,7 @@ export function NetworkPage() {
                   <Radio className="h-3.5 w-3.5 text-[#1a73e8]" /> ANPR Camera Scans ({travelLogs.length})
                 </h3>
 
-                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[340px] overflow-y-auto">
+                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[340px] overflow-y-auto overflow-x-auto w-full">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#f8f9fa] border-b border-[#dadce0] sticky top-0 z-10">
                       <tr>
@@ -1526,7 +1526,7 @@ export function NetworkPage() {
                   <span className="text-[10px] text-[#5f6368] font-mono">{targetPhone}</span>
                 </div>
 
-                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[320px] overflow-y-auto">
+                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[320px] overflow-y-auto overflow-x-auto w-full">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#f8f9fa] border-b border-[#dadce0] sticky top-0 z-10">
                       <tr>

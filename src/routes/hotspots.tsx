@@ -841,7 +841,7 @@ function Hotspots() {
             {viewMode === "area" && selectedArea ? (
               <div className="space-y-4">
                 {/* Module A: Stats */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <Stat label={t("FIRs")} value={selectedArea.firs} />
                   <Stat label={t("Spike")} value={`${selectedArea.spike > 0 ? "+" : ""}${selectedArea.spike}%`} accent={selectedArea.spike > 15 ? "alert" : undefined} />
                 </div>
@@ -925,7 +925,7 @@ function Hotspots() {
             ) : (
               <>
                 {/* Key Metrics Grid */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Stat label="Total FIRs" value={activeDistrict.total} />
                   <Stat label="Heinous Share" value={`${activeGravity.heinousPct}%`} accent="alert" />
                   <Stat label="Arrests" value={activeDistrict.arrests} accent="success" />

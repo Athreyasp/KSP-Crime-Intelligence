@@ -130,7 +130,7 @@ function CasesPage() {
       />
 
       {/* Minimalist Metric Cards Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         <MetricCard label={t("Total FIR Files")} value={allCases.length} icon={<Folder className="h-4 w-4 text-[#2563eb]" />} />
         <MetricCard label={t("Heinous Offences")} value={heinousCount} highlightRed icon={<AlertTriangle className="h-4 w-4 text-[#ef4444]" />} />
         <MetricCard label={t("Under Investigation")} value={activeCount} icon={<Clock className="h-4 w-4 text-[#f59e0b]" />} />
@@ -143,7 +143,7 @@ function CasesPage() {
         <CardContent className="p-4 space-y-4">
           
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex-1 min-w-[280px]">
+            <div className="relative w-full sm:w-auto flex-1">
               <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#94a3b8]" />
               <Input
                 placeholder={t("Search Crime No., Complainant, Accused, or Station...")}
@@ -174,7 +174,7 @@ function CasesPage() {
           </div>
 
           {/* Filter Dropdowns Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             <MinimalSelect
               label="District"
               defaultLabel="All Districts"

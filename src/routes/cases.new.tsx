@@ -1415,7 +1415,7 @@ function NewCasePage() {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-4 grid gap-4 md:grid-cols-4">
+            <CardContent className="pt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
               <div className="md:col-span-2 flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Complainant Full Name *</label>
                 <Input placeholder="Enter complainant name" value={complainantName} onChange={e => setComplainantName(e.target.value)} className="bg-surface-2 border-border" required />
@@ -1592,7 +1592,7 @@ function NewCasePage() {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
+            <CardContent className="pt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">District (DistrictID)</label>
                 <select value={districtId} onChange={e => handleCaseDistrictChange(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
@@ -1664,7 +1664,7 @@ function NewCasePage() {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
+            <CardContent className="pt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category (CaseCategoryID)</label>
                 <select value={category} onChange={e => setCategory(e.target.value)} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">

@@ -488,7 +488,7 @@ function Overview() {
               )}
             </p>
 
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="border-l-2 border-ink pl-2">
                 <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{t("FIRs")}</p>
                 <p className="font-display text-xl font-bold">{selected.total}</p>
@@ -547,7 +547,7 @@ function Overview() {
       </motion.section>
 
       {/* ───────── SECOND ROW: TREND + TAXONOMY + CLEARANCE ───────── */}
-      <div className="grid gap-4 lg:grid-cols-6">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-6">
         {/* TREND */}
         <div className="bento-card p-5 lg:col-span-3">
           <div className="border-b-2 border-ink pb-2">

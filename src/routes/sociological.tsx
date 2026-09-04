@@ -327,7 +327,7 @@ function Sociological() {
             </div>
 
             {/* SIMULATOR RESPONSE BLOCKS */}
-            <div className="grid gap-4 md:grid-cols-5 bg-paper border-2 border-ink/80 p-4 rounded-md">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-5 bg-paper border-2 border-ink/80 p-4 rounded-md">
               <div className="md:col-span-2 flex flex-col justify-center items-center text-center p-3 border-b md:border-b-0 md:border-r border-border/80">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Projected Crime Rate</span>
                 <span className="text-3xl font-mono font-black text-ink my-1.5">{projectedCrime} <span className="text-xs font-normal text-muted-foreground">/ 100k</span></span>

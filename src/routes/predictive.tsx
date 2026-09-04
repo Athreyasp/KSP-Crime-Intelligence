@@ -257,7 +257,7 @@ function Predictive() {
             </div>
             
             {/* List labels */}
-            <div className="w-full grid grid-cols-3 gap-2 border-t border-border pt-3 text-[10px]">
+            <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border pt-3 text-[10px]">
               {topRisk.slice(0, 3).map((d, idx) => {
                 const colors = [
                   "border-l-2 border-rose-500 text-rose-600 bg-rose-500/5",
