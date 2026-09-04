@@ -1,5 +1,5 @@
 import { CASES as SEED_CASES, DISTRICTS, CRIME_HEADS, CASE_STATUS, type Case, type District, type SubArea, type MicroSpot, AREA_NAMES, AREA_COORDS, DISTRICT_COORDS, STREET_SUFFIXES, type Offender, type Associate, type Prediction } from "../data/mock";
-import { type RichNode, type RichEdge, type EntityType, type RelationType } from "../data/network-rich";
+import { type RichNode, type RichEdge, type EntityType, type RelationType, VICTIM_PHOTOS, VEHICLE_PHOTOS, VEHICLE_SPECS, createTravelHistory, getUniqueVehicleDetails, getAccusedPhoto, getFormatted10DigitPhone, createCallLogs } from "../data/network-rich";
 export type CrimeHead = (typeof CRIME_HEADS)[number];
 import { fetchLiveCases, insertLiveCase, clearLiveCases, seedLiveCases, updateLiveCase } from "./catalyst-api";
 import { sanitizeBriefFacts } from "./ml-engine";
@@ -412,7 +412,8 @@ export function computeOffenders(cases: Case[]): Offender[] {
     const uniqueDistricts = Array.from(new Set(data.cases.map(c => c.district.name)));
     const uniqueMo = Array.from(new Set(data.cases.map(c => c.moTag)));
     const incidentCount = data.cases.length;
-    const accusedPhoto = data.cases.flatMap(c => c.accused).find(a => a.name.trim().toLowerCase() === key && a.photo)?.photo || "";
+    const explicitPhoto = data.cases.flatMap(c => c.accused).find(a => a.name.trim().toLowerCase() === key && a.photo)?.photo;
+    const accusedPhoto = getAccusedPhoto(data.name, data.gender, idx, explicitPhoto);
 
     return {
       id: `OFF-${1000 + idx}`,
@@ -544,13 +545,6 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
 
   const VEHICLE_PLATES = ["KA-01-XX-4421", "KA-05-MJ-9013", "KA-19-BZ-7702", "KA-09-AP-3388", "KA-51-KL-1147"];
   const PHONE_NUMBERS  = ["+91 98450 ●●●32", "+91 96632 ●●●08", "+91 90080 ●●●17", "+91 99011 ●●●94"];
-  const DEFAULT_ACCUSED_PHOTOS = [
-    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop&q=80"
-  ];
 
   // 1. Process all cases from Zoho DB
   cases.forEach((kase, cIdx) => {
@@ -590,12 +584,13 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
     // Add Victim Nodes
     kase.victims.forEach((v, vIdx) => {
       const victimNodeId = `V-${kase.caseMasterId}-${vIdx}`;
+      const victimPhoto = v.photo || VICTIM_PHOTOS[(kase.caseMasterId + vIdx) % VICTIM_PHOTOS.length];
       addNode({
         id: victimNodeId,
         label: v.name,
         type: "victim",
         cluster,
-        meta: { age: v.age, district: kase.district.name, photo: v.photo || "" }
+        meta: { age: v.age, district: kase.district.name, photo: victimPhoto }
       });
       addEdge({ source: victimNodeId, target: caseNodeId, relation: "victim-of", weight: 1 });
     });
@@ -609,7 +604,7 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       const accusedNodeId = matchingOffender ? matchingOffender.id : `ACC-${a.name.replace(/\s+/g, "-")}-${aIdx}`;
       accusedNodeIdsInCase.push(accusedNodeId);
 
-      const accusedPhoto = a.photo || matchingOffender?.photo || DEFAULT_ACCUSED_PHOTOS[(cIdx + aIdx) % DEFAULT_ACCUSED_PHOTOS.length];
+      const accusedPhoto = getAccusedPhoto(a.name, a.gender || matchingOffender?.gender, cIdx + aIdx, a.photo || matchingOffender?.photo);
 
       addNode({
         id: accusedNodeId,
@@ -638,14 +633,25 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       // Add vehicle connection for select suspects
       const hasRealVehicle = a.vehicleUsed && a.vehicleNo;
       if (hasRealVehicle || (cIdx + aIdx) % 2 === 0) {
-        const plate = (hasRealVehicle ? a.vehicleNo : VEHICLE_PLATES[(cIdx + aIdx) % VEHICLE_PLATES.length]) || "";
+        const vehIndex = cIdx * 5 + aIdx;
+        const caseMo = kase.moTag || kase.crimeHead.name || "";
+        const vehInfo = getUniqueVehicleDetails(vehIndex, hasRealVehicle ? a.vehicleNo : undefined, `${a.name} (Registered)`, caseMo);
+        const plate = vehInfo.plate;
         const vehId = `VEH-${plate.replace(/[^A-Z0-9]/g, "")}`;
+        const travelHistory = createTravelHistory(plate, kase.district.name, a.name, vehInfo.photo);
+
         addNode({
           id: vehId,
           label: plate,
           type: "vehicle",
           cluster,
-          meta: { plate, district: kase.district.name }
+          meta: {
+            plate,
+            district: kase.district.name,
+            photo: vehInfo.photo,
+            vehicleDetails: vehInfo.vehicleDetails,
+            travelHistory
+          }
         });
         addEdge({ source: accusedNodeId, target: vehId, relation: "drove", weight: 1.5 });
       }
@@ -653,14 +659,26 @@ export function computeNetworkRich(offenders: Offender[], cases: Case[]) {
       // Add phone connection for select suspects
       const hasRealPhone = a.phone;
       if (hasRealPhone || (cIdx + aIdx) % 3 === 0) {
-        const num = (hasRealPhone ? a.phone : PHONE_NUMBERS[(cIdx + aIdx) % PHONE_NUMBERS.length]) || "";
+        const num = getFormatted10DigitPhone(cIdx * 7 + aIdx, a.phone);
         const phId = `PH-${num.replace(/[^0-9]/g, "")}`;
+        const callLogs = createCallLogs(num, kase.district.name, a.name);
         addNode({
           id: phId,
           label: num,
           type: "phone",
           cluster,
-          meta: { number: num, district: kase.district.name }
+          meta: {
+            number: num,
+            district: kase.district.name,
+            callLogs,
+            phoneDetails: {
+              subscriberName: a.name,
+              operator: (cIdx + aIdx) % 2 === 0 ? "Airtel Karnataka" : "Jio Digital KA",
+              circle: `${kase.district.name} Circle`,
+              imei: `86490204${String(1000000 + ((cIdx * 31 + aIdx) * 9123 % 8999999))}`,
+              status: "Active Intercept"
+            }
+          }
         });
         addEdge({ source: accusedNodeId, target: phId, relation: "called", weight: 1 });
       }

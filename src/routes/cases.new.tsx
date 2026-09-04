@@ -55,6 +55,83 @@ const isLatLngInKarnataka = (latitude: number, longitude: number): boolean => {
   );
 };
 
+export const DISTRICT_BOUNDS: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number; center: [number, number] }> = {
+  "Bengaluru Urban": { minLat: 12.7200, maxLat: 13.1700, minLng: 77.4200, maxLng: 77.7800, center: [77.5946, 12.9716] },
+  "Bengaluru Rural": { minLat: 13.0000, maxLat: 13.4500, minLng: 77.2000, maxLng: 77.8000, center: [77.5528, 13.2954] },
+  "Mysuru":          { minLat: 11.9500, maxLat: 12.5500, minLng: 75.9000, maxLng: 77.0000, center: [76.6394, 12.2958] },
+  "Dakshina Kannada":{ minLat: 12.4500, maxLat: 13.1500, minLng: 74.7500, maxLng: 75.6000, center: [74.8560, 12.9141] },
+  "Dharwad":         { minLat: 15.1500, maxLat: 15.6000, minLng: 74.8000, maxLng: 75.4000, center: [75.1240, 15.3647] },
+  "Belagavi":        { minLat: 15.3500, maxLat: 16.9500, minLng: 74.1000, maxLng: 75.4000, center: [74.5085, 15.8497] },
+  "Kalaburagi":      { minLat: 16.7000, maxLat: 17.7500, minLng: 76.4000, maxLng: 77.5000, center: [76.8343, 17.3297] },
+  "Ballari":         { minLat: 14.8000, maxLat: 15.8000, minLng: 76.5000, maxLng: 77.2000, center: [76.9214, 15.1394] },
+  "Vijayapura":      { minLat: 16.2000, maxLat: 17.3000, minLng: 75.3000, maxLng: 76.4000, center: [75.7139, 16.8302] },
+  "Tumakuru":        { minLat: 13.0000, maxLat: 14.3000, minLng: 76.3000, maxLng: 77.3000, center: [77.1010, 13.3392] },
+  "Shivamogga":      { minLat: 13.5000, maxLat: 14.4000, minLng: 74.7000, maxLng: 75.8000, center: [75.5681, 13.9299] },
+  "Udupi":           { minLat: 13.0000, maxLat: 13.9000, minLng: 74.5000, maxLng: 75.1000, center: [74.7421, 13.3409] },
+  "Davanagere":      { minLat: 13.9000, maxLat: 14.7000, minLng: 75.6000, maxLng: 76.4000, center: [75.9218, 14.4644] },
+  "Raichur":         { minLat: 15.8000, maxLat: 16.6000, minLng: 76.3000, maxLng: 77.6000, center: [77.3566, 16.2076] },
+  "Hassan":          { minLat: 12.5000, maxLat: 13.4000, minLng: 75.6000, maxLng: 76.5000, center: [75.9218, 13.0068] },
+  "Mandya":          { minLat: 12.2000, maxLat: 13.0000, minLng: 76.3000, maxLng: 77.2000, center: [76.8951, 12.5218] },
+  "Chikkamagaluru":  { minLat: 13.0000, maxLat: 13.9000, minLng: 75.1000, maxLng: 76.2000, center: [75.7720, 13.3161] },
+  "Kodagu":          { minLat: 11.9000, maxLat: 12.7000, minLng: 75.4000, maxLng: 76.2000, center: [75.7382, 12.4244] },
+  "Bidar":           { minLat: 17.5000, maxLat: 18.4000, minLng: 76.9000, maxLng: 77.6000, center: [77.5193, 17.9104] },
+  "Kolar":           { minLat: 12.8000, maxLat: 13.5000, minLng: 77.8000, maxLng: 78.6000, center: [78.1291, 13.1367] },
+  "Bagalkote":       { minLat: 15.8000, maxLat: 16.5000, minLng: 75.0000, maxLng: 76.2000, center: [75.6868, 16.1853] },
+  "Chamarajanagara": { minLat: 11.6000, maxLat: 12.3000, minLng: 76.4000, maxLng: 77.6000, center: [76.9437, 11.9261] },
+  "Chikkaballapura": { minLat: 13.2000, maxLat: 13.9000, minLng: 77.5000, maxLng: 78.3000, center: [77.7275, 13.4355] },
+  "Chitradurga":     { minLat: 13.6000, maxLat: 14.8000, minLng: 76.0000, maxLng: 76.9000, center: [76.4009, 14.2251] },
+  "Gadag":           { minLat: 14.9000, maxLat: 15.8000, minLng: 75.3000, maxLng: 76.0000, center: [75.6290, 15.4319] },
+  "Haveri":          { minLat: 14.2000, maxLat: 15.1000, minLng: 75.0000, maxLng: 75.8000, center: [75.4042, 14.7958] },
+  "Koppal":          { minLat: 15.1000, maxLat: 16.0000, minLng: 75.8000, maxLng: 76.5000, center: [76.1548, 15.3477] },
+  "Ramanagara":      { minLat: 12.4000, maxLat: 13.0000, minLng: 77.1000, maxLng: 77.6000, center: [77.2811, 12.7209] },
+  "Uttara Kannada":  { minLat: 13.9000, maxLat: 15.5000, minLng: 74.1000, maxLng: 75.2000, center: [74.6868, 14.8000] },
+  "Yadgir":          { minLat: 16.2000, maxLat: 17.0000, minLng: 76.5000, maxLng: 77.4000, center: [77.1378, 16.7679] },
+  "Vijayanagara":    { minLat: 14.6000, maxLat: 15.5000, minLng: 75.8000, maxLng: 76.8000, center: [76.3897, 15.2754] },
+};
+
+const isLatLngInDistrict = (latitude: number, longitude: number, districtName: string): boolean => {
+  if (!isLatLngInKarnataka(latitude, longitude)) return false;
+  const bounds = DISTRICT_BOUNDS[districtName];
+  if (!bounds) return true;
+
+  return (
+    latitude >= bounds.minLat &&
+    latitude <= bounds.maxLat &&
+    longitude >= bounds.minLng &&
+    longitude <= bounds.maxLng
+  );
+};
+
+const findDistrictForCoords = (latitude: number, longitude: number, addressData?: any): string | null => {
+  if (addressData) {
+    const candidates = [
+      addressData.state_district,
+      addressData.county,
+      addressData.city,
+      addressData.district,
+      addressData.suburb
+    ].filter(Boolean);
+
+    for (const cand of candidates) {
+      const cleaned = String(cand).replace(/district/i, "").replace(/urban/i, "").replace(/rural/i, "").trim().toLowerCase();
+      for (const dist of DISTRICTS) {
+        const dNameLower = dist.name.toLowerCase();
+        if (dNameLower.includes(cleaned) || cleaned.includes(dNameLower.replace(" urban", "").replace(" rural", ""))) {
+          return dist.name;
+        }
+      }
+    }
+  }
+
+  for (const distName of Object.keys(DISTRICT_BOUNDS)) {
+    if (isLatLngInDistrict(latitude, longitude, distName)) {
+      return distName;
+    }
+  }
+
+  return null;
+};
+
 function PhotoUploadWidget({
   label,
   value,
@@ -355,6 +432,28 @@ function NewCasePage() {
   // SECTION 2: POLICE DETAILS
   // ==========================================
   const [districtId, setDistrictId] = useState(DISTRICTS[0].id);
+
+  const handleCaseDistrictChange = (newDistrictId: number) => {
+    setDistrictId(newDistrictId);
+    const distObj = DISTRICTS.find(d => d.id === newDistrictId);
+    if (!distObj) return;
+
+    const bounds = DISTRICT_BOUNDS[distObj.name];
+    if (bounds) {
+      const [centerLng, centerLat] = bounds.center;
+      const formattedLat = centerLat.toFixed(4);
+      const formattedLng = centerLng.toFixed(4);
+      setLat(formattedLat);
+      setLng(formattedLng);
+      setOccurrencePlace(`${distObj.name} Central Precinct Area`);
+
+      if (occMapRef.current && occMarkerRef.current) {
+        occMapRef.current.flyTo({ center: bounds.center, zoom: 12 });
+        occMarkerRef.current.setLngLat(bounds.center);
+      }
+      toast.info(`Jurisdictional Boundary Updated: Map auto-centered to ${distObj.name}. Pin constrained within ${distObj.name}.`);
+    }
+  };
   const [policeStation, setPoliceStation] = useState("Central PS-1");
   const [registeringOfficer, setRegisteringOfficer] = useState(REGISTERING_OFFICERS[0]);
   const [officerRank, setOfficerRank] = useState("Police Inspector (PI)");
@@ -494,6 +593,15 @@ function NewCasePage() {
             const newLng = parsedLon.toFixed(4);
             setCompLat(newLat);
             setCompLng(newLng);
+
+            const detectedDistrict = findDistrictForCoords(parsedLat, parsedLon, firstResult.address);
+            if (detectedDistrict) {
+              setComplainantDistrict(detectedDistrict);
+              const subAreas = AREA_NAMES[detectedDistrict] ?? [];
+              if (subAreas.length > 0 && !subAreas.includes(complainantSubArea)) {
+                setComplainantSubArea(subAreas[0]);
+              }
+            }
             
             // Move map camera and update marker
             if (compMapRef.current) {
@@ -502,7 +610,7 @@ function NewCasePage() {
             if (compMarkerRef.current) {
               compMarkerRef.current.setLngLat([parsedLon, parsedLat]);
             }
-            toast.success("Map centered to address location.");
+            toast.success(`Map centered to address location (${detectedDistrict || "Karnataka"}).`);
           }
         } else {
           toast.error("Address location not found on map.");
@@ -648,7 +756,15 @@ function NewCasePage() {
             }
             if (data.display_name) {
               setComplainantAddress(data.display_name);
-              toast.success("Residential Address updated from map pin!");
+              const detectedDistrict = findDistrictForCoords(newLat, newLng, data.address);
+              if (detectedDistrict) {
+                setComplainantDistrict(detectedDistrict);
+                const subAreas = AREA_NAMES[detectedDistrict] ?? [];
+                if (subAreas.length > 0 && !subAreas.includes(complainantSubArea)) {
+                  setComplainantSubArea(subAreas[0]);
+                }
+              }
+              toast.success(`Residential Address updated: District set to ${detectedDistrict || complainantDistrict}`);
             }
           }
         }
@@ -687,7 +803,15 @@ function NewCasePage() {
             }
             if (data.display_name) {
               setComplainantAddress(data.display_name);
-              toast.success("Residential Address updated from map click!");
+              const detectedDistrict = findDistrictForCoords(newLat, newLng, data.address);
+              if (detectedDistrict) {
+                setComplainantDistrict(detectedDistrict);
+                const subAreas = AREA_NAMES[detectedDistrict] ?? [];
+                if (subAreas.length > 0 && !subAreas.includes(complainantSubArea)) {
+                  setComplainantSubArea(subAreas[0]);
+                }
+              }
+              toast.success(`Residential Address updated: District set to ${detectedDistrict || complainantDistrict}`);
             }
           }
         }
@@ -774,8 +898,10 @@ function NewCasePage() {
       const newLat = lngLat.lat;
       const newLng = lngLat.lng;
 
-      if (!isLatLngInKarnataka(newLat, newLng)) {
-        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+      const currentDist = DISTRICTS.find(d => d.id === districtId)?.name || "Bengaluru Urban";
+
+      if (!isLatLngInDistrict(newLat, newLng, currentDist)) {
+        toast.error(`Jurisdictional Error: Selected location is outside ${currentDist}. You must pin the occurrence location within ${currentDist} district.`);
         marker.setLngLat([Number(lng), Number(lat)]);
         return;
       }
@@ -799,7 +925,7 @@ function NewCasePage() {
             }
             if (data.display_name) {
               setOccurrencePlace(data.display_name);
-              toast.success("Occurrence Location updated from map pin!");
+              toast.success(`Occurrence Location updated inside ${currentDist}!`);
             }
           }
         }
@@ -812,8 +938,10 @@ function NewCasePage() {
       const newLat = e.lngLat.lat;
       const newLng = e.lngLat.lng;
 
-      if (!isLatLngInKarnataka(newLat, newLng)) {
-        toast.error("Invalid Location: Please select a coordinate within the border of Karnataka.");
+      const currentDist = DISTRICTS.find(d => d.id === districtId)?.name || "Bengaluru Urban";
+
+      if (!isLatLngInDistrict(newLat, newLng, currentDist)) {
+        toast.error(`Jurisdictional Error: Selected location is outside ${currentDist}. You must pin the occurrence location within ${currentDist} district.`);
         return;
       }
 
@@ -838,7 +966,7 @@ function NewCasePage() {
             }
             if (data.display_name) {
               setOccurrencePlace(data.display_name);
-              toast.success("Occurrence Location updated from map click!");
+              toast.success(`Occurrence Location updated inside ${currentDist}!`);
             }
           }
         }
@@ -1048,8 +1176,9 @@ function NewCasePage() {
       setStep(3);
       return;
     }
-    if (!isLatLngInKarnataka(Number(lat), Number(lng))) {
-      toast.error("Invalid Location: Crime occurrence coordinates must be within the border of Karnataka.");
+    const selectedDistName = DISTRICTS.find(d => d.id === districtId)?.name || "Bengaluru Urban";
+    if (!isLatLngInDistrict(Number(lat), Number(lng), selectedDistName)) {
+      toast.error(`Jurisdictional Error: Crime occurrence location (${lat}, ${lng}) must be pinned within ${selectedDistName} district.`);
       setStep(3);
       return;
     }
@@ -1410,6 +1539,14 @@ function NewCasePage() {
                               .then(data => {
                                 if (data && data.display_name) {
                                   setComplainantAddress(data.display_name);
+                                  const detectedDistrict = findDistrictForCoords(Number(newLat), Number(newLng), data.address);
+                                  if (detectedDistrict) {
+                                    setComplainantDistrict(detectedDistrict);
+                                    const subAreas = AREA_NAMES[detectedDistrict] ?? [];
+                                    if (subAreas.length > 0 && !subAreas.includes(complainantSubArea)) {
+                                      setComplainantSubArea(subAreas[0]);
+                                    }
+                                  }
                                   toast.success("Residential Address synced with GPS coordinates!");
                                 }
                               });
@@ -1458,7 +1595,7 @@ function NewCasePage() {
             <CardContent className="pt-4 grid gap-4 md:grid-cols-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">District (DistrictID)</label>
-                <select value={districtId} onChange={e => setDistrictId(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
+                <select value={districtId} onChange={e => handleCaseDistrictChange(Number(e.target.value))} className="form-select border border-border bg-surface-2 px-3 py-1.5 rounded-md text-sm">
                   {DISTRICTS.map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
@@ -1613,6 +1750,11 @@ function NewCasePage() {
                     </div>
                   </div>
 
+                  {/* District Jurisdiction Constraint Badge */}
+                  <div className="absolute top-3 right-3 z-10 bg-[#2563eb] text-white border-2 border-slate-900 px-2.5 py-1 rounded-xs shadow-md font-sans flex items-center gap-1.5 font-bold text-[9px] uppercase tracking-wider pointer-events-none">
+                    🛡️ BOUND TO: {DISTRICTS.find(d => d.id === districtId)?.name || "Bengaluru Urban"}
+                  </div>
+
                   {/* GPS Locator Button */}
                   <button
                     type="button"
@@ -1622,8 +1764,9 @@ function NewCasePage() {
                           (position) => {
                             const newLat = position.coords.latitude.toFixed(4);
                             const newLng = position.coords.longitude.toFixed(4);
-                            if (!isLatLngInKarnataka(Number(newLat), Number(newLng))) {
-                              toast.error("Invalid GPS Location: Coordinates must be within the border of Karnataka.");
+                            const currentDistName = DISTRICTS.find(d => d.id === districtId)?.name || "Bengaluru Urban";
+                            if (!isLatLngInDistrict(Number(newLat), Number(newLng), currentDistName)) {
+                              toast.error(`GPS Jurisdiction Error: Device coordinates (${newLat}, ${newLng}) are outside ${currentDistName} district boundaries.`);
                               return;
                             }
                             setLat(newLat);
