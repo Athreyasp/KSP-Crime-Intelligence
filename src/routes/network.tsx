@@ -41,12 +41,12 @@ const W = 1000;
 const H = 620;
 
 const TYPE_META: Record<EntityType, { color: string; bg: string; border: string; label: string; Icon: typeof Users }> = {
-  accused:  { color: "#d93025", bg: "#fce8e6", border: "#f8b4b0", label: "Suspect", Icon: Fingerprint },
+  accused:  { color: "#c5221f", bg: "#fce8e6", border: "#f8b4b0", label: "Suspect", Icon: Fingerprint },
   victim:   { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Victim",  Icon: Users },
-  case:     { color: "#e37400", bg: "#fef7e0", border: "#fde293", label: "FIR Case", Icon: FileText },
-  location: { color: "#188038", bg: "#e6f4ea", border: "#a8dab5", label: "Location", Icon: PinIcon },
-  vehicle:  { color: "#a142f4", bg: "#f3e8fd", border: "#d7aefb", label: "Vehicle", Icon: Car },
-  phone:    { color: "#0284c7", bg: "#e0f2fe", border: "#7dd3fc", label: "Phone",   Icon: Phone },
+  case:     { color: "#b06000", bg: "#fef7e0", border: "#feefc3", label: "FIR Case", Icon: FileText },
+  location: { color: "#137333", bg: "#e6f4ea", border: "#ceead6", label: "Location", Icon: PinIcon },
+  vehicle:  { color: "#1a73e8", bg: "#e8f0fe", border: "#aecbfa", label: "Vehicle", Icon: Car },
+  phone:    { color: "#0284c7", bg: "#e0f2fe", border: "#bae6fd", label: "Phone",   Icon: Phone },
 };
 
 /* ------------------------------------------------------------------ */
@@ -82,6 +82,296 @@ function useForceLayout(networkRich: any) {
     for (let i = 0; i < 350; i++) sim.tick();
     return { nodes, links };
   }, [networkRich]);
+}
+
+/* ------------------------------------------------------------------ */
+/* PDF Report Generation Helpers (Karnataka State Police SCRB Format)  */
+/* ------------------------------------------------------------------ */
+function exportVehiclePdfReport(targetPlate: string, vehInfo: any, travelLogs: TravelCheckpoint[]) {
+  const printWindow = window.open("", "_blank", "width=950,height=1000");
+  if (!printWindow) {
+    toast.error("Pop-up window blocked. Please allow pop-ups to view/export the PDF report.");
+    return;
+  }
+
+  const rowsHtml = travelLogs.map((cp, idx) => `
+    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8f9fa'}; border-bottom: 1px solid #e0e0e0;">
+      <td style="padding: 10px 12px; font-weight: 600; text-align: center; color: #1a73e8;">#${idx + 1}</td>
+      <td style="padding: 10px 12px;">
+        <strong style="color: #202124; font-size: 12px;">${cp.locationName}</strong><br/>
+        <span style="font-size: 10px; color: #5f6368; font-family: monospace;">ID: ${cp.checkpointId}</span>
+      </td>
+      <td style="padding: 10px 12px; color: #3c4043;">${cp.district}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: #1a73e8; font-weight: 600;">${cp.timestamp}</td>
+      <td style="padding: 10px 12px; font-family: monospace; font-weight: 600;">${cp.speedKmph} km/h</td>
+      <td style="padding: 10px 12px; color: #3c4043;">${cp.cameraType}</td>
+      <td style="padding: 10px 12px; font-weight: 600; color: #202124;">${(cp.occupantsDetected || []).join(", ") || "Driver Only"}</td>
+      <td style="padding: 10px 12px;">
+        <span style="background: #fce8e6; color: #c5221f; border: 1px solid #f8b4b0; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">${cp.flagStatus}</span>
+      </td>
+    </tr>
+  `).join("");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>KSP ANPR Forensic Telemetry Report - ${targetPlate}</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #202124; margin: 0; padding: 24px; font-size: 12px; background: #ffffff; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #1a73e8; padding-bottom: 16px; margin-bottom: 24px; }
+          .header-title h1 { margin: 0; font-size: 20px; color: #1a73e8; font-weight: 700; letter-spacing: 0.3px; }
+          .header-title p { margin: 4px 0 0 0; color: #5f6368; font-size: 11px; font-weight: 500; }
+          .plate-badge { background: #1a73e8; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 16px; letter-spacing: 1px; }
+          .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
+          .meta-item { display: flex; flex-direction: column; gap: 2px; }
+          .meta-item label { text-transform: uppercase; font-size: 9px; color: #5f6368; font-weight: 700; letter-spacing: 0.5px; }
+          .meta-item p { margin: 0; font-size: 13px; font-weight: 600; color: #202124; }
+          .section-header { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #1a73e8; letter-spacing: 0.5px; margin-top: 24px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+          table { width: 100%; border-collapse: collapse; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; font-size: 11px; }
+          th { background: #f1f3f4; text-align: left; padding: 10px 12px; border-bottom: 2px solid #dadce0; color: #3c4043; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+          .sig-container { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .seal-box { border: 2px border-dashed #aecbfa; padding: 12px 18px; border-radius: 8px; background: #e8f0fe; color: #1a73e8; font-size: 10px; font-weight: 600; text-align: center; }
+          .sig-box { text-align: right; }
+          .sig-line { width: 220px; border-bottom: 1.5px solid #202124; display: inline-block; margin-bottom: 6px; }
+          .footer { margin-top: 30px; border-top: 1px solid #dadce0; padding-top: 12px; display: flex; justify-content: space-between; color: #5f6368; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-title">
+            <h1>Karnataka State Police · SCRB</h1>
+            <p>Automatic License Plate Recognition (ANPR) Forensic Vehicle Movement Report</p>
+          </div>
+          <div style="text-align: right;">
+            <span class="plate-badge">${targetPlate}</span>
+            <p style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #5f6368;">REF: KSP-ANPR-${Date.now().toString().slice(-6)}</p>
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item">
+            <label>Registration Plate</label>
+            <p style="color: #1a73e8; font-family: monospace;">${targetPlate}</p>
+          </div>
+          <div class="meta-item">
+            <label>Make & Model</label>
+            <p>${vehInfo.makeModel || "Honda City e:HEV Hybrid"}</p>
+          </div>
+          <div class="meta-item">
+            <label>Registered Owner</label>
+            <p>${vehInfo.ownerName || "Vijay Bhat"}</p>
+          </div>
+          <div class="meta-item">
+            <label>Vehicle Category</label>
+            <p>${vehInfo.category || "Motor Car"}</p>
+          </div>
+          <div class="meta-item">
+            <label>Primary Surveillance Jurisdiction</label>
+            <p>${vehInfo.district || "Bengaluru Urban"}</p>
+          </div>
+          <div class="meta-item">
+            <label>ANPR Checkpoints Traversed</label>
+            <p style="color: #1a73e8;">${travelLogs.length} Camera Checkpoints</p>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <span>ANPR Camera Checkpoint Trajectory</span>
+          <span style="font-size: 10px; color: #5f6368; font-weight: normal;">Confidential Intelligence Record</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">Scan</th>
+              <th>Location / Camera Site</th>
+              <th>District</th>
+              <th>Timestamp</th>
+              <th>Speed</th>
+              <th>Camera Type</th>
+              <th>Occupants Detected</th>
+              <th>Hotlist Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="sig-container">
+          <div class="seal-box">
+            OFFICIAL DIGITAL TELEMETRY SEAL<br/>
+            STATE CRIME RECORDS BUREAU · KARNATAKA
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p style="margin: 0; font-size: 11px; font-weight: 700;">Investigating Officer Signature</p>
+            <p style="margin: 2px 0 0 0; font-size: 10px; color: #5f6368;">State Crime Records Bureau (SCRB)</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
+          <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 400);
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+}
+
+function exportPhonePdfReport(targetPhone: string, subscriber: string, operator: string, imei: string, districtName: string, callLogs: CallLogEntry[]) {
+  const printWindow = window.open("", "_blank", "width=950,height=1000");
+  if (!printWindow) {
+    toast.error("Pop-up window blocked. Please allow pop-ups to view/export the PDF report.");
+    return;
+  }
+
+  const rowsHtml = callLogs.map((log, idx) => `
+    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8f9fa'}; border-bottom: 1px solid #e0e0e0;">
+      <td style="padding: 10px 12px; font-weight: 600; text-align: center; color: #0284c7;">#${idx + 1}</td>
+      <td style="padding: 10px 12px;">
+        <span style="background: ${log.type === "Incoming" ? "#e6f4ea" : log.type === "Outgoing" ? "#e8f0fe" : "#fce8e6"}; color: ${log.type === "Incoming" ? "#137333" : log.type === "Outgoing" ? "#1a73e8" : "#c5221f"}; font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 10px;">${log.type}</span>
+      </td>
+      <td style="padding: 10px 12px; font-family: monospace; font-weight: 700; color: #202124; font-size: 12px;">${log.otherPartyNumber}</td>
+      <td style="padding: 10px 12px; font-weight: 600; color: #3c4043;">${log.otherPartyName}</td>
+      <td style="padding: 10px 12px; font-family: monospace; font-weight: 600; color: #0284c7;">${log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Ans)"}</td>
+      <td style="padding: 10px 12px; color: #3c4043;">${log.towerLocation} <span style="color: #5f6368; font-size: 10px;">(${log.towerId})</span></td>
+      <td style="padding: 10px 12px; color: #3c4043;">${log.district}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: #1a73e8; font-weight: 600;">${log.timestamp}</td>
+    </tr>
+  `).join("");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>KSP CDR Telecom Forensic Intercept Report - ${targetPhone}</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #202124; margin: 0; padding: 24px; font-size: 12px; background: #ffffff; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; }
+          .header-title h1 { margin: 0; font-size: 20px; color: #0284c7; font-weight: 700; letter-spacing: 0.3px; }
+          .header-title p { margin: 4px 0 0 0; color: #5f6368; font-size: 11px; font-weight: 500; }
+          .phone-badge { background: #0284c7; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 16px; letter-spacing: 1px; }
+          .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
+          .meta-item { display: flex; flex-direction: column; gap: 2px; }
+          .meta-item label { text-transform: uppercase; font-size: 9px; color: #5f6368; font-weight: 700; letter-spacing: 0.5px; }
+          .meta-item p { margin: 0; font-size: 13px; font-weight: 600; color: #202124; }
+          .section-header { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #0284c7; letter-spacing: 0.5px; margin-top: 24px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+          table { width: 100%; border-collapse: collapse; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; font-size: 11px; }
+          th { background: #f1f3f4; text-align: left; padding: 10px 12px; border-bottom: 2px solid #dadce0; color: #3c4043; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+          .sig-container { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .seal-box { border: 2px border-dashed #bae6fd; padding: 12px 18px; border-radius: 8px; background: #e0f2fe; color: #0284c7; font-size: 10px; font-weight: 600; text-align: center; }
+          .sig-box { text-align: right; }
+          .sig-line { width: 220px; border-bottom: 1.5px solid #202124; display: inline-block; margin-bottom: 6px; }
+          .footer { margin-top: 30px; border-top: 1px solid #dadce0; padding-top: 12px; display: flex; justify-content: space-between; color: #5f6368; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-title">
+            <h1>Karnataka State Police · SCRB</h1>
+            <p>Call Detail Record (CDR) Telecom Tower Intercept Forensic Report</p>
+          </div>
+          <div style="text-align: right;">
+            <span class="phone-badge">${targetPhone}</span>
+            <p style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #5f6368;">REF: KSP-CDR-${Date.now().toString().slice(-6)}</p>
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item">
+            <label>Target Subscriber Line</label>
+            <p style="color: #0284c7; font-family: monospace;">${targetPhone}</p>
+          </div>
+          <div class="meta-item">
+            <label>Subscriber Name</label>
+            <p>${subscriber}</p>
+          </div>
+          <div class="meta-item">
+            <label>Telecom Operator</label>
+            <p>${operator}</p>
+          </div>
+          <div class="meta-item">
+            <label>Hardware IMEI Number</label>
+            <p style="font-family: monospace;">${imei}</p>
+          </div>
+          <div class="meta-item">
+            <label>Tower District Jurisdiction</label>
+            <p>${districtName}</p>
+          </div>
+          <div class="meta-item">
+            <label>Total Call Detail Events</label>
+            <p style="color: #0284c7;">${callLogs.length} Records</p>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <span>Chronological Call Detail Records (CDR) Feed</span>
+          <span style="font-size: 10px; color: #5f6368; font-weight: normal;">Telecom Intercept Evidence</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">#</th>
+              <th>Call Type</th>
+              <th>Target Contact Number</th>
+              <th>Contact Name / Role</th>
+              <th>Duration</th>
+              <th>Cell Tower Location</th>
+              <th>District</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="sig-container">
+          <div class="seal-box">
+            OFFICIAL CYBER TELECOM INTERCEPT SEAL<br/>
+            STATE CRIME RECORDS BUREAU · KARNATAKA
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p style="margin: 0; font-size: 11px; font-weight: 700;">Cyber & Telecom Nodal Officer</p>
+            <p style="margin: 2px 0 0 0; font-size: 10px; color: #5f6368;">State Crime Records Bureau (SCRB)</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
+          <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 400);
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
 }
 
 export function NetworkPage() {
@@ -575,8 +865,8 @@ export function NetworkPage() {
           {selectedNode && (
             <div className="absolute top-3 right-3 bottom-3 left-3 sm:left-auto z-20 w-auto sm:w-80 bg-white border border-[#dadce0] rounded-2xl p-4 shadow-xl flex flex-col overflow-y-auto space-y-4 text-xs animate-in fade-in slide-in-from-right-2">
               
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: TYPE_META[selectedNode.type].bg, color: TYPE_META[selectedNode.type].color }}>
+              <div className="flex items-center justify-between border-b border-[#dadce0] pb-2">
+                <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: TYPE_META[selectedNode.type].bg, color: TYPE_META[selectedNode.type].color }}>
                   {TYPE_META[selectedNode.type].label}
                 </span>
                 <X className="h-4 w-4 cursor-pointer text-[#5f6368] hover:text-[#202124]" onClick={() => setSelected(null)} />
@@ -585,31 +875,31 @@ export function NetworkPage() {
               {/* Accused Photo Header */}
               {selectedNode.type === "accused" && selectedNode.meta.photo && (
                 <div className="flex items-center gap-3 p-2 bg-[#f8f9fa] rounded-xl border border-[#dadce0]">
-                  <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-16 h-16 rounded-full object-cover border-2 border-[#d93025] shadow-md shrink-0" />
+                  <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-14 h-14 rounded-full object-cover border-2 border-[#c5221f] shadow-2xs shrink-0" />
                   <div>
-                    <h3 className="font-display text-base font-bold text-[#202124]">{selectedNode.label}</h3>
+                    <h3 className="font-display text-sm font-semibold text-[#202124]">{selectedNode.label}</h3>
                     {selectedNode.meta.aliases?.[0] && (
-                      <p className="text-xs text-[#0b57d0] font-medium italic">a.k.a. {selectedNode.meta.aliases[0]}</p>
+                      <p className="text-xs text-[#1a73e8] font-medium italic">a.k.a. {selectedNode.meta.aliases[0]}</p>
                     )}
-                    <span className="text-[10px] text-[#5f6368] font-bold block mt-0.5">District: {selectedNode.meta.district || "Karnataka"}</span>
+                    <span className="text-[10px] text-[#5f6368] font-medium block mt-0.5">District: {selectedNode.meta.district || "Karnataka"}</span>
                   </div>
                 </div>
               )}
 
               {/* Victim Photo Header */}
               {selectedNode.type === "victim" && (
-                <div className="flex items-center gap-3 p-2 bg-[#e8f0fe]/60 rounded-xl border border-[#aecbfa]">
+                <div className="flex items-center gap-3 p-2.5 bg-[#e8f0fe]/60 rounded-xl border border-[#aecbfa]">
                   {selectedNode.meta.photo ? (
-                    <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-16 h-16 rounded-full object-cover border-2 border-[#1a73e8] shadow-md shrink-0" />
+                    <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-14 h-14 rounded-full object-cover border-2 border-[#1a73e8] shadow-2xs shrink-0" />
                   ) : (
-                    <div className="w-16 h-16 rounded-full bg-[#1a73e8] text-white flex items-center justify-center font-bold text-lg border-2 border-[#1a73e8] shrink-0">
+                    <div className="w-14 h-14 rounded-full bg-[#1a73e8] text-white flex items-center justify-center font-bold text-base border-2 border-[#1a73e8] shrink-0">
                       {selectedNode.label.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <h3 className="font-display text-base font-bold text-[#202124]">{selectedNode.label}</h3>
-                    <p className="text-xs text-[#1a73e8] font-bold">Victim of Recorded Crime</p>
-                    <span className="text-[10px] text-[#5f6368] font-bold block mt-0.5">Age: {selectedNode.meta.age || "32"} · District: {selectedNode.meta.district || "Karnataka"}</span>
+                    <h3 className="font-display text-sm font-semibold text-[#202124]">{selectedNode.label}</h3>
+                    <p className="text-xs text-[#1a73e8] font-medium">Victim of Recorded Crime</p>
+                    <span className="text-[10px] text-[#5f6368] font-medium block mt-0.5">Age: {selectedNode.meta.age || "32"} · District: {selectedNode.meta.district || "Karnataka"}</span>
                   </div>
                 </div>
               )}
@@ -617,17 +907,17 @@ export function NetworkPage() {
               {/* Vehicle Photo Header & Travel Tracking Trigger */}
               {selectedNode.type === "vehicle" && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-2 bg-[#f3e8fd]/60 rounded-xl border border-[#d7aefb]">
+                  <div className="flex items-center gap-3 p-2.5 bg-[#e8f0fe]/60 rounded-xl border border-[#aecbfa]">
                     {selectedNode.meta.photo ? (
-                      <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-16 h-16 rounded-xl object-cover border-2 border-[#a142f4] shadow-md shrink-0" />
+                      <img src={selectedNode.meta.photo} alt={selectedNode.label} className="w-14 h-14 rounded-lg object-cover border border-[#aecbfa] shadow-2xs shrink-0" />
                     ) : (
-                      <div className="w-16 h-16 rounded-xl bg-[#a142f4] text-white flex items-center justify-center font-bold text-lg border-2 border-[#a142f4] shrink-0">
-                        🚗
+                      <div className="w-14 h-14 rounded-lg bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center font-bold text-lg border border-[#aecbfa] shrink-0">
+                        <Car className="h-6 w-6" />
                       </div>
                     )}
-                    <div className="flex-1 overflow-hidden">
-                      <Badge className="bg-[#a142f4] text-white text-[10px] font-mono px-2 py-0.5 mb-1">{selectedNode.label}</Badge>
-                      <h3 className="font-bold text-xs text-[#202124] truncate">{selectedNode.meta.vehicleDetails?.makeModel || "Vehicle Registration"}</h3>
+                    <div className="flex-1 overflow-hidden space-y-0.5">
+                      <Badge className="bg-[#1a73e8] text-white text-[10px] font-mono px-2 py-0.5 mb-0.5 font-bold">{selectedNode.label}</Badge>
+                      <h3 className="font-semibold text-xs text-[#202124] truncate">{selectedNode.meta.vehicleDetails?.makeModel || "Vehicle Registration"}</h3>
                       <p className="text-[10px] text-[#5f6368]">Owner: {selectedNode.meta.vehicleDetails?.ownerName || "Registered Driver"}</p>
                     </div>
                   </div>
@@ -635,10 +925,10 @@ export function NetworkPage() {
                   {/* PROMINENT VEHICLE TRAVEL TRACKING BUTTON */}
                   <Button
                     size="sm"
-                    className="w-full bg-[#a142f4] hover:bg-[#8b2fc9] text-white font-bold text-xs rounded-xl py-2 flex items-center justify-center gap-1.5 shadow-md transition-transform active:scale-98"
+                    className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium text-xs rounded-lg py-2 flex items-center justify-center gap-1.5 shadow-2xs transition-all"
                     onClick={() => setTrackingVehicleNode(selectedNode)}
                   >
-                    <Navigation className="h-4 w-4 animate-pulse" /> Track Vehicle Movement & Travel History
+                    <Navigation className="h-3.5 w-3.5" /> Track Vehicle Movement & Travel History
                   </Button>
                 </div>
               )}
@@ -646,41 +936,41 @@ export function NetworkPage() {
               {/* Phone Header & CDR Call Logs Trigger */}
               {selectedNode.type === "phone" && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-2 bg-[#e0f2fe]/60 rounded-xl border border-[#7dd3fc]">
-                    <div className="w-16 h-16 rounded-xl bg-[#0284c7] text-white flex items-center justify-center font-bold text-xl border-2 border-[#0284c7] shrink-0 shadow-sm">
-                      📞
+                  <div className="flex items-center gap-3 p-2.5 bg-[#e0f2fe]/60 rounded-xl border border-[#bae6fd]">
+                    <div className="w-14 h-14 rounded-lg bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center font-bold text-lg border border-[#bae6fd] shrink-0">
+                      <PhoneCall className="h-6 w-6" />
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                      <Badge className="bg-[#0284c7] text-white text-[10px] font-mono px-2 py-0.5 mb-1">{selectedNode.label}</Badge>
-                      <h3 className="font-bold text-xs text-[#202124] truncate">{selectedNode.meta.phoneDetails?.subscriberName || "Phone Subscriber"}</h3>
-                      <p className="text-[10px] text-[#5f6368]">Operator: <span className="font-bold text-[#0284c7]">{selectedNode.meta.phoneDetails?.operator || "Airtel Karnataka"}</span></p>
+                    <div className="flex-1 overflow-hidden space-y-0.5">
+                      <Badge className="bg-[#0284c7] text-white text-[10px] font-mono px-2 py-0.5 mb-0.5 font-bold">{selectedNode.label}</Badge>
+                      <h3 className="font-semibold text-xs text-[#202124] truncate">{selectedNode.meta.phoneDetails?.subscriberName || "Phone Subscriber"}</h3>
+                      <p className="text-[10px] text-[#5f6368]">Operator: <span className="font-medium text-[#0284c7]">{selectedNode.meta.phoneDetails?.operator || "Airtel Karnataka"}</span></p>
                     </div>
                   </div>
 
                   {/* PROMINENT CDR CALL LOGS BUTTON */}
                   <Button
                     size="sm"
-                    className="w-full bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold text-xs rounded-xl py-2 flex items-center justify-center gap-1.5 shadow-md transition-transform active:scale-98"
+                    className="w-full bg-[#0284c7] hover:bg-[#0369a1] text-white font-medium text-xs rounded-lg py-2 flex items-center justify-center gap-1.5 shadow-2xs transition-all"
                     onClick={() => setTrackingPhoneNode(selectedNode)}
                   >
-                    <PhoneCall className="h-4 w-4 animate-pulse" /> Track CDR Call Logs & Tower Intercepts
+                    <PhoneCall className="h-3.5 w-3.5" /> Track CDR Call Logs & Tower Intercepts
                   </Button>
                 </div>
               )}
 
               {selectedNode.type !== "accused" && selectedNode.type !== "victim" && selectedNode.type !== "vehicle" && selectedNode.type !== "phone" && (
                 <div>
-                  <h3 className="font-display text-base font-bold text-[#202124]">{selectedNode.label}</h3>
+                  <h3 className="font-display text-sm font-semibold text-[#202124]">{selectedNode.label}</h3>
                 </div>
               )}
 
               {selectedNode.type === "accused" && (
-                <div className="p-3 rounded-xl bg-[#fce8e6] border border-[#f8b4b0] text-[#d93025] font-bold flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
+                <div className="p-3 rounded-xl bg-[#fce8e6] border border-[#f8b4b0] text-[#c5221f] font-medium flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center justify-between font-semibold">
                     <span>STATUS: WANTED SUSPECT</span>
-                    <Badge className="bg-[#d93025] text-white text-[10px]">RISK {selectedNode.meta.riskScore || 80}/100</Badge>
+                    <Badge className="bg-[#c5221f] text-white text-[10px]">RISK {selectedNode.meta.riskScore || 80}/100</Badge>
                   </div>
-                  <div className="text-[10px] text-[#c5221f] font-mono border-t border-[#f8b4b0]/40 pt-1 flex items-center gap-1 font-bold">
+                  <div className="text-[10px] text-[#c5221f] font-mono border-t border-[#f8b4b0]/40 pt-1 flex items-center gap-1 font-semibold">
                     <span>ROLE:</span>
                     <span>
                       {(deg.get(selectedNode.id) || 0) >= 5
@@ -694,35 +984,35 @@ export function NetworkPage() {
               )}
 
               <div className="grid grid-cols-2 gap-2 text-[#202124]">
-                <div className="p-2.5 rounded-xl bg-[#f8f9fa] border border-[#dadce0]">
-                  <span className="text-[9px] uppercase font-bold text-[#5f6368] block">District</span>
-                  <span className="font-bold text-xs">{selectedNode.meta.district || "Karnataka"}</span>
+                <div className="p-2.5 rounded-lg bg-[#f8f9fa] border border-[#dadce0]">
+                  <span className="text-[9px] uppercase font-semibold text-[#5f6368] block">District</span>
+                  <span className="font-semibold text-xs">{selectedNode.meta.district || "Karnataka"}</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#f8f9fa] border border-[#dadce0]">
-                  <span className="text-[9px] uppercase font-bold text-[#5f6368] block">Links</span>
-                  <span className="font-bold text-xs text-[#0b57d0]">{deg.get(selectedNode.id) ?? 0} Connected</span>
+                <div className="p-2.5 rounded-lg bg-[#f8f9fa] border border-[#dadce0]">
+                  <span className="text-[9px] uppercase font-semibold text-[#5f6368] block">Links</span>
+                  <span className="font-semibold text-xs text-[#1a73e8]">{deg.get(selectedNode.id) ?? 0} Connected</span>
                 </div>
               </div>
 
               {/* Intelligence Linkages */}
               <div className="space-y-1.5">
-                <span className="text-[9px] uppercase font-bold text-[#5f6368] block">Intelligence Linkages</span>
+                <span className="text-[9px] uppercase font-semibold tracking-wider text-[#5f6368] block">Intelligence Linkages</span>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {getSuspectRelations().map((rel, rIdx) => (
                     <button
                       key={rIdx}
                       onClick={() => setSelected(rel.id)}
-                      className="flex items-center justify-between w-full p-2 bg-[#f8f9fa] border border-[#dadce0] hover:bg-[#e8f0fe] hover:border-[#0b57d0] rounded-xl text-left transition-colors text-[10px]"
+                      className="flex items-center justify-between w-full p-2 bg-[#f8f9fa] border border-[#dadce0] hover:bg-[#e8f0fe] hover:border-[#1a73e8] rounded-lg text-left transition-colors text-[10px]"
                     >
                       <div className="flex items-center gap-2 truncate max-w-[150px]">
                         {rel.photo ? (
-                          <img src={rel.photo} alt={rel.name} className="w-5 h-5 rounded-full object-cover border shrink-0" />
+                          <img src={rel.photo} alt={rel.name} className="w-4 h-4 rounded-full object-cover border border-[#dadce0] shrink-0" />
                         ) : (
-                          <span className="w-2 h-2 rounded-full bg-[#0b57d0] shrink-0" />
+                          <span className="w-2 h-2 rounded-full bg-[#1a73e8] shrink-0" />
                         )}
-                        <span className="font-bold truncate text-[#202124]">{rel.name}</span>
+                        <span className="font-semibold truncate text-[#202124]">{rel.name}</span>
                       </div>
-                      <Badge className="bg-[#e8f0fe] text-[#0b57d0] text-[8px] hover:bg-[#e8f0fe] border border-[#0b57d0]/20 font-bold px-1.5 py-0">
+                      <Badge variant="outline" className="bg-[#e8f0fe] text-[#1a73e8] text-[8px] border-[#aecbfa] font-medium px-1.5 py-0">
                         {rel.relation}
                       </Badge>
                     </button>
@@ -735,19 +1025,19 @@ export function NetworkPage() {
 
               {/* AI Prediction */}
               {selectedNode.meta.predictedNext && (
-                <div className="p-3 rounded-xl bg-[#fef7e0] border border-[#f9ab00]/40 text-[#202124] space-y-1">
-                  <div className="flex items-center gap-1 text-xs font-bold text-[#e37400]">
-                    <Sparkles className="h-3.5 w-3.5 text-[#e37400]" /> Predicted Next Move
+                <div className="p-3 rounded-lg bg-[#fef7e0] border border-[#feefc3] text-[#202124] space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-[#b06000]">
+                    <Sparkles className="h-3.5 w-3.5 text-[#b06000]" /> Predicted Next Move
                   </div>
-                  <p className="font-bold text-xs">{selectedNode.meta.predictedNext.crime} in {selectedNode.meta.district || "Bengaluru"}</p>
+                  <p className="font-semibold text-xs">{selectedNode.meta.predictedNext.crime} in {selectedNode.meta.district || "Bengaluru"}</p>
                   <p className="text-[10px] text-[#5f6368] font-mono">{selectedNode.meta.predictedNext.probability}% Probability · {selectedNode.meta.predictedNext.window}</p>
                 </div>
               )}
 
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t border-[#dadce0]">
                 <Button
                   size="sm"
-                  className="w-full bg-[#0b57d0] text-white rounded-xl font-bold text-xs"
+                  className="w-full bg-[#0b57d0] hover:bg-[#0842a0] text-white rounded-lg font-medium text-xs h-9 flex items-center justify-center gap-1"
                   onClick={() => {
                     if (selectedNode.type === "case") {
                       const cid = selectedNode.id.replace("C-", "");
@@ -795,32 +1085,32 @@ export function NetworkPage() {
                       src={n.meta.photo}
                       alt={n.label}
                       className={cn(
-                        "w-12 h-12 rounded-full object-cover border-2 shadow-sm shrink-0",
-                        n.type === "accused" ? "border-[#d93025]" : n.type === "victim" ? "border-[#1a73e8]" : "border-[#a142f4]"
+                        "w-11 h-11 rounded-full object-cover border shadow-2xs shrink-0",
+                        n.type === "accused" ? "border-[#c5221f]" : "border-[#1a73e8]"
                       )}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-[#f8f9fa] border-2 border-[#dadce0] flex items-center justify-center font-bold text-xs shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-[#f8f9fa] border border-[#dadce0] flex items-center justify-center font-bold text-xs shrink-0">
                       {n.label.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="overflow-hidden flex-1">
-                    <h4 className="font-bold text-sm text-[#202124] truncate">{n.label}</h4>
+                    <h4 className="font-semibold text-sm text-[#202124] truncate">{n.label}</h4>
                     <p className="text-xs text-[#5f6368]">District: {n.meta.district || "Karnataka"}</p>
                     {n.type === "vehicle" && n.meta.vehicleDetails?.makeModel && (
-                      <p className="text-[10px] text-[#a142f4] font-bold truncate">{n.meta.vehicleDetails.makeModel}</p>
+                      <p className="text-[10px] text-[#1a73e8] font-medium truncate">{n.meta.vehicleDetails.makeModel}</p>
                     )}
                   </div>
                 </div>
 
                 {n.type === "accused" && (
                   <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold">
+                    <div className="flex justify-between text-[10px] font-semibold">
                       <span className="text-[#5f6368]">Criminal Risk Score</span>
-                      <span className="text-[#d93025]">{n.meta.riskScore || 75}/100</span>
+                      <span className="text-[#c5221f]">{n.meta.riskScore || 75}/100</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-[#f1f3f4] overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-[#f9ab00] to-[#d93025]" style={{ width: `${n.meta.riskScore || 75}%` }} />
+                      <div className="h-full bg-gradient-to-r from-[#f9ab00] to-[#c5221f]" style={{ width: `${n.meta.riskScore || 75}%` }} />
                     </div>
                   </div>
                 )}
@@ -828,13 +1118,13 @@ export function NetworkPage() {
                 {n.type === "vehicle" && (
                   <Button
                     size="sm"
-                    className="w-full bg-[#f3e8fd] hover:bg-[#a142f4] text-[#a142f4] hover:text-white font-bold text-[11px] rounded-xl h-7 flex items-center justify-center gap-1 border border-[#d7aefb]"
+                    className="w-full bg-[#e8f0fe] hover:bg-[#1557b0] text-[#1a73e8] hover:text-white font-medium text-xs rounded-lg h-8 flex items-center justify-center gap-1 border border-[#aecbfa]"
                     onClick={(e) => {
                       e.stopPropagation();
                       setTrackingVehicleNode(n);
                     }}
                   >
-                    <Navigation className="h-3 w-3" /> Track Travel History
+                    <Navigation className="h-3.5 w-3.5" /> Track Travel History
                   </Button>
                 )}
 
@@ -998,61 +1288,53 @@ export function NetworkPage() {
                 </div>
               </div>
 
-              {/* ANPR Camera Scans List */}
+              {/* ANPR Camera Scans List (Clean Google Workspace Data Table) */}
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
                   <Radio className="h-3.5 w-3.5 text-[#1a73e8]" /> ANPR Camera Scans ({travelLogs.length})
                 </h3>
 
-                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                  {travelLogs.map((cp: TravelCheckpoint, idx: number) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-white border border-[#dadce0] hover:border-[#1a73e8] rounded-xl transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                    >
-                      {/* Left Info */}
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center font-semibold text-xs shrink-0 border border-[#aecbfa]">
-                          #{idx + 1}
-                        </div>
-                        <div className="space-y-0.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold text-sm text-[#202124]">{cp.locationName}</span>
-                            <Badge variant="outline" className="bg-[#f1f3f4] text-[#3c4043] border-[#dadce0] text-[9px] font-mono font-medium">
-                              {cp.cameraType}
-                            </Badge>
+                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[340px] overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#f8f9fa] border-b border-[#dadce0] sticky top-0 z-10">
+                      <tr>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368] text-center w-12">Scan</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Checkpoint Location</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">District</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Timestamp</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Speed & Match</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Occupants</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#dadce0] bg-white">
+                      {travelLogs.map((cp: TravelCheckpoint, idx: number) => (
+                        <tr key={idx} className="hover:bg-[#f8f9fa] transition-colors">
+                          <td className="py-2.5 px-3 text-center font-bold text-[#1a73e8]">#{idx + 1}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-semibold text-[#202124] block">{cp.locationName}</span>
+                            <span className="text-[10px] text-[#5f6368] font-mono">{cp.cameraType} · {cp.checkpointId}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-[#202124]">{cp.district}</td>
+                          <td className="py-2.5 px-3 font-mono text-[#1a73e8] font-medium">{cp.timestamp}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-mono font-semibold text-[#202124]">{cp.speedKmph} km/h</span>
+                            <span className="text-[10px] text-[#5f6368] block font-mono">ANPR: {cp.anprConfidence}%</span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="bg-[#f1f3f4] text-[#3c4043] px-2 py-0.5 rounded border border-[#dadce0] font-mono text-[10px]">
+                              {(cp.occupantsDetected || []).join(", ") || "Driver Only"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
                             <Badge variant="outline" className="bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0] text-[9px] font-medium">
                               {cp.flagStatus}
                             </Badge>
-                          </div>
-                          <p className="text-xs text-[#5f6368]">
-                            District: <span className="font-semibold text-[#202124]">{cp.district}</span> · Timestamp: <span className="font-mono text-[#1a73e8] font-semibold">{cp.timestamp}</span> · Camera ID: <span className="font-mono text-[#5f6368]">{cp.checkpointId}</span>
-                          </p>
-                          {cp.occupantsDetected && cp.occupantsDetected.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-[#5f6368] pt-0.5">
-                              <span className="font-medium text-[#202124]">Occupants:</span>
-                              <span className="bg-[#f1f3f4] text-[#3c4043] px-2 py-0.5 rounded border border-[#dadce0] font-mono text-[10px]">{cp.occupantsDetected.join(", ")}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right Specs & Snapshot */}
-                      <div className="flex items-center gap-4 shrink-0 justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-[#dadce0]">
-                        <div className="text-right text-xs">
-                          <p className="font-mono font-semibold text-[#1a73e8] text-sm">{cp.speedKmph} km/h</p>
-                          <p className="text-[10px] text-[#5f6368] font-mono">ANPR Match: {cp.anprConfidence}%</p>
-                        </div>
-                        <div className="relative">
-                          <img
-                            src={cp.imageSnapshot}
-                            alt={`ANPR scan for ${targetPlate}`}
-                            className="w-14 h-10 rounded object-cover border border-[#dadce0] shrink-0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -1106,7 +1388,10 @@ export function NetworkPage() {
                     size="sm"
                     variant="outline"
                     className="border-[#dadce0] text-[#3c4043] hover:bg-[#f1f3f4] font-medium text-xs rounded-lg h-9 px-4"
-                    onClick={() => toast.info(`ANPR Travel Log PDF for vehicle ${targetPlate} exported!`)}
+                    onClick={() => {
+                      exportVehiclePdfReport(targetPlate, { makeModel: vehMakeModel, ownerName: vehOwner, category: vehCategory, district: trackingVehicleNode.meta.district }, travelLogs);
+                      toast.success(`Generated Official ANPR PDF Forensic Report for ${targetPlate}`);
+                    }}
                   >
                     <FileText className="mr-1.5 h-3.5 w-3.5 text-[#1a73e8]" /> Export PDF Report
                   </Button>
@@ -1174,7 +1459,7 @@ export function NetworkPage() {
                       Call Detail Records (CDR) & Intercept Feed
                     </h2>
                     <p className="text-xs text-[#5f6368]">
-                      Subscriber Number: <span className="font-mono font-semibold text-[#202124]">{targetPhone}</span> · Real-Time Telecom Tower Intercept Logs
+                      Subscriber Line: <span className="font-mono font-semibold text-[#202124]">{targetPhone}</span> · Real-Time Telecom Tower Intercept Logs
                     </p>
                   </div>
                 </div>
@@ -1233,7 +1518,7 @@ export function NetworkPage() {
                 </div>
               </div>
 
-              {/* CDR Call Logs Table / List */}
+              {/* CDR Call Logs Feed (Clean Google Workspace Data Table) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f6368] flex items-center gap-1.5">
@@ -1242,65 +1527,58 @@ export function NetworkPage() {
                   <span className="text-[10px] text-[#5f6368] font-mono">{targetPhone}</span>
                 </div>
 
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {callLogs.map((log) => (
-                    <div
-                      key={log.callId}
-                      className={cn(
-                        "p-3 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs transition-all",
-                        log.callStatus === "Intercept Flagged" || log.type === "Encrypted VOIP"
-                          ? "bg-[#fce8e6]/30 border-[#f8b4b0] hover:bg-[#fce8e6]/50"
-                          : "bg-white border-[#dadce0] hover:border-[#0284c7]"
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-xs shrink-0 border mt-0.5",
-                          log.type === "Incoming" ? "bg-[#e6f4ea] text-[#137333] border-[#ceead6]" :
-                          log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
-                          log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" :
-                          "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
-                        )}>
-                          {log.type === "Incoming" ? "📥" : log.type === "Outgoing" ? "📤" : log.type === "Encrypted VOIP" ? "🔐" : "💬"}
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-semibold text-sm text-[#202124]">{log.otherPartyNumber}</span>
-                            <Badge variant="outline" className="bg-[#f1f3f4] text-[#3c4043] border-[#dadce0] text-[9px] font-semibold">
-                              {log.otherPartyName}
-                            </Badge>
+                <div className="border border-[#dadce0] rounded-xl overflow-hidden max-h-[320px] overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#f8f9fa] border-b border-[#dadce0] sticky top-0 z-10">
+                      <tr>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368] text-center w-12">Call</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Type</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Target Contact Number</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Contact Name / Role</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Cell Tower & District</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Timestamp</th>
+                        <th className="py-2.5 px-3 text-[10px] uppercase font-bold text-[#5f6368]">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#dadce0] bg-white">
+                      {callLogs.map((log, idx) => (
+                        <tr
+                          key={log.callId}
+                          className={cn(
+                            "hover:bg-[#f8f9fa] transition-colors",
+                            (log.callStatus === "Intercept Flagged" || log.type === "Encrypted VOIP") && "bg-[#fce8e6]/20"
+                          )}
+                        >
+                          <td className="py-2.5 px-3 text-center font-bold text-[#0284c7]">#{idx + 1}</td>
+                          <td className="py-2.5 px-3">
                             <Badge variant="outline" className={cn(
-                              "text-[9px] font-mono font-semibold",
+                              "text-[9px] font-mono font-medium px-2 py-0.5",
                               log.type === "Incoming" ? "bg-[#e6f4ea] text-[#137333] border-[#ceead6]" :
                               log.type === "Outgoing" ? "bg-[#e8f0fe] text-[#1a73e8] border-[#aecbfa]" :
                               log.type === "Encrypted VOIP" ? "bg-[#fce8e6] text-[#c5221f] border-[#f8b4b0]" : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
                             )}>
                               {log.type}
                             </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-[#202124]">{log.otherPartyNumber}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-semibold text-[#202124] block">{log.otherPartyName}</span>
                             {log.callStatus === "Intercept Flagged" && (
-                              <Badge className="bg-[#c5221f] text-white text-[9px] font-medium">
-                                Flagged Intercept
-                              </Badge>
+                              <span className="text-[9px] font-bold text-[#c5221f] uppercase tracking-wider block">Flagged Intercept</span>
                             )}
-                          </div>
-
-                          <p className="text-xs text-[#5f6368]">
-                            Cell Tower: <span className="font-medium text-[#202124]">{log.towerLocation}</span> ({log.towerId}) · District: <span className="font-medium text-[#202124]">{log.district}</span> · Timestamp: <span className="font-mono text-[#0284c7] font-semibold">{log.timestamp}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0 self-end md:self-center border-t md:border-t-0 pt-2 md:pt-0 border-[#dadce0] w-full md:w-auto justify-between md:justify-end">
-                        <div className="text-right text-xs">
-                          <span className="font-mono font-semibold text-xs text-[#0284c7]">
-                            {log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Answer)"}
-                          </span>
-                          <span className="text-[10px] text-[#5f6368] block font-mono">IMEI: {log.imei.slice(-6)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-medium text-[#202124] block">{log.towerLocation}</span>
+                            <span className="text-[10px] text-[#5f6368]">{log.district} · {log.towerId}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-[#1a73e8] font-medium">{log.timestamp}</td>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-[#0284c7]">
+                            {log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Ans)"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -1351,7 +1629,10 @@ export function NetworkPage() {
                     size="sm"
                     variant="outline"
                     className="border-[#dadce0] text-[#3c4043] hover:bg-[#f1f3f4] font-medium text-xs rounded-lg h-9 px-4"
-                    onClick={() => toast.info(`CDR Telemetry PDF Forensic Report for number ${targetPhone} exported!`)}
+                    onClick={() => {
+                      exportPhonePdfReport(targetPhone, subscriber, operator, imei, districtName, callLogs);
+                      toast.success(`Generated Official CDR PDF Forensic Report for ${targetPhone}`);
+                    }}
                   >
                     <FileText className="mr-1.5 h-3.5 w-3.5 text-[#0284c7]" /> Export PDF Report
                   </Button>
