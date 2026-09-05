@@ -117,11 +117,11 @@ function Sociological() {
   const correlationMatrix = useMemo(() => {
     if (!SOCIO || SOCIO.length === 0) return [];
     const arrays: Record<string, number[]> = {
-      urbanization: SOCIO.map(s => s.urbanization),
-      literacy: SOCIO.map(s => s.literacy),
-      population: SOCIO.map(s => s.population),
-      crimeRate: SOCIO.map(s => s.crimeRate),
-      cyberShare: SOCIO.map(s => s.cyberShare || 0)
+      urbanization: SOCIO.map((s: any) => s.urbanization),
+      literacy: SOCIO.map((s: any) => s.literacy),
+      population: SOCIO.map((s: any) => s.population),
+      crimeRate: SOCIO.map((s: any) => s.crimeRate),
+      cyberShare: SOCIO.map((s: any) => s.cyberShare || 0)
     };
     return corrVariables.map((v1) => {
       return corrVariables.map((v2) => {
@@ -148,13 +148,13 @@ function Sociological() {
 
   // Calculate State Averages
   const totalCount = SOCIO ? SOCIO.length : 1;
-  const avgUrban = SOCIO ? Math.round(SOCIO.reduce((sum, s) => sum + s.urbanization, 0) / totalCount * 10) / 10 : 38.5;
-  const avgLiteracy = SOCIO ? Math.round(SOCIO.reduce((sum, s) => sum + s.literacy, 0) / totalCount * 10) / 10 : 75.3;
-  const avgCrimeRate = SOCIO ? Math.round(SOCIO.reduce((sum, s) => sum + s.crimeRate, 0) / totalCount * 10) / 10 : 12.8;
-  const avgCyberShare = SOCIO ? Math.round(SOCIO.reduce((sum, s) => sum + (s.cyberShare || 0), 0) / totalCount * 10) / 10 : 8.4;
+  const avgUrban = SOCIO ? Math.round(SOCIO.reduce((sum: number, s: any) => sum + s.urbanization, 0) / totalCount * 10) / 10 : 38.5;
+  const avgLiteracy = SOCIO ? Math.round(SOCIO.reduce((sum: number, s: any) => sum + s.literacy, 0) / totalCount * 10) / 10 : 75.3;
+  const avgCrimeRate = SOCIO ? Math.round(SOCIO.reduce((sum: number, s: any) => sum + s.crimeRate, 0) / totalCount * 10) / 10 : 12.8;
+  const avgCyberShare = SOCIO ? Math.round(SOCIO.reduce((sum: number, s: any) => sum + (s.cyberShare || 0), 0) / totalCount * 10) / 10 : 8.4;
 
   // Selected District Data
-  const districtData = SOCIO ? SOCIO.find(s => s.district === selectedDistrict) : null;
+  const districtData = SOCIO ? SOCIO.find((s: any) => s.district === selectedDistrict) : null;
 
   // Simulated AI Regression Models (SHAP Values/Risk projections)
   const baselineCrime = avgCrimeRate;
@@ -417,7 +417,7 @@ function Sociological() {
                 onChange={(e) => setSelectedDistrict(e.target.value)}
                 className="form-select w-full border border-border bg-paper px-3 py-2 rounded-md text-sm font-semibold"
               >
-                {SOCIO && SOCIO.map(s => (
+                {SOCIO && SOCIO.map((s: any) => (
                   <option key={s.district} value={s.district}>{s.district}</option>
                 ))}
               </select>

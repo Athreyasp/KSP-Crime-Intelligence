@@ -1171,8 +1171,24 @@ function NewCasePage() {
       setStep(2);
       return;
     }
+    const nowTs = Date.now();
+    if (infoReceivedPSDate && new Date(infoReceivedPSDate).getTime() > nowTs) {
+      toast.error("Info Received Date & Time cannot be in the future.");
+      setStep(2);
+      return;
+    }
     if (!occurrencePlace.trim()) {
       toast.error("Please enter occurrence place.");
+      setStep(3);
+      return;
+    }
+    if (incidentFromDate && new Date(incidentFromDate).getTime() > nowTs) {
+      toast.error("Incident From Date & Time cannot be in the future.");
+      setStep(3);
+      return;
+    }
+    if (incidentToDate && new Date(incidentToDate).getTime() > nowTs) {
+      toast.error("Incident To Date & Time cannot be in the future.");
       setStep(3);
       return;
     }
@@ -1637,7 +1653,21 @@ function NewCasePage() {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Info Received at PS Date & Time (InfoReceivedPSDate) *</label>
-                <Input type="datetime-local" value={infoReceivedPSDate} onChange={e => setInfoReceivedPSDate(e.target.value)} className="bg-surface-2 border-border" required />
+                <Input 
+                  type="datetime-local" 
+                  value={infoReceivedPSDate} 
+                  max={formatDateLocal(new Date())}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val && new Date(val).getTime() > Date.now()) {
+                      toast.error("Future date & time cannot be selected.");
+                      return;
+                    }
+                    setInfoReceivedPSDate(val);
+                  }} 
+                  className="bg-surface-2 border-border" 
+                  required 
+                />
               </div>
 
               <div className="flex flex-col gap-1 md:col-span-3 pt-2 border-t border-border/40">
@@ -1718,12 +1748,40 @@ function NewCasePage() {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident From (IncidentFromDate) *</label>
-                <Input type="datetime-local" value={incidentFromDate} onChange={e => setIncidentFromDate(e.target.value)} className="bg-surface-2 border-border" required />
+                <Input 
+                  type="datetime-local" 
+                  value={incidentFromDate} 
+                  max={formatDateLocal(new Date())}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val && new Date(val).getTime() > Date.now()) {
+                      toast.error("Future date & time cannot be selected.");
+                      return;
+                    }
+                    setIncidentFromDate(val);
+                  }} 
+                  className="bg-surface-2 border-border" 
+                  required 
+                />
               </div>
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Incident To (IncidentToDate) *</label>
-                <Input type="datetime-local" value={incidentToDate} onChange={e => setIncidentToDate(e.target.value)} className="bg-surface-2 border-border" required />
+                <Input 
+                  type="datetime-local" 
+                  value={incidentToDate} 
+                  max={formatDateLocal(new Date())}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val && new Date(val).getTime() > Date.now()) {
+                      toast.error("Future date & time cannot be selected.");
+                      return;
+                    }
+                    setIncidentToDate(val);
+                  }} 
+                  className="bg-surface-2 border-border" 
+                  required 
+                />
               </div>
 
               <div className="flex gap-2">
@@ -2038,10 +2096,10 @@ function NewCasePage() {
 
                     {/* Behavioral DNA preview if offender is found in the database */}
                     {(() => {
-                      const offenderMatch = offenders.find(o => o.name.toLowerCase() === acc.name.toLowerCase());
+                      const offenderMatch = offenders.find((o: any) => o.name.toLowerCase() === acc.name.toLowerCase());
                       if (!offenderMatch) return null;
                       
-                      const associatesCount = allCases.filter(c => c.accused.some(a => a.name.toLowerCase().includes(acc.name.toLowerCase()))).length;
+                      const associatesCount = allCases.filter((c: any) => c.accused.some((a: any) => a.name.toLowerCase().includes(acc.name.toLowerCase()))).length;
                       const mobility = Math.min(100, (offenderMatch.jurisdictions?.length || 1) * 33);
                       
                       return (

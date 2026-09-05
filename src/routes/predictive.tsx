@@ -53,7 +53,7 @@ function Predictive() {
   const topRisk = useMemo(() => {
     return computedRiskStats.slice(0, 6).map(r => {
       const distInfo = DISTRICTS.find(d => d.name === r.districtName) || DISTRICTS[0];
-      const stats = DISTRICT_STATS.find(s => s.district.name === r.districtName) || { heinous: 0, arrests: 0 };
+      const stats = DISTRICT_STATS.find((s: any) => s.district.name === r.districtName) || { heinous: 0, arrests: 0 };
       return {
         district: distInfo,
         total: r.totalCrimes,

@@ -376,7 +376,7 @@ function exportPhonePdfReport(targetPhone: string, subscriber: string, operator:
 
 export function NetworkPage() {
   const navigate = useNavigate();
-  const { networkRich, cases } = useDb();
+  const { networkRich, cases: CASES, offenders: OFFENDERS } = useDb();
   const { nodes, links } = useForceLayout(networkRich);
   const { t, language } = useLanguage();
 
@@ -1422,6 +1422,12 @@ export function NetworkPage() {
         const imei = trackingPhoneNode.meta.phoneDetails?.imei || "864902047132984";
         const districtName = trackingPhoneNode.meta.district || "Bengaluru Urban";
 
+        const subscriberPhoto = trackingPhoneNode.meta.photo || 
+          (trackingPhoneNode.meta.phoneDetails as any)?.photo ||
+          (CASES || []).flatMap((c: any) => c.accused || []).find((a: any) => a.name && subscriber && (a.name.toLowerCase().includes(subscriber.toLowerCase()) || subscriber.toLowerCase().includes(a.name.toLowerCase())))?.photo ||
+          (OFFENDERS || []).find((o: any) => o.name && subscriber && (o.name.toLowerCase().includes(subscriber.toLowerCase()) || subscriber.toLowerCase().includes(o.name.toLowerCase())))?.photo ||
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80";
+
         const callLogs: CallLogEntry[] = (trackingPhoneNode.meta.callLogs && trackingPhoneNode.meta.callLogs.length > 0)
           ? trackingPhoneNode.meta.callLogs
           : createCallLogs(targetPhone, districtName, subscriber);
@@ -1474,16 +1480,28 @@ export function NetworkPage() {
 
               {/* Phone Subscriber Specs & Overview Banner */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f8f9fa] border border-[#dadce0] rounded-xl p-4">
-                {/* Card Info */}
-                <div className="bg-white border border-[#dadce0] rounded-lg p-3 flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#0284c7] block mb-1">Subscriber Identity</span>
-                    <h3 className="font-semibold text-sm text-[#202124]">{subscriber}</h3>
-                    <p className="font-mono font-semibold text-xs text-[#0284c7] mt-0.5">{targetPhone}</p>
+                {/* Card Info with Subscriber Photo */}
+                <div className="bg-white border border-[#dadce0] rounded-lg p-3 flex items-center gap-3">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-[#bae6fd] bg-slate-100 shrink-0 shadow-xs">
+                    <img 
+                      src={subscriberPhoto} 
+                      alt={subscriber} 
+                      className="w-full h-full object-cover" 
+                    />
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[7.5px] font-bold text-center py-0.5 uppercase tracking-tighter">
+                      SUBSCRIBER
+                    </div>
                   </div>
-                  <div className="pt-2 border-t border-[#f1f3f4] flex items-center justify-between text-[10px] text-[#5f6368]">
-                    <span>Operator: <strong className="text-[#202124] font-medium">{operator}</strong></span>
-                    <span>Status: <strong className="text-[#137333] font-medium">Active SIM</strong></span>
+                  <div className="min-w-0 flex-1 flex flex-col justify-between h-full">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#0284c7] block mb-0.5">Subscriber Identity</span>
+                      <h3 className="font-semibold text-sm text-[#202124] truncate">{subscriber}</h3>
+                      <p className="font-mono font-semibold text-xs text-[#0284c7] mt-0.5">{targetPhone}</p>
+                    </div>
+                    <div className="pt-1.5 border-t border-[#f1f3f4] flex items-center justify-between text-[10px] text-[#5f6368] mt-1">
+                      <span>Operator: <strong className="text-[#202124] font-medium">{operator}</strong></span>
+                      <span>Status: <strong className="text-[#137333] font-medium">Active SIM</strong></span>
+                    </div>
                   </div>
                 </div>
 

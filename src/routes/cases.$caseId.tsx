@@ -50,7 +50,7 @@ function CaseDetail() {
   const { caseId } = Route.useParams();
   const router = useRouter();
   const { cases } = useDb();
-  const c = cases.find(x => x.caseMasterId === Number(caseId)) || cases[0];
+  const c = cases.find((x: any) => x.caseMasterId === Number(caseId)) || cases[0];
   const [activeTab, setActiveTab] = useState<"overview" | "legal" | "complainant" | "accused" | "logs">("overview");
   const [printLang, setPrintLang] = useState<"en" | "kn" | "bilingual">("bilingual");
 
@@ -675,7 +675,15 @@ function CaseDetail() {
                     <input
                       type="date"
                       value={editChargesheetDate}
-                      onChange={(e) => setEditChargesheetDate(e.target.value)}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val && new Date(val).getTime() > Date.now()) {
+                          toast.error("Future date cannot be selected.");
+                          return;
+                        }
+                        setEditChargesheetDate(val);
+                      }}
                       className="w-full border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 rounded-xl text-xs text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
                       required
                     />
@@ -738,7 +746,15 @@ function CaseDetail() {
               <input
                 type="date"
                 value={arrestDate}
-                onChange={(e) => setArrestDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && new Date(val).getTime() > Date.now()) {
+                    toast.error("Future date cannot be selected.");
+                    return;
+                  }
+                  setArrestDate(val);
+                }}
                 className="w-full border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 rounded-xl text-xs font-semibold text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
                 required
               />

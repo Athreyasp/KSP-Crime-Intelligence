@@ -241,7 +241,7 @@ function Hotspots() {
     const districtQuery = params.get("district");
     if (districtQuery && DISTRICT_STATS.length > 0) {
       const queryLower = districtQuery.toLowerCase();
-      const match = DISTRICT_STATS.find(s => 
+      const match = DISTRICT_STATS.find((s: any) => 
         s.district.name.toLowerCase() === queryLower ||
         toGeo(s.district.name).toLowerCase() === queryLower ||
         toGeo(s.district.name).toLowerCase().includes(queryLower) ||
@@ -258,24 +258,24 @@ function Hotspots() {
   }, [DISTRICT_STATS, hasProcessedParam]);
 
   const filteredDistrictStats = useMemo(() => {
-    return DISTRICT_STATS.map(s => {
-      let cases = (allCases || []).filter(c => c.district.id === s.district.id || toGeoSVG(c.district.name) === toGeoSVG(s.district.name));
-      if (crimeFilter !== "all") cases = cases.filter(c => c.crimeHead.name === crimeFilter);
-      if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
+    return DISTRICT_STATS.map((s: any) => {
+      let cases = (allCases || []).filter((c: any) => c.district.id === s.district.id || toGeoSVG(c.district.name) === toGeoSVG(s.district.name));
+      if (crimeFilter !== "all") cases = cases.filter((c: any) => c.crimeHead.name === crimeFilter);
+      if (hour[0] > 0 || hour[1] < 23) cases = cases.filter((c: any) => c.hour >= hour[0] && c.hour <= hour[1]);
       const total = cases.length;
-      const heinous = cases.filter(c => c.gravity === "Heinous").length;
-      const arrests = cases.reduce((acc, c) => acc + (c.accused?.filter(a => a.arrestId).length || 0), 0);
+      const heinous = cases.filter((c: any) => c.gravity === "Heinous").length;
+      const arrests = cases.reduce((acc: number, c: any) => acc + (c.accused?.filter((a: any) => a.arrestId).length || 0), 0);
       return { ...s, total, heinous, arrests };
     });
   }, [DISTRICT_STATS, allCases, crimeFilter, hour]);
 
-  const filteredMaxTotal = Math.max(...filteredDistrictStats.map(d => d.total), 1);
-  const filteredMinTotal = Math.min(...filteredDistrictStats.map(d => d.total), 0);
+  const filteredMaxTotal = Math.max(...filteredDistrictStats.map((d: any) => d.total), 1);
+  const filteredMinTotal = Math.min(...filteredDistrictStats.map((d: any) => d.total), 0);
 
-  const selected = filteredDistrictStats.find(d => d.district.id === selectedId) ?? filteredDistrictStats[0] ?? { district: { id: 1, name: "Bengaluru Urban" }, total: 0, heinous: 0, arrests: 0, riskScore: 50, spike: 0 };
+  const selected = filteredDistrictStats.find((d: any) => d.district.id === selectedId) ?? filteredDistrictStats[0] ?? { district: { id: 1, name: "Bengaluru Urban" }, total: 0, heinous: 0, arrests: 0, riskScore: 50, spike: 0 };
   const activeDistrict = useMemo(() => {
     const targetId = hoveredId ?? selectedId;
-    return filteredDistrictStats.find(d => d.district.id === targetId) ?? selected;
+    return filteredDistrictStats.find((d: any) => d.district.id === targetId) ?? selected;
   }, [filteredDistrictStats, hoveredId, selectedId, selected]);
 
   const lowT = thresholds[0] / 100;
@@ -289,16 +289,16 @@ function Hotspots() {
   const allAreas: SubArea[] = useMemo(() => computeSubAreas(selected.district.id, DISTRICT_STATS), [selected, DISTRICT_STATS]);
 
   const activeCases = useMemo(() => {
-    let cases = (allCases || []).filter(c => c.district.id === activeDistrict.district.id || toGeoSVG(c.district.name) === toGeoSVG(activeDistrict.district.name));
-    if (crimeFilter !== "all") cases = cases.filter(c => c.crimeHead.name === crimeFilter);
-    if (hour[0] > 0 || hour[1] < 23) cases = cases.filter(c => c.hour >= hour[0] && c.hour <= hour[1]);
+    let cases = (allCases || []).filter((c: any) => c.district.id === activeDistrict.district.id || toGeoSVG(c.district.name) === toGeoSVG(activeDistrict.district.name));
+    if (crimeFilter !== "all") cases = cases.filter((c: any) => c.crimeHead.name === crimeFilter);
+    if (hour[0] > 0 || hour[1] < 23) cases = cases.filter((c: any) => c.hour >= hour[0] && c.hour <= hour[1]);
     return cases;
   }, [allCases, activeDistrict, crimeFilter, hour]);
 
   // 1. Hourly 24h profile
   const activeHourly = useMemo(() => {
     const counts = Array(24).fill(0);
-    activeCases.forEach(c => {
+    activeCases.forEach((c: any) => {
       const h = typeof c.hour === "number" && c.hour >= 0 && c.hour < 24 ? c.hour : 10;
       counts[h] = (counts[h] || 0) + 1;
     });
@@ -316,7 +316,7 @@ function Hotspots() {
   const activeTaxonomy = useMemo(() => {
     const total = activeCases.length || 1;
     return CRIME_HEADS.map(ch => {
-      const count = activeCases.filter(c => c.crimeHead.id === ch.id).length;
+      const count = activeCases.filter((c: any) => c.crimeHead.id === ch.id).length;
       return {
         ...ch,
         count,
@@ -328,7 +328,7 @@ function Hotspots() {
   // 3. Gravity breakdown (Heinous vs Non-Heinous)
   const activeGravity = useMemo(() => {
     const total = activeCases.length || 1;
-    const heinousCount = activeCases.filter(c => c.gravity === "Heinous").length;
+    const heinousCount = activeCases.filter((c: any) => c.gravity === "Heinous").length;
     const nonHeinousCount = Math.max(0, total - heinousCount);
     const heinousPct = Math.round((heinousCount / total) * 100);
     return { heinousCount, nonHeinousCount, heinousPct };
@@ -337,10 +337,10 @@ function Hotspots() {
   // 4. Status disposal mix
   const activeStatus = useMemo(() => {
     const total = activeCases.length || 1;
-    const pending = activeCases.filter(c => c.status === "Under Investigation").length;
-    const chargeSheeted = activeCases.filter(c => c.status === "Charge Sheeted").length;
-    const closed = activeCases.filter(c => c.status === "Closed").length;
-    const trial = activeCases.filter(c => c.status === "Pending Trial").length;
+    const pending = activeCases.filter((c: any) => c.status === "Under Investigation").length;
+    const chargeSheeted = activeCases.filter((c: any) => c.status === "Charge Sheeted").length;
+    const closed = activeCases.filter((c: any) => c.status === "Closed").length;
+    const trial = activeCases.filter((c: any) => c.status === "Pending Trial").length;
     return [
       { name: "Under Inv.", count: pending, color: "#f59e0b", pct: Math.round((pending / total) * 100) },
       { name: "Charge Sheeted", count: chargeSheeted, color: "#22c3e6", pct: Math.round((chargeSheeted / total) * 100) },
@@ -353,7 +353,7 @@ function Hotspots() {
   const activeDayOfWeek = useMemo(() => {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const counts: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
-    activeCases.forEach(c => {
+    activeCases.forEach((c: any) => {
       const dt = new Date(c.registeredDate || c.incidentDate || Date.now());
       const dayIdx = (dt.getDay() + 6) % 7; // Mon = 0
       const dName = days[dayIdx] || "Mon";
@@ -392,7 +392,7 @@ function Hotspots() {
 
   const areaCases = useMemo(() => {
     if (!selectedArea) return [];
-    return allCases.filter(c => {
+    return allCases.filter((c: any) => {
       if (!c.latitude || !c.longitude) return false;
       const dist = haversineDistance(c.latitude, c.longitude, selectedArea.lat, selectedArea.lng);
       return dist <= 3.5;
@@ -402,7 +402,7 @@ function Hotspots() {
   const localOffenders = useMemo(() => {
     if (!selectedArea || !allOffenders) return [];
     return allOffenders
-      .filter(o => o.jurisdictions.includes(selected.district.name))
+      .filter((o: any) => o.jurisdictions.includes(selected.district.name))
       .slice(0, 3);
   }, [allOffenders, selected, selectedArea]);
 
@@ -428,7 +428,7 @@ function Hotspots() {
       downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `hotspot-areas_${label}.csv`);
     } else {
       const header = "District,Total FIRs,Heinous,Arrests,Risk Score,Spike %\n";
-      const rows = DISTRICT_STATS.map(s =>
+      const rows = DISTRICT_STATS.map((s: any) =>
         [s.district.name, s.total, s.heinous, s.arrests, s.riskScore, s.spike]
           .map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
       ).join("\n");
@@ -867,7 +867,7 @@ function Hotspots() {
                     <span>{t("Geographic Case Log")} ({areaCases.length})</span>
                   </div>
                   <div className="max-h-[190px] overflow-y-auto border border-border/60 rounded-xl divide-y divide-border/40 bg-white">
-                    {areaCases.map(c => {
+                    {areaCases.map((c: any) => {
                       const isSelected = selectedMicroId === String(c.caseMasterId);
                       return (
                         <div
@@ -896,7 +896,7 @@ function Hotspots() {
                 <div className="space-y-2">
                   <div className="text-xs font-bold text-foreground">{t("Repeat Offender Watchlist")}</div>
                   <div className="space-y-1.5">
-                    {localOffenders.map(o => (
+                    {localOffenders.map((o: any) => (
                       <div key={o.id} className="flex items-center justify-between p-2 rounded-xl border border-border/60 bg-slate-50/50">
                         <div className="flex items-center gap-2">
                           <div className="h-6 w-6 rounded-full bg-blue-100/70 border border-blue-200 flex items-center justify-center text-[10px] font-bold text-blue-700 uppercase shrink-0">
@@ -904,7 +904,7 @@ function Hotspots() {
                           </div>
                           <div>
                             <div className="text-xs font-bold text-[#0f172a]">{o.name}</div>
-                            <div className="text-[9px] text-muted-foreground leading-tight">{o.moTags.slice(0, 2).map(tg => t(tg)).join(", ")}</div>
+                            <div className="text-[9px] text-muted-foreground leading-tight">{o.moTags.slice(0, 2).map((tg: string) => t(tg)).join(", ")}</div>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
@@ -1175,7 +1175,7 @@ function Hotspots() {
         <CardHeader className="pb-2"><CardTitle className="text-base">Emerging Trend Alerts</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-3">
-            {DISTRICT_STATS.filter(d => d.spike > 15).slice(0, 6).map(d => (
+            {DISTRICT_STATS.filter((d: any) => d.spike > 15).slice(0, 6).map((d: any) => (
               <button
                 key={d.district.id}
                 onClick={() => openDistrict(d.district.id)}

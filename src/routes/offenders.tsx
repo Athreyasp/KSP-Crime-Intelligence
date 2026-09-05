@@ -43,34 +43,34 @@ function OffendersPage() {
     setActiveTab("overview");
   };
 
-  const filtered = OFFENDERS.filter(o => {
+  const filtered = OFFENDERS.filter((o: any) => {
     const matchesSearch = o.name.toLowerCase().includes(q.toLowerCase());
     if (!matchesSearch) return false;
     if (filterTab === "high") return o.riskScore > 80;
     if (filterTab === "property") {
-      return o.moTags.some(t => {
+      return o.moTags.some((t: string) => {
         const low = t.toLowerCase();
         return low.includes("theft") || low.includes("burglary") || low.includes("shutter") || low.includes("lock") || low.includes("housebreak") || low.includes("shop");
       });
     }
     if (filterTab === "violent") {
-      return o.moTags.some(t => {
+      return o.moTags.some((t: string) => {
         const low = t.toLowerCase();
         return low.includes("assault") || low.includes("murder") || low.includes("snatch") || low.includes("robbery") || low.includes("weapon");
       });
     }
     return true;
-  }).sort((a, b) => b.riskScore - a.riskScore);
+  }).sort((a: any, b: any) => b.riskScore - a.riskScore);
 
-  const active = OFFENDERS.find(o => o.id === openId) || OFFENDERS[0];
+  const active = OFFENDERS.find((o: any) => o.id === openId) || OFFENDERS[0];
 
   // Extract a real database uploaded photo for the active offender if available
   const offenderPhoto = useMemo(() => {
     if (!active) return null;
     for (const cid of active.cases) {
-      const c = CASES.find(x => x.caseMasterId === cid);
+      const c = CASES.find((x: any) => x.caseMasterId === cid);
       if (c && c.accused) {
-        const found = c.accused.find(a => a.name.toLowerCase().includes(active.name.toLowerCase()) || active.name.toLowerCase().includes(a.name.toLowerCase()));
+        const found = c.accused.find((a: any) => a.name.toLowerCase().includes(active.name.toLowerCase()) || active.name.toLowerCase().includes(a.name.toLowerCase()));
         if (found && found.photo) {
           return found.photo;
         }
@@ -162,7 +162,7 @@ function OffendersPage() {
               </div>
 
               <div className="max-h-[520px] overflow-y-auto divide-y divide-[#dadce0] rounded-xl border border-[#dadce0]">
-                {filtered.map(o => {
+                {filtered.map((o: any) => {
                   const isActive = openId === o.id;
                   const isHighRisk = o.riskScore > 80;
                   return (
@@ -181,7 +181,7 @@ function OffendersPage() {
                           ? "bg-[#fce8e6] border-[#f8b4b0] text-[#c5221f]" 
                           : "bg-[#e8f0fe] border-[#aecbfa] text-[#1a73e8]"
                       }`}>
-                        {o.name.split(" ").map(x => x[0]).join("")}
+                        {o.name.split(" ").map((x: string) => x[0]).join("")}
                       </div>
 
                       {/* Info Detail */}
@@ -321,7 +321,7 @@ function OffendersPage() {
                         <Fingerprint className="h-4 w-4 text-[#1a73e8]" /> {t("Modus Operandi Pattern")}
                       </p>
                       <div className="flex flex-wrap gap-1.5 p-3 rounded-xl border border-[#dadce0] bg-[#f8f9fa]">
-                        {active.moTags.map(m => (
+                        {active.moTags.map((m: string) => (
                           <Badge key={m} variant="outline" className="bg-[#e8f0fe] border-[#aecbfa] text-[#1a73e8] text-xs py-0.5 font-medium rounded-md">
                             {m}
                           </Badge>
@@ -334,7 +334,7 @@ function OffendersPage() {
                         <MapPin className="h-4 w-4 text-[#137333]" /> {t("Operations Sectors")}
                       </p>
                       <div className="flex flex-wrap gap-1.5 p-3 rounded-xl border border-[#dadce0] bg-[#f8f9fa]">
-                        {active.jurisdictions.map(j => (
+                        {active.jurisdictions.map((j: string) => (
                           <Badge key={j} variant="outline" className="bg-[#e6f4ea] border-[#ceead6] text-[#137333] text-xs py-0.5 font-medium rounded-md">
                             {j}
                           </Badge>
@@ -360,7 +360,7 @@ function OffendersPage() {
                 {activeTab === "timeline" && (() => {
                   // Sort cases chronologically
                   const sorted = [...active.cases]
-                    .map(cid => CASES.find(x => x.caseMasterId === cid))
+                    .map((cid: string) => CASES.find((x: any) => x.caseMasterId === cid))
                     .filter(Boolean)
                     .sort((a, b) => new Date(a!.registeredDate || a!.incidentDate).getTime() - new Date(b!.registeredDate || b!.incidentDate).getTime());
 
@@ -448,7 +448,7 @@ function DNAPanel({ offender }: { offender: any }) {
   }, [offender, CASES, primaryAssociates]);
 
   const secondaryOffender = useMemo(() => {
-    return OFFENDERS.find(o => o.id === compareId) || null;
+    return OFFENDERS.find((o: any) => o.id === compareId) || null;
   }, [compareId, OFFENDERS]);
 
   const secondaryAssociates = OFFENDER_ASSOCIATES[compareId] ?? [];
@@ -566,7 +566,7 @@ function DNAPanel({ offender }: { offender: any }) {
             className="bg-[#f8f9fa] border border-[#dadce0] text-[11.5px] rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-[#1a73e8] text-[#202124] font-medium outline-none"
           >
             <option value="">-- {t("Select Offender to Compare")} --</option>
-            {OFFENDERS.filter(o => o.id !== offender.id).map(o => (
+            {OFFENDERS.filter((o: any) => o.id !== offender.id).map((o: any) => (
               <option key={o.id} value={o.id}>{o.name} ({o.id})</option>
             ))}
           </select>
@@ -778,7 +778,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
 
   // Filter logic
   const filteredAssociates = useMemo(() => {
-    return rawAssociates.filter(a => {
+    return rawAssociates.filter((a: any) => {
       if (filterRole === "all") return true;
       if (filterRole === "strong") return a.strength >= 70;
       return a.role === filterRole;
@@ -909,7 +909,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
               </text>
 
               {/* Connection Strings */}
-              {filteredAssociates.map((a, i) => {
+              {filteredAssociates.map((a: any, i: number) => {
                 const angle = (i / filteredAssociates.length) * Math.PI * 2 - Math.PI / 2;
                 
                 // Radius is computed dynamically based on tie strength (stronger ties are closer to center)
@@ -953,7 +953,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
               </g>
 
               {/* Associate Nodes */}
-              {filteredAssociates.map((a, i) => {
+              {filteredAssociates.map((a: any, i: number) => {
                 const angle = (i / filteredAssociates.length) * Math.PI * 2 - Math.PI / 2;
                 const nodeRadius = RAD - ((a.strength - 20) / 80) * (RAD * 0.55);
                 const cos = Math.cos(angle);
@@ -1062,7 +1062,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
                   <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs border ${
                     roleMeta[activeSuspect.role]?.bg || "bg-[#e8f0fe] border-[#aecbfa] text-[#1a73e8]"
                   }`}>
-                    {activeSuspect.name.split(" ").map(x => x[0]).join("")}
+                    {activeSuspect.name.split(" ").map((x: string) => x[0]).join("")}
                   </div>
                 </div>
 
@@ -1127,7 +1127,7 @@ function AssociatesPanel({ offenderId }: { offenderId: string }) {
 
           {/* Quick List */}
           <div className="max-h-[140px] overflow-y-auto divide-y divide-[#dadce0] rounded-xl border border-[#dadce0] bg-white shadow-2xs">
-            {filteredAssociates.map((a, i) => {
+            {filteredAssociates.map((a: any, i: number) => {
               const isHovered = hoveredIdx === i || selectedIdx === i;
               const meta = roleMeta[a.role] || roleMeta["Co-Accused"];
               return (

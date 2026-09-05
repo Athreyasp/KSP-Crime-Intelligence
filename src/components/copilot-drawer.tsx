@@ -64,57 +64,41 @@ function generateBNSAdvisorReport(
   const query = userQuery.toLowerCase().trim();
   const isKn = language === "kn";
 
-  // 1. SEARCH FOR SPECIFIC CASE OR OFFENDER IN DATABASE
+  // Check if user is asking for a SPECIFIC FIR or specific criminal profile explicitly
+  const isExplicitFirQuery = /fir|crime\s*no|case\s*#|\b1000\d+|\b2026\d+/i.test(query);
+  const matchedAccused = offenders.find((o: any) => o.name && query.includes(o.name.toLowerCase()));
+
   let matchedCase: any = null;
 
-  // Search by exact FIR Number or Case ID
-  matchedCase = allCases.find((c: any) => {
-    const crimeNoStr = String(c.crimeNo || "").toLowerCase();
-    const caseIdStr = String(c.caseMasterId || "").toLowerCase();
-    return (
-      query.includes(crimeNoStr) ||
-      (c.crimeNo && query.includes(c.crimeNo.split("/")[0])) ||
-      query.includes(`case ${caseIdStr}`) ||
-      query.includes(`fir ${crimeNoStr}`) ||
-      (caseIdStr.length > 2 && query.includes(caseIdStr))
-    );
-  });
-
-  // Search by Accused Name if no case found yet
-  if (!matchedCase) {
+  if (isExplicitFirQuery) {
+    matchedCase = allCases.find((c: any) => {
+      const crimeNoStr = String(c.crimeNo || "").toLowerCase();
+      const caseIdStr = String(c.caseMasterId || "").toLowerCase();
+      return (
+        query.includes(crimeNoStr) ||
+        (c.crimeNo && query.includes(c.crimeNo.split("/")[0])) ||
+        query.includes(`case ${caseIdStr}`) ||
+        query.includes(`fir ${crimeNoStr}`) ||
+        query.includes(caseIdStr)
+      );
+    });
+  } else if (matchedAccused) {
     matchedCase = allCases.find((c: any) =>
-      c.accused?.some((a: any) => a.name && query.includes(a.name.toLowerCase()))
+      c.accused?.some((a: any) => a.name.toLowerCase() === matchedAccused.name.toLowerCase())
     );
   }
 
-  // Search by Offender Name if no case found yet
-  if (!matchedCase) {
-    const matchedOffender = offenders.find((o: any) => o.name && query.includes(o.name.toLowerCase()));
-    if (matchedOffender && matchedOffender.cases && matchedOffender.cases.length > 0) {
-      matchedCase = allCases.find((c: any) => c.caseMasterId === matchedOffender.cases[0]);
-    }
-  }
-
-  // Search by Police Station / District Name if no case found yet
-  if (!matchedCase) {
-    matchedCase = allCases.find((c: any) =>
-      (c.policeStation && query.includes(c.policeStation.toLowerCase())) ||
-      (c.district?.name && query.includes(c.district.name.toLowerCase()))
-    );
-  }
-
-  // IF A SPECIFIC CASE MATCH WAS FOUND IN DATABASE:
+  // IF AN EXPLICIT MATCHED CASE WAS SOUGHT BY THE USER:
   if (matchedCase) {
     const c = matchedCase;
     const crimeHeadName = c.crimeHead?.name || "Offence";
     const districtName = c.district?.name || "Karnataka District";
-    const stationName = c.policeStation || "PS";
     const brief = c.briefFacts || "Case file under active investigation.";
     const accusedNames = (c.accused || []).map((a: any) => `${a.name}${a.arrestId || a.isArrested ? " (In Custody)" : " (At Large)"}`).join(", ") || "Unidentified Suspects";
 
     let bnsPrimary = "BNS Section 303(2) (Theft)";
     let ipcLegacy = "IPC Section 379";
-    let penalty = isKn ? "3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್." : "Imprisonment up to 3 years, or fine, or both. Non-bailable, Cognizable.";
+    let penalty = isKn ? "3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Imprisonment up to 3 years, or fine, or both. Non-bailable.";
     let secondarySections: string[] = [];
 
     const textToScan = `${crimeHeadName} ${brief} ${c.moTag || ""}`.toLowerCase();
@@ -122,195 +106,206 @@ function generateBNSAdvisorReport(
     if (textToScan.includes("murder") || textToScan.includes("kill") || textToScan.includes("homicide")) {
       bnsPrimary = "BNS Section 103(1) (Murder)";
       ipcLegacy = "IPC Section 302";
-      penalty = isKn ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್." : "Death or Imprisonment for Life, and fine. Non-bailable, Cognizable.";
-      secondarySections.push("BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187 (Custody Remand Procedure)");
-    } else if (textToScan.includes("attempt to murder") || textToScan.includes("stabbing") || textToScan.includes("shoot") || textToScan.includes("gun")) {
-      bnsPrimary = "BNS Section 109 (Attempt to Murder)";
-      ipcLegacy = "IPC Section 307";
-      penalty = isKn ? "10 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ; ಗಾಯ ಉಂಟಾದರೆ ಜೀವಾವಧಿ. ಜಾಮೀನು ರಹಿತ." : "Imprisonment up to 10 years and fine; if hurt caused, up to Life. Non-bailable.";
-      secondarySections.push("BNS Section 118 (Grievous hurt by dangerous weapon)", "Arms Act Section 25/27");
-    } else if (textToScan.includes("robbery") || textToScan.includes("dacoity") || textToScan.includes("gang") || textToScan.includes("extortion")) {
-      bnsPrimary = textToScan.includes("dacoity") || textToScan.includes("gang") ? "BNS Section 310 (Dacoity / Gang Robbery)" : "BNS Section 309 (Robbery)";
+      penalty = isKn ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಕಾರಾಗೃಹ ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Death or Imprisonment for Life, and fine. Non-bailable.";
+      secondarySections.push("BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187 (Custody Remand)");
+    } else if (textToScan.includes("robbery") || textToScan.includes("dacoity") || textToScan.includes("gang")) {
+      bnsPrimary = textToScan.includes("dacoity") || textToScan.includes("gang") ? "BNS Section 310 (Dacoity)" : "BNS Section 309 (Robbery)";
       ipcLegacy = textToScan.includes("dacoity") ? "IPC Section 395" : "IPC Section 392";
-      penalty = isKn ? "10 ರಿಂದ 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment 10 to 14 years and fine. Non-bailable.";
-      secondarySections.push("BNS Section 111 (Organized Crime Syndicate)", "BNS Section 308 (Extortion)");
-    } else if (textToScan.includes("burglary") || textToScan.includes("housebreak") || textToScan.includes("shutter") || textToScan.includes("night") || textToScan.includes("lock")) {
-      bnsPrimary = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
+      penalty = isKn ? "10 ರಿಂದ 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment 10 to 14 years and fine. Non-bailable.";
+      secondarySections.push("BNS Section 111 (Organized Crime Syndicate)");
+    } else if (textToScan.includes("burglary") || textToScan.includes("housebreak")) {
+      bnsPrimary = "BNS Section 331(4) (Lurking House-Trespass/House-breaking)";
       ipcLegacy = "IPC Section 457";
-      penalty = isKn ? "14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment up to 14 years and fine. Non-bailable.";
-      secondarySections.push("BNS Section 305 (Theft in dwelling house)", "BNS Section 317 (Receiving stolen property)");
-    } else if (textToScan.includes("snatch") || textToScan.includes("chain")) {
-      bnsPrimary = "BNS Section 307 (Snatching - New BNS Offence)";
-      ipcLegacy = "Legacy IPC Section 379A";
-      penalty = isKn ? "3 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment up to 3 years and fine. Non-bailable.";
-      secondarySections.push("BNS Section 317 (Stolen Property)");
-    } else if (textToScan.includes("cyber") || textToScan.includes("phish") || textToScan.includes("fraud") || textToScan.includes("online") || textToScan.includes("cheating") || textToScan.includes("bank")) {
-      bnsPrimary = "BNS Section 318(4) (Cheating & Dishonestly Inducing Delivery of Property)";
-      ipcLegacy = "IPC Section 420 / 419";
-      penalty = isKn ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ." : "Imprisonment up to 7 years and fine. Non-bailable, Cognizable.";
-      secondarySections.push("IT Act Section 66C (Identity Theft)", "IT Act Section 66D (Cheating by Computer Resource)");
-    } else if (textToScan.includes("assault") || textToScan.includes("hurt") || textToScan.includes("fight") || textToScan.includes("weapon")) {
-      bnsPrimary = "BNS Section 117 (Voluntarily Causing Grievous Hurt)";
-      ipcLegacy = "IPC Section 325 / 323";
-      penalty = isKn ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ/ಸಹಿತ." : "Imprisonment up to 7 years and fine. Non-bailable/Bailable.";
-      secondarySections.push("BNS Section 126 (Wrongful Restraint)", "BNS Section 189 (Unlawful Assembly)");
+      penalty = isKn ? "14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ. ಜಾಮೀನು ರಹಿತ." : "Rigorous imprisonment up to 14 years. Non-bailable.";
+      secondarySections.push("BNS Section 305 (Theft in dwelling house)");
+    } else if (textToScan.includes("cyber") || textToScan.includes("fraud") || textToScan.includes("cheating")) {
+      bnsPrimary = "BNS Section 318(4) (Cheating)";
+      ipcLegacy = "IPC Section 420";
+      penalty = isKn ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ." : "Imprisonment up to 7 years and fine. Non-bailable.";
+      secondarySections.push("IT Act Section 66D (Computer Fraud)");
     }
 
     if (isKn) {
-      return `⚖️ [ಪ್ರಕರಣದ ನಿರ್ದಿಷ್ಟ BNS ಕಾನೂನು ಸಲಹಾ ವರದಿ - FIR #${c.crimeNo}]
+      return `⚖️ [ವಿಶೇಷ ಪ್ರಕರಣ BNS ಕಾನೂನು ಸಮಾಲೋಚನೆ - FIR #${c.crimeNo}]
 
-• ಪ್ರಕರಣ ಸಂಖ್ಯೆ: FIR No. ${c.crimeNo} (${c.policeStation}, ${districtName})
-• ಅಪರಾಧ ವರ್ಗೀಕರಣ: ${crimeHeadName} [ಗಾಂಭೀರ್ಯತೆ: ${c.gravity}]
-• ಆರೋಪಿಗಳ ಪಟ್ಟಿ: ${accusedNames}
+• ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆ: ${c.crimeNo} (${c.policeStation}, ${districtName})
+• ಅಪರಾಧ: ${crimeHeadName} [ಗಾಂಭೀರ್ಯತೆ: ${c.gravity}]
+• ಆರೋಪಿಗಳು: ${accusedNames}
 
----------------------------------------------------
-📌 ಪ್ರಾಥಮಿಕ ಬಿಎನ್‌ಎಸ್ (BNS, 2023) ಸೆಕ್ಷನ್‌ಗಳು:
-• ಪ್ರಮುಖ BNS ಸೆಕ್ಷನ್: ${bnsPrimary}
-• ಹಳೆಯ IPC ಸಮಾನ ಸೆಕ್ಷನ್: ${ipcLegacy}
-• ಶಿಕ್ಷೆ ಮತ್ತು ಕಾನೂನು ಸ್ವರೂಪ: ${penalty}
+📌 ಬಿಎನ್‌ಎಸ್ (BNS 2023) ಸೆಕ್ಷನ್‌ಗಳು:
+• ಪ್ರಮುಖ BNS: ${bnsPrimary} (ಹಳೆಯ IPC: ${ipcLegacy})
+• ಶಿಕ್ಷೆ: ${penalty}
+• ಹೆಚ್ಚುವರಿ ಸೆಕ್ಷನ್‌ಗಳು: ${secondarySections.join(", ") || "BNS 61"}
 
-🛡️ ಹೆಚ್ಚುವರಿ ಲಗತ್ತಿಸಬೇಕಾದ ಬಿಎನ್‌ಎಸ್/ವಿಶೇಷ ಕಾಯ್ದೆಗಳು:
-${secondarySections.length > 0 ? secondarySections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
-
-📋 ಪ್ರಕರಣದ ನೈಜ ಸಾರಾಂಶ ವಿಶ್ಲೇಷಣೆ:
-"${brief}"
-
-💡 ತನಿಖಾಧಿಕಾರಿಗಳಿಗೆ (IO) ಕಾರ್ಯವಿಧಾನ ನಿರ್ದೇಶನ:
-1. ಎಫ್‌ಐಆರ್ ದಾಖಲಾತಿ ಫಾರ್ಮ್‌ನ ಹಂತ 3 ರಲ್ಲಿ ${bnsPrimary} ಮತ್ತು ${secondarySections[0] || "BNS 317"} ಸೆಕ್ಷನ್‌ಗಳನ್ನು ನೋಂದಾಯಿಸಿ.
-2. ಬಿಎನ್‌ಎಸ್‌ಎಸ್ (BNSS, 2023) ರ ಸೆಕ್ಷನ್ 176(3) ರ ಪ್ರಕಾರ ಫೊರೆನ್ಸಿಕ್ ಮತ್ತು ಡಿಜಿಟಲ್ ಪುರಾವೆಗಳನ್ನು ಕಡ್ಡಾಯವಾಗಿ ಸಂಗ್ರಹಿಸಿ.
-3. ಬಂಧಿತ ಆರೋಪಿಗಳ ವಿಚಾರಣೆಯನ್ನು BNSS ಸೆಕ್ಷನ್ 187 ರ ಪ್ರಕಾರ ನಡೆಸಿ.`;
+💡 ತನಿಖಾಧಿಕಾರಿಯ ಕಾರ್ಯವಿಧಾನ:
+1. ಎಫ್‌ಐಆರ್ ನಮೂನೆ ಹಂತ 3 ರಲ್ಲಿ ${bnsPrimary} ದಾಖಲಿಸಿ.
+2. BNSS ಸೆಕ್ಷನ್ 176(3) ರ ಅಡಿಯಲ್ಲಿ ವಿಡಿಯೋಗ್ರಫಿ ಸಂಗ್ರಹಿಸಿ.`;
     } else {
-      return `⚖️ [CASE-SPECIFIC BNS LEGAL ADVISOR REPORT · FIR #${c.crimeNo}]
+      return `⚖️ [SPECIFIC CASE BNS ADVISORY REPORT · FIR #${c.crimeNo}]
 
-• Case Identification: FIR No. ${c.crimeNo} (${c.policeStation}, ${districtName})
-• Crime Classification: ${crimeHeadName} [Gravity: ${c.gravity}]
-• Linked Suspects: ${accusedNames}
+• Case File: FIR No. ${c.crimeNo} (${c.policeStation}, ${districtName})
+• Offence: ${crimeHeadName} [Gravity: ${c.gravity}]
+• Accused Suspects: ${accusedNames}
 
----------------------------------------------------
-📌 PRIMARY BNS (2023) STATUTORY MAPPING:
-• Primary BNS Section: ${bnsPrimary}
-• Legacy IPC Equivalent: ${ipcLegacy}
-• Statutory Mandate & Penalty: ${penalty}
+📌 BNS (2023) STATUTORY MAPPING:
+• Primary BNS Section: ${bnsPrimary} (Legacy IPC: ${ipcLegacy})
+• Mandate & Penalty: ${penalty}
+• Secondary Sections: ${secondarySections.join(", ") || "BNS Section 61"}
 
-🛡️ RECOMMENDED ADDITIONAL STATUTORY PROVISIONS:
-${secondarySections.length > 0 ? secondarySections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
-
-📋 FACTUAL CASE ANALYSIS:
-"${brief}"
-
-💡 INVESTIGATING OFFICER (IO) PROCEDURAL DIRECTIVES:
-1. Formally record ${bnsPrimary} and ${secondarySections[0] || "BNS Section 317"} inside Step 3 (Acts & Sections) of the FIR form.
-2. Mandatory collection of digital & physical evidence under BNSS Section 176(3).
-3. Follow strict custody & remand timelines under BNSS Section 187.`;
+💡 IO DIRECTIVES:
+1. Apply ${bnsPrimary} in Step 3 of FIR filing.
+2. Mandate videography & forensic collection under BNSS Section 176(3).`;
     }
   }
 
-  // 2. GENERAL DEEP BNS QUERY MAPPING FOR QUERY-BASED INPUTS
-  let bnsSec = "BNS Section 303(2) (Theft)";
-  let ipcSec = "IPC Section 379";
-  let details = isKn 
-    ? "3 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ಅವರಿಂದ ವಿಚಾರಣೆ."
-    : "Punishment: Imprisonment up to 3 years, or fine, or both. Non-bailable, triable by any Magistrate.";
-  let addlSections: string[] = [];
+  // -------------------------------------------------------------
+  // ON-SPOT DIRECT QUESTION & SITUATION ANSWERING ENGINE
+  // -------------------------------------------------------------
 
-  if (query.includes("murder") || query.includes("kill") || query.includes("homicide") || query.includes("death") || query.includes("dead")) {
-    bnsSec = "BNS Section 103(1) (Murder)";
-    ipcSec = "IPC Section 302";
-    details = isKn 
-      ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಸೆಷನ್ಸ್ ನ್ಯಾಯಾಲಯ ವಿಚಾರಣೆ."
-      : "Punishment: Death or Imprisonment for Life, and fine. Non-bailable, Cognizable, triable by Court of Session.";
-    addlSections = ["BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187 (Custody Remand)"];
-  } else if (query.includes("attempt to murder") || query.includes("stabbing") || query.includes("shoot") || query.includes("gun")) {
-    bnsSec = "BNS Section 109 (Attempt to Murder)";
-    ipcSec = "IPC Section 307";
-    details = isKn 
-      ? "10 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ; ಗಾಯ ಸಂಭವಿಸಿದರೆ ಜೀವಾವಧಿ. ಜಾಮೀನು ರಹಿತ."
-      : "Punishment: Imprisonment up to 10 years and fine; up to Life if hurt is caused. Non-bailable.";
-    addlSections = ["BNS Section 118 (Grievous hurt with weapon)", "Arms Act Section 25/27"];
-  } else if (query.includes("robbery") || query.includes("dacoity") || query.includes("extortion") || query.includes("gang")) {
-    bnsSec = query.includes("dacoity") || query.includes("gang") ? "BNS Section 310 (Dacoity / Gang Robbery)" : "BNS Section 309 (Robbery)";
-    ipcSec = query.includes("dacoity") ? "IPC Section 395" : "IPC Section 392";
-    details = isKn 
-      ? "10 ರಿಂದ 14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
-      : "Punishment: Rigorous imprisonment up to 10 to 14 years and fine. Non-bailable.";
-    addlSections = ["BNS Section 111 (Organized Crime Syndicate)", "BNS Section 308 (Extortion)"];
-  } else if (query.includes("trespass") || query.includes("break") || query.includes("night") || query.includes("window") || query.includes("shutter") || query.includes("house")) {
-    bnsSec = "BNS Section 331(4) (Lurking house-trespass or house-breaking by night)";
-    ipcSec = "IPC Section 457";
-    details = isKn 
-      ? "14 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-      : "Punishment: Rigorous imprisonment up to 14 years and fine. Non-bailable, triable by Magistrate of First Class.";
-    addlSections = ["BNS Section 305 (Theft in dwelling house)", "BNS Section 317 (Receiving stolen property)"];
-  } else if (query.includes("snatch") || query.includes("chain")) {
-    bnsSec = "BNS Section 307 (Snatching)";
-    ipcSec = "Legacy IPC Section 379A";
-    details = isKn 
-      ? "3 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಕಾಗ್ನಿಜಬಲ್."
-      : "Punishment: Rigorous imprisonment up to 3 years and fine. Non-bailable, Cognizable.";
-    addlSections = ["BNS Section 317 (Receiving stolen property)"];
-  } else if (query.includes("cyber") || query.includes("hack") || query.includes("online") || query.includes("phish") || query.includes("fraud") || query.includes("phone") || query.includes("bank") || query.includes("cheating")) {
-    bnsSec = "BNS Section 318(4) (Cheating & Dishonestly Inducing Delivery of Property)";
-    ipcSec = "IPC Section 420 / 419";
-    details = isKn 
-      ? "7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ, ಪ್ರಥಮ ದರ್ಜೆ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-      : "Punishment: Imprisonment up to 7 years and fine. Non-bailable, Cognizable, triable by Magistrate of First Class.";
-    addlSections = ["IT Act Section 66C (Identity Theft)", "IT Act Section 66D (Cheating by Computer Resource)"];
-  } else if (query.includes("hurt") || query.includes("beat") || query.includes("assault") || query.includes("hit") || query.includes("fight")) {
-    bnsSec = "BNS Section 115 (Voluntarily Causing Hurt)";
-    ipcSec = "IPC Section 323";
-    details = isKn 
-      ? "1 ವರ್ಷದವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಅಥವಾ ದಂಡ. ಜಾಮೀನು ಸಹಿತ, ಯಾವುದೇ ಮ್ಯಾಜಿಸ್ಟ್ರೇಟ್ ವಿಚಾರಣೆ."
-      : "Punishment: Imprisonment up to 1 year or fine. Bailable, triable by any Magistrate.";
-    addlSections = ["BNS Section 117 (Grievous Hurt)", "BNS Section 126 (Wrongful Restraint)"];
-  } else if (query.includes("kidnap") || query.includes("abduct") || query.includes("ransom")) {
-    bnsSec = query.includes("ransom") ? "BNS Section 140 (Kidnapping for Ransom)" : "BNS Section 137 (Kidnapping)";
-    ipcSec = query.includes("ransom") ? "IPC Section 364A" : "IPC Section 363";
-    details = isKn 
-      ? "ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಕಾರಾಗೃಹ ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
-      : "Punishment: Death or Life Imprisonment, and fine. Non-bailable, Cognizable.";
-    addlSections = ["BNS Section 61 (Criminal Conspiracy)", "BNSS Section 187"];
-  } else if (query.includes("drug") || query.includes("ganja") || query.includes("narcotic") || query.includes("substance")) {
-    bnsSec = "NDPS Act Section 20/22 (Possession of Psychotropic Substances)";
-    ipcSec = "NDPS Act, 1985";
-    details = isKn 
-      ? "10 ರಿಂದ 20 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
-      : "Punishment: Rigorous imprisonment 10 to 20 years and fine. Non-bailable.";
-    addlSections = ["BNS Section 111 (Organized Crime Syndicate)"];
-  } else if (query.includes("weapon") || query.includes("gun") || query.includes("pistol") || query.includes("arms") || query.includes("sword")) {
-    bnsSec = "Arms Act Section 25(1B) / Section 27 (Illegal Arms Possession/Use)";
-    ipcSec = "Arms Act, 1959";
-    details = isKn 
-      ? "3 ರಿಂದ 7 ವರ್ಷಗಳ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ."
-      : "Punishment: Imprisonment 3 to 7 years and fine. Non-bailable.";
-    addlSections = ["BNS Section 192 (Rioting with deadly weapon)"];
+  // A. Bail / Custody / Remand Questions
+  if (query.includes("bail") || query.includes("anticipatory") || query.includes("custody") || query.includes("remand") || query.includes("ಜಾಮೀನು")) {
+    if (isKn) {
+      return `⚖️ [ಒನ್-ಸ್ಪಾಟ್ ಬಿಎನ್‌ಎಸ್‌ಎಸ್ 2023 ಜಾಮೀನು ಮತ್ತು ಕಸ್ಟಡಿ ಕಾನೂನು ಸಲಹೆ]
+
+• ಜಾಮೀನು ನಿಯಮಗಳು: BNSS 2023 ರ ಸೆಕ್ಷನ್ 479 ರ ಪ್ರಕಾರ, ಪ್ರಥಮ ಬಾರಿಗೆ ಅಪರಾಧ ಎಸಗಿದ ಆರೋಪಿಗೆ ಗರಿಷ್ಠ ಶಿಕ್ಷೆಯ ಮೂರನೇ ಒಂದು ಭಾಗ (1/3rd) ಜೈಲಿನಲ್ಲಿ ಕಳೆದ ನಂತರ ಕಡ್ಡಾಯ ಜಾಮೀನು ಲಭಿಸುತ್ತದೆ.
+• ಪೊಲೀಸ್ ಕಸ್ಟಡಿ (Remand): BNSS ಸೆಕ್ಷನ್ 187 ರ ಪ್ರಕಾರ ಬಂಧನದ ಮೊದಲ 40 ರಿಂದ 60 ದಿನಗಳ ಅವಧಿಯಲ್ಲಿ 15 ದಿನಗಳವರೆಗೆ ಪೊಲೀಸ್ ಕಸ್ಟಡಿಗೆ ಪಡೆಯಬಹುದು.
+• ನಿರೀಕ್ಷಣಾ ಜಾಮೀನು (Anticipatory Bail): BNSS ಸೆಕ್ಷನ್ 482 ರ ಅಡಿಯಲ್ಲಿ ಜಾಮೀನು ರಹಿತ ಅಪರಾಧಗಳಲ್ಲಿ ಸೆಷನ್ಸ್ ನ್ಯಾಯಾಲಯ ಅಥವಾ ಹೈಕೋರ್ಟ್‌ಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬಹುದು.`;
+    } else {
+      return `⚖️ [ON-SPOT BNSS 2023 BAIL & CUSTODY ADVISORY]
+
+• Bail Provisions: Under BNSS (2023) Section 479, a first-time offender who has served 1/3rd of the maximum period of imprisonment is entitled to mandatory bail.
+• Remand Procedure: Under BNSS Section 187, police custody remand can be taken up to 15 days in staggered blocks during the initial 40 to 60 days of detention.
+• Anticipatory Bail: Available under BNSS Section 482 for non-bailable offences by petitioning the Court of Sessions or the High Court.`;
+    }
   }
 
+  // B. FIR Filing / Zero FIR / Procedure
+  if (query.includes("file") || query.includes("complaint") || query.includes("zero fir") || query.includes("procedure") || query.includes("ಎಫ್‌ಐಆರ್")) {
+    if (isKn) {
+      return `⚖️ [ಒನ್-ಸ್ಪಾಟ್ ಎಫ್‌ಐಆರ್ ಮತ್ತು ದೂರು ದಾಖಲಾತಿ ಮಾರ್ಗದರ್ಶಿ]
+
+• ಜೀರೋ ಎಫ್‌ಐಆರ್ (Zero FIR): BNSS ಸೆಕ್ಷನ್ 173(1) ರ ಪ್ರಕಾರ, ಅಪರಾಧ ನಡೆದ ಸ್ಥಳ ಯಾವುದೇ ಪೊಲೀಸ್ ಠಾಣಾ ವ್ಯಾಪ್ತಿಯಲ್ಲಿದ್ದರೂ, ಪ್ರತಿಯೊಂದು ಪೊಲೀಸ್ ಠಾಣೆಯಲ್ಲೂ ಉಚಿತವಾಗಿ Zero FIR ದಾಖಲಿಸುವುದು ಕಡ್ಡಾಯವಾಗಿದೆ.
+• ಇ-ಎಫ್‌ಐಆರ್ ಮತ್ತು ಪ್ರಾಥಮಿಕ ವಿಚಾರಣೆ: 3 ರಿಂದ 7 ವರ್ಷ ಶಿಕ್ಷೆ ಇರುವ ಅಪರಾಧಗಳಿಗೆ 14 ದಿನಗಳಲ್ಲಿ ಪ್ರಾಥಮಿಕ ವಿಚಾರಣೆ (Preliminary Inquiry) ನಡೆಸಬಹುದು.
+• ದೂರುದಾರರ ಹಕ್ಕು: ಉಚಿತ ಎಫ್‌ಐಆರ್ ಪ್ರತಿಯನ್ನು ತಕ್ಷಣವೇ ದೂರುದಾರರಿಗೆ ನೀಡಬೇಕು.`;
+    } else {
+      return `⚖️ [ON-SPOT FIR & COMPLAINT FILING DIRECTIVE]
+
+• Zero FIR Mandate: Under BNSS (2023) Section 173(1), an FIR can be registered at any Police Station regardless of jurisdiction as a 'Zero FIR' and subsequently transferred.
+• Preliminary Inquiry: Under BNSS 173(3), for offences punishable between 3 to 7 years, a preliminary inquiry must be concluded within 14 days before formal arrest.
+• Right to Copy: The informant/complainant is statutorily entitled to a free copy of the FIR immediately upon registration.`;
+    }
+  }
+
+  // C. Murder / Violent Crime
+  if (query.includes("murder") || query.includes("kill") || query.includes("homicide") || query.includes("stabbing") || query.includes("ಕೊಲೆ")) {
+    if (isKn) {
+      return `⚖️ [ಕೊಲೆ ಪ್ರಕರಣದ ಬಿಎನ್‌ಎಸ್ 2023 ಕಾನೂನು ವಿವರಣೆ]
+
+• ಶಾಸನಬದ್ಧ ಸೆಕ್ಷನ್: BNS Section 103(1) (ಹಳೆಯ IPC 302).
+• ಶಿಕ್ಷೆಯ ಪ್ರಮಾಣ: ಮರಣದಂಡನೆ ಅಥವಾ ಜೀವಾವಧಿ ಕಾರಾಗೃಹ ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ.
+• ಜಾಮೀನು ಸ್ಥಿತಿ: ಕಾಗ್ನಿಜಬಲ್ ಮತ್ತು ಜಾಮೀನು ರಹಿತ (Non-bailable). ಸೆಷನ್ಸ್ ನ್ಯಾಯಾಲಯದಿಂದ ವಿಚಾರಣೆ.
+• ಯತ್ನ (Attempt to Murder): BNS Section 109 (ಹಳೆಯ IPC 307) - 10 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಶಿಕ್ಷೆ.`;
+    } else {
+      return `⚖️ [MURDER & HEINOUS OFFENCE LEGAL DIRECTIVE]
+
+• Primary Provision: **BNS Section 103(1)** (Legacy IPC Section 302).
+• Statutory Penalty: Death Penalty or Imprisonment for Life, and fine.
+• Legal Nature: Cognizable and **Non-Bailable** (Triable exclusively by Court of Session).
+• Attempted Murder: **BNS Section 109** (Legacy IPC 307) — Imprisonment up to 10 years or Life if hurt is caused.`;
+    }
+  }
+
+  // D. Robbery / Dacoity / Gang Extortion
+  if (query.includes("robbery") || query.includes("dacoity") || query.includes("extortion") || query.includes("gang") || query.includes("ದರೋಡೆ")) {
+    if (isKn) {
+      return `⚖️ [ದರೋಡೆ ಮತ್ತು ಕಳವು ಬಿಎನ್‌ಎಸ್ 2023 ಕಾನೂನು ಸಲಹೆ]
+
+• ದರೋಡೆ (Robbery): BNS Section 309 (ಹಳೆಯ IPC 392) — 10 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ. ಜಾಮೀನು ರಹಿತ.
+• ಗ್ಯಾಂಗ್ ದರೋಡೆ (Dacoity): BNS Section 310 (ಹಳೆಯ IPC 395) — 5 ಅಥವಾ ಹೆಚ್ಚು ಜನರ ತಂಡದ ದರೋಡೆಗೆ 10 ವರ್ಷದಿಂದ ಜೀವಾವಧಿ ಶಿಕ್ಷೆ.
+• ಸಂಘಟಿತ ಅಪರಾಧ: BNS Section 111 (Organized Crime) ಅಡಿಯಲ್ಲಿಯೂ ಪ್ರಕರಣ ದಾಖಲಿಸಬಹುದು.`;
+    } else {
+      return `⚖️ [ROBBERY & DACOITY STATUTORY LEGAL ADVISORY]
+
+• Robbery Provision: **BNS Section 309** (Legacy IPC 392) — Rigorous imprisonment up to 10 years and fine. Non-bailable.
+• Dacoity Provision: **BNS Section 310** (Legacy IPC 395) — Rigorous imprisonment 10 years to Life for 5 or more persons. Non-bailable.
+• Organized Crime Link: Invokable under **BNS Section 111** for habitual criminal syndicates.`;
+    }
+  }
+
+  // E. Cyber Fraud / Online Scam / Cheating
+  if (query.includes("cyber") || query.includes("fraud") || query.includes("cheating") || query.includes("online") || query.includes("bank") || query.includes("ಸೈಬರ್")) {
+    if (isKn) {
+      return `⚖️ [ಸೈಬರ್ ವಂಚನೆ ಮತ್ತು ಚೀಟಿಂಗ್ ಬಿಎನ್‌ಎಸ್ ಕಾನೂನು ಸಲಹೆ]
+
+• ವಂಚನೆ ಸೆಕ್ಷನ್: BNS Section 318(4) (ಹಳೆಯ IPC 420/419) — 7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ. ಜಾಮೀನು ರಹಿತ.
+• ಐಟಿ ಕಾಯ್ದೆ ಲಗತ್ತು: IT Act Section 66C (ಗುರುತಿನ ಕಳುವು) ಮತ್ತು Section 66D (ಗಣಕಯಂತ್ರ ವಂಚನೆ).
+• ಬ್ಯಾಂಕ್ ಖಾತೆ ಮುಟ್ಟುಗೋಲು: BNSS ಸೆಕ್ಷನ್ 106 ರ ಅಡಿಯಲ್ಲಿ ತನಿಖಾಧಿಕಾರಿಯು ವಂಚನೆಯ ಬ್ಯಾಂಕ್ ಖಾತೆಗಳನ್ನು ಮುಟ್ಟುಗೋಲು ಹಾಕಿಕೊಳ್ಳಬಹುದು.`;
+    } else {
+      return `⚖️ [CYBER CRIME & FRAUD LEGAL STATUTORY DIRECTIVE]
+
+• Primary Offence: **BNS Section 318(4)** (Cheating & Inducing Delivery — Legacy IPC 420) — Imprisonment up to 7 years and fine. Non-bailable.
+• Information Technology Act: Add IT Act **Section 66C** (Identity Theft) & **Section 66D** (Cheating by Computer Resource).
+• Asset Freezing: Under **BNSS Section 106**, police officers can freeze proceeds of cyber fraud in bank accounts directly.`;
+    }
+  }
+
+  // F. Theft / Snatching
+  if (query.includes("theft") || query.includes("snatching") || query.includes("stolen") || query.includes("ಕಳವು")) {
+    if (isKn) {
+      return `⚖️ [ಕಳುವು ಮತ್ತು ಚೈನ್‌ ಸ್ನ್ಯಾಚಿಂಗ್‌ ಬಿಎನ್‌ಎಸ್ ಕಾನೂನು ಸಲಹೆ]
+
+• ಸ್ನ್ಯಾಚಿಂಗ್ (Snatching): BNS Section 307 (ಹೊಸ ಅಪರಾಧ) — 3 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಜೈಲು ಶಿಕ್ಷೆ. ಜಾಮೀನು ರಹಿತ.
+• ಸಾಮಾನ್ಯ ಕಳುವು (Theft): BNS Section 303(2) (ಹಳೆಯ IPC 379) — 3 ವರ್ಷಗಳವರೆಗೆ ಶಿಕ್ಷೆ.
+• ಮನೆಯಲ್ಲಿ ಕಳುವು: BNS Section 305 — 7 ವರ್ಷಗಳವರೆಗೆ ಶಿಕ್ಷೆ.`;
+    } else {
+      return `⚖️ [THEFT & CHAIN SNATCHING LEGAL DIRECTIVE]
+
+• Snatching (New BNS Offence): **BNS Section 307** — Rigorous imprisonment up to 3 years and fine. **Non-bailable**.
+• General Theft: **BNS Section 303(2)** (Legacy IPC 379) — Imprisonment up to 3 years, fine, or both.
+• Theft in Dwelling House: **BNS Section 305** — Imprisonment up to 7 years. Non-bailable.`;
+    }
+  }
+
+  // G. Assault / Hurt / Physical Violence
+  if (query.includes("assault") || query.includes("hurt") || query.includes("beat") || query.includes("fight") || query.includes("ಹಲ್ಲೆ")) {
+    if (isKn) {
+      return `⚖️ [ಹಲ್ಲೆ ಮತ್ತು ಗಾಯಗೊಳಿಸುವಿಕೆ ಬಿಎನ್‌ಎಸ್ 2023 ವಿವರಣೆ]
+
+• ಸಾಮಾನ್ಯ ಗಾಯ (Hurt): BNS Section 115 (ಹಳೆಯ IPC 323) — 1 ವರ್ಷದವರೆಗೆ ಶಿಕ್ಷೆ. ಜಾಮೀನು ಸಹಿತ.
+• ಗಂಭೀರ ಗಾಯ (Grievous Hurt): BNS Section 117 (ಹಳೆಯ IPC 325) — 7 ವರ್ಷಗಳವರೆಗೆ ಜೈಲು ಶಿಕ್ಷೆ ಮತ್ತು ದಂಡ.
+• ಮಾರಕ ಮಾರಕಾಸ್ತ್ರ ಬಳಸಿ ಹಲ್ಲೆ: BNS Section 118 — 10 ವರ್ಷಗಳವರೆಗೆ ಕಠಿಣ ಶಿಕ್ಷೆ.`;
+    } else {
+      return `⚖️ [ASSAULT & HURT STATUTORY ADVISORY]
+
+• Voluntarily Causing Hurt: **BNS Section 115** (Legacy IPC 323) — Imprisonment up to 1 year or fine. Bailable.
+• Voluntarily Causing Grievous Hurt: **BNS Section 117** (Legacy IPC 325) — Imprisonment up to 7 years and fine.
+• Hurt with Dangerous Weapon: **BNS Section 118** — Imprisonment up to 10 years. Non-bailable.`;
+    }
+  }
+
+  // H. GENERAL DYNAMIC ON-SPOT ANSWER FOR ALL OTHER CUSTOM QUESTIONS
   if (isKn) {
-    return `⚖️ [BNS ಕ್ರಾಸ್-ಮ್ಯಾಪಿಂಗ್ ಹಾಗೂ ಕಾನೂನು ಸಲಹಾ ವರದಿ]
+    return `⚖️ [ಬಿಎನ್‌ಎಸ್ 2023 ಆನ್-ಸ್ಪಾಟ್ ಕಾನೂನು ಉತ್ತರ]
 
-• ಹೊಸ ಬಿಎನ್‌ಎಸ್ ಸೆಕ್ಷನ್: ${bnsSec}
-• ಹಳೆಯ ಐಪಿಸಿ ಸಮಾನ ಸೆಕ್ಷನ್: ${ipcSec}
-• ಶಾಸನಬದ್ಧ ಶಿಕ್ಷೆ ವಿವರಗಳು: ${details}
+• ನಿಮ್ಮ ಪ್ರಶ್ನೆ: "${userQuery}"
+• ಶಾಸನಬದ್ಧ ಚೌಕಟ್ಟು: ಭಾರತೀಯ ನ್ಯಾಯ ಸಂಹಿತೆ (BNS 2023) ಮತ್ತು ಭಾರತೀಯ ನಾಗರಿಕ ಸುರಕ್ಷಾ ಸಂಹಿತೆ (BNSS 2023).
 
-🛡️ ಹೆಚ್ಚುವರಿ ಲಗತ್ತಿಸಬೇಕಾದ ಬಿಎನ್‌ಎಸ್/ವಿಶೇಷ ಕಾಯ್ದೆಗಳು:
-${addlSections.length > 0 ? addlSections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
+📌 ಕಾನೂನು ವಿಶ್ಲೇಷಣೆ ಮತ್ತು ಪ್ರಮುಖ ಮಾರ್ಗದರ್ಶನ:
+1. ಸಂಬಂಧಿತ ಅಪರಾಧಗಳನ್ನು BNS ನ ಸೆಕ್ಷನ್ 303, 309, 318 ಅಥವಾ 115 ರ ಅಡಿಯಲ್ಲಿ ದಾಖಲಿಸತಕ್ಕದ್ದು.
+2. ಸಾಕ್ಷ್ಯ ಸಂಗ್ರಹಣೆ: BNSS ಸೆಕ್ಷನ್ 176(3) ರ ಪ್ರಕಾರ 7 ವರ್ಷಕ್ಕಿಂತ ಹೆಚ್ಚು ಶಿಕ್ಷೆ ಇರುವ ಅಪರಾಧಗಳಿಗೆ ಫೊರೆನ್ಸಿಕ್ ಮತ್ತು ವಿಡಿಯೋ ಸಾಕ್ಷ್ಯ ಕಡ್ಡಾಯ.
+3. ಕಸ್ಟಡಿ ಮತ್ತು ಜಾಮೀನು: BNSS ಸೆಕ್ಷನ್ 187 ಮತ್ತು 479 ರ ನಿಯಮಗಳು ಅನ್ವಯಿಸುತ್ತವೆ.
 
-💡 ತನಿಖಾಧಿಕಾರಿಗಳಿಗೆ (IO) ಕಾರ್ಯವಿಧಾನ ಸೂಚನೆ:
-1. ಎಫ್‌ಐಆರ್ ನ ಹಂತ 3 (ಕಾಯ್ದೆಗಳು ಮತ್ತು ಸೆಕ್ಷನ್‌ಗಳು) ರ ಅಡಿಯಲ್ಲಿ ಈ ಸೆಕ್ಷನ್ಗಳನ್ನು ದಾಖಲಿಸಿ.
-2. ಬಿಎನ್‌ಎಸ್‌ಎಸ್ (BNSS, 2023) ಶಾಸನಬದ್ಧ ನಿಯಮಗಳ ಪ್ರಕಾರ ತನಿಖಾ ಪುರಾವೆಗಳನ್ನು ಸಂಗ್ರಹಿಸಿ.`;
+ನಿರ್ದಿಷ್ಟ ಪ್ರಕರಣ ಅಥವಾ ಎಫ್‌ಐಆರ್ ತನಿಖೆಗೆ ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆಯನ್ನು (ಉದಾ: FIR/BAG/2026/204) ನಮೂದಿಸಿ.`;
   } else {
-    return `⚖️ [BNS LEGAL STATUTORY ADVISORY REPORT]
+    return `⚖️ [BNS 2023 ON-SPOT LEGAL ADVISORY ANSWER]
 
-• New BNS Section: ${bnsSec}
-• Legacy IPC Equivalent: ${ipcSec}
-• Statutory Penalty Details: ${details}
+• Your Question: "${userQuery}"
+• Legal Framework: Bharatiya Nyaya Sanhita (BNS 2023) & Bharatiya Nagarik Suraksha Sanhita (BNSS 2023).
 
-🛡️ RECOMMENDED COMPONENT SECTIONS:
-${addlSections.length > 0 ? addlSections.map(s => `  • ${s}`).join("\n") : "  • BNS Section 61 (Criminal Conspiracy)"}
-
-💡 INVESTIGATING OFFICER (IO) PROCEDURAL DIRECTIVES:
-1. Map these sections inside Step 3 (Acts & Sections) of the FIR Filing form.
-2. Ensure compliance with evidence recording guidelines under BNSS (2023).`;
+📌 DIRECT LEGAL ANALYSIS & GUIDANCE:
+1. Statutory Application: Map the offence under corresponding BNS 2023 sections (e.g., BNS Section 303 for theft, BNS Section 309 for robbery, BNS Section 318 for fraud, BNS Section 115 for hurt).
+2. Mandatory Evidence Collection: Under BNSS Section 176(3), forensic videography and digital evidence collection are mandatory for offences carrying punishment >= 7 years.
+For specific case dossier interrogation, enter an explicit FIR Number (e.g. FIR/BAG/2026/204) or suspect name.`;
   }
 }
 
