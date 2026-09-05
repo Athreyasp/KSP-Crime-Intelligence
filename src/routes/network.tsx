@@ -87,27 +87,28 @@ function useForceLayout(networkRich: any) {
 /* ------------------------------------------------------------------ */
 /* PDF Report Generation Helpers (Karnataka State Police SCRB Format)  */
 /* ------------------------------------------------------------------ */
+import kspLogo from "@/assets/karnataka-police-logo.png";
+
 function exportVehiclePdfReport(targetPlate: string, vehInfo: any, travelLogs: TravelCheckpoint[]) {
-  const printWindow = window.open("", "_blank", "width=950,height=1000");
+  const printWindow = window.open("", "_blank", "width=980,height=1000");
   if (!printWindow) {
     toast.error("Pop-up window blocked. Please allow pop-ups to view/export the PDF report.");
     return;
   }
 
   const rowsHtml = travelLogs.map((cp, idx) => `
-    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8f9fa'}; border-bottom: 1px solid #e0e0e0;">
-      <td style="padding: 10px 12px; font-weight: 600; text-align: center; color: #1a73e8;">#${idx + 1}</td>
-      <td style="padding: 10px 12px;">
-        <strong style="color: #202124; font-size: 12px;">${cp.locationName}</strong><br/>
-        <span style="font-size: 10px; color: #5f6368; font-family: monospace;">ID: ${cp.checkpointId}</span>
+    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+      <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: #1a73e8;">#${idx + 1}</td>
+      <td style="padding: 7px 8px;">
+        <strong style="color: #0f172a; font-size: 11px;">${cp.locationName}</strong><br/>
+        <span style="font-size: 9px; color: #64748b;">ID: ${cp.checkpointId} · ${cp.cameraType}</span>
       </td>
-      <td style="padding: 10px 12px; color: #3c4043;">${cp.district}</td>
-      <td style="padding: 10px 12px; font-family: monospace; color: #1a73e8; font-weight: 600;">${cp.timestamp}</td>
-      <td style="padding: 10px 12px; font-family: monospace; font-weight: 600;">${cp.speedKmph} km/h</td>
-      <td style="padding: 10px 12px; color: #3c4043;">${cp.cameraType}</td>
-      <td style="padding: 10px 12px; font-weight: 600; color: #202124;">${(cp.occupantsDetected || []).join(", ") || "Driver Only"}</td>
-      <td style="padding: 10px 12px;">
-        <span style="background: #fce8e6; color: #c5221f; border: 1px solid #f8b4b0; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">${cp.flagStatus}</span>
+      <td style="padding: 7px 8px; font-weight: 600;">${cp.district}</td>
+      <td style="padding: 7px 8px; color: #1a73e8; font-weight: bold;">${cp.timestamp}</td>
+      <td style="padding: 7px 8px; font-weight: bold;">${cp.speedKmph} km/h</td>
+      <td style="padding: 7px 8px;">${(cp.occupantsDetected || []).join(", ") || "Driver Only"}</td>
+      <td style="padding: 7px 8px; text-align: center;">
+        <span style="background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold;">${cp.flagStatus}</span>
       </td>
     </tr>
   `).join("");
@@ -116,105 +117,305 @@ function exportVehiclePdfReport(targetPlate: string, vehInfo: any, travelLogs: T
     <!DOCTYPE html>
     <html>
       <head>
-        <title>KSP ANPR Forensic Telemetry Report - ${targetPlate}</title>
+        <title>KSP ANPR Forensic Vehicle Report - ${targetPlate}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
           @page { size: A4 portrait; margin: 12mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #202124; margin: 0; padding: 24px; font-size: 12px; background: #ffffff; }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #1a73e8; padding-bottom: 16px; margin-bottom: 24px; }
-          .header-title h1 { margin: 0; font-size: 20px; color: #1a73e8; font-weight: 700; letter-spacing: 0.3px; }
-          .header-title p { margin: 4px 0 0 0; color: #5f6368; font-size: 11px; font-weight: 500; }
-          .plate-badge { background: #1a73e8; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 16px; letter-spacing: 1px; }
-          .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
-          .meta-item { display: flex; flex-direction: column; gap: 2px; }
-          .meta-item label { text-transform: uppercase; font-size: 9px; color: #5f6368; font-weight: 700; letter-spacing: 0.5px; }
-          .meta-item p { margin: 0; font-size: 13px; font-weight: 600; color: #202124; }
-          .section-header { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #1a73e8; letter-spacing: 0.5px; margin-top: 24px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; font-size: 11px; }
-          th { background: #f1f3f4; text-align: left; padding: 10px 12px; border-bottom: 2px solid #dadce0; color: #3c4043; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
-          .sig-container { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
-          .seal-box { border: 2px border-dashed #aecbfa; padding: 12px 18px; border-radius: 8px; background: #e8f0fe; color: #1a73e8; font-size: 10px; font-weight: 600; text-align: center; }
+          body {
+            font-family: 'EB Garamond', serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 24px;
+            font-size: 11px;
+            line-height: 1.5;
+            background: #ffffff;
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px;
+            height: 420px;
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 0;
+            filter: grayscale(100%);
+          }
+          .content { position: relative; z-index: 1; }
+          .top-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1.5px solid #000;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+          }
+          .gov-ribbon {
+            text-align: center;
+            margin-bottom: 10px;
+          }
+          .gov-badge {
+            display: inline-block;
+            border: 1px solid #000;
+            padding: 3px 14px;
+            font-family: 'EB Garamond', serif;
+            font-weight: bold;
+            letter-spacing: 2px;
+            font-size: 9.5px;
+            text-transform: uppercase;
+            background: #ffffff;
+          }
+          .header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .logo-img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+          }
+          .title-box {
+            text-align: center;
+            flex: 1;
+            padding: 0 12px;
+          }
+          .title-box h1 {
+            margin: 0;
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          }
+          .title-box h2 {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            color: #1a73e8;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .plate-badge {
+            background: #1a73e8;
+            color: #ffffff;
+            padding: 5px 14px;
+            border-radius: 6px;
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 1px;
+            display: inline-block;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            border: 1.5px solid #000;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: #fafafa;
+          }
+          .meta-item { display: flex; flex-direction: column; gap: 1px; }
+          .meta-label { font-size: 8.5px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+          .meta-val { font-family: 'Courier Prime', monospace; font-weight: bold; font-size: 11px; color: #0f172a; }
+          .section-heading {
+            font-family: 'EB Garamond', serif;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1.5px solid #000;
+            padding-bottom: 4px;
+            margin-top: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1.5px solid #000;
+            font-family: 'Courier Prime', monospace;
+            font-size: 10px;
+          }
+          .data-table th {
+            background: #f1f5f9;
+            border: 1px solid #000;
+            padding: 7px 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 8.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .data-table td {
+            border: 1px solid #cbd5e1;
+          }
+          .sig-container {
+            margin-top: 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .seal-box {
+            border: 2px dashed #1a73e8;
+            padding: 10px 16px;
+            border-radius: 6px;
+            background: #eff6ff;
+            color: #1a73e8;
+            font-family: 'Courier Prime', monospace;
+            font-size: 9.5px;
+            font-weight: bold;
+            text-align: center;
+          }
           .sig-box { text-align: right; }
-          .sig-line { width: 220px; border-bottom: 1.5px solid #202124; display: inline-block; margin-bottom: 6px; }
-          .footer { margin-top: 30px; border-top: 1px solid #dadce0; padding-top: 12px; display: flex; justify-content: space-between; color: #5f6368; font-size: 10px; }
+          .sig-line { width: 210px; border-bottom: 1.5px solid #000; display: inline-block; margin-bottom: 4px; }
+          .footer {
+            margin-top: 24px;
+            border-top: 1px solid #000;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Courier Prime', monospace;
+            font-size: 8.5px;
+            color: #64748b;
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="header-title">
-            <h1>Karnataka State Police · SCRB</h1>
-            <p>Automatic License Plate Recognition (ANPR) Forensic Vehicle Movement Report</p>
-          </div>
-          <div style="text-align: right;">
-            <span class="plate-badge">${targetPlate}</span>
-            <p style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #5f6368;">REF: KSP-ANPR-${Date.now().toString().slice(-6)}</p>
-          </div>
-        </div>
+        <!-- Background Official Seal Watermark -->
+        <img src="${kspLogo}" class="watermark" alt="" />
 
-        <div class="meta-grid">
-          <div class="meta-item">
-            <label>Registration Plate</label>
-            <p style="color: #1a73e8; font-family: monospace;">${targetPlate}</p>
-          </div>
-          <div class="meta-item">
-            <label>Make & Model</label>
-            <p>${vehInfo.makeModel || "Honda City e:HEV Hybrid"}</p>
-          </div>
-          <div class="meta-item">
-            <label>Registered Owner</label>
-            <p>${vehInfo.ownerName || "Vijay Bhat"}</p>
-          </div>
-          <div class="meta-item">
-            <label>Vehicle Category</label>
-            <p>${vehInfo.category || "Motor Car"}</p>
-          </div>
-          <div class="meta-item">
-            <label>Primary Surveillance Jurisdiction</label>
-            <p>${vehInfo.district || "Bengaluru Urban"}</p>
-          </div>
-          <div class="meta-item">
-            <label>ANPR Checkpoints Traversed</label>
-            <p style="color: #1a73e8;">${travelLogs.length} Camera Checkpoints</p>
-          </div>
-        </div>
+        <div class="content">
+          <!-- Top Meta Barcode & QR Bar -->
+          <div class="top-meta">
+            <div>
+              <svg style="width: 120px; height: 16px;" viewBox="0 0 160 20">
+                <rect x="0" y="0" width="3" height="20" fill="black" />
+                <rect x="5" y="0" width="1" height="20" fill="black" />
+                <rect x="8" y="0" width="4" height="20" fill="black" />
+                <rect x="14" y="0" width="1" height="20" fill="black" />
+                <rect x="17" y="0" width="3" height="20" fill="black" />
+                <rect x="22" y="0" width="5" height="20" fill="black" />
+                <rect x="29" y="0" width="1" height="20" fill="black" />
+                <rect x="32" y="0" width="3" height="20" fill="black" />
+                <rect x="40" y="0" width="4" height="20" fill="black" />
+                <rect x="49" y="0" width="5" height="20" fill="black" />
+                <rect x="56" y="0" width="3" height="20" fill="black" />
+                <rect x="64" y="0" width="4" height="20" fill="black" />
+                <rect x="75" y="0" width="1" height="20" fill="black" />
+                <rect x="84" y="0" width="5" height="20" fill="black" />
+                <rect x="99" y="0" width="1" height="20" fill="black" />
+                <rect x="108" y="0" width="3" height="20" fill="black" />
+                <rect x="123" y="0" width="4" height="20" fill="black" />
+                <rect x="137" y="0" width="5" height="20" fill="black" />
+              </svg>
+              <div style="font-family: 'Courier Prime', monospace; font-size: 7px; color: #64748b;">CCTNS-ANPR-${targetPlate.replace(/[^A-Z0-9]/g, "")}</div>
+            </div>
 
-        <div class="section-header">
-          <span>ANPR Camera Checkpoint Trajectory</span>
-          <span style="font-size: 10px; color: #5f6368; font-weight: normal;">Confidential Intelligence Record</span>
-        </div>
+            <div style="text-align: center; font-size: 8px; font-family: 'EB Garamond', serif; font-weight: bold;">
+              INTEGRATED CRIME RECORDS HUB (CCTNS CLOUD)<br/>
+              <span style="color: #1a73e8;">STATUS: OFFICIAL TELEMETRY EVIDENCE RECORD</span>
+            </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: center;">Scan</th>
-              <th>Location / Camera Site</th>
-              <th>District</th>
-              <th>Timestamp</th>
-              <th>Speed</th>
-              <th>Camera Type</th>
-              <th>Occupants Detected</th>
-              <th>Hotlist Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="sig-container">
-          <div class="seal-box">
-            OFFICIAL DIGITAL TELEMETRY SEAL<br/>
-            STATE CRIME RECORDS BUREAU · KARNATAKA
+            <div style="border: 1px solid #000; padding: 4px 8px; font-family: 'Courier Prime', monospace; font-size: 7px; text-align: center;">
+              <strong>KSP VERIFIED</strong><br/>
+              <span>SHA: ANPR-${Date.now().toString().slice(-6)}</span>
+            </div>
           </div>
-          <div class="sig-box">
-            <div class="sig-line"></div>
-            <p style="margin: 0; font-size: 11px; font-weight: 700;">Investigating Officer Signature</p>
-            <p style="margin: 2px 0 0 0; font-size: 10px; color: #5f6368;">State Crime Records Bureau (SCRB)</p>
-          </div>
-        </div>
 
-        <div class="footer">
-          <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
-          <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+          <!-- Government Ribbon Header -->
+          <div class="gov-ribbon">
+            <div class="gov-badge">Government of Karnataka · State Crime Records Bureau</div>
+          </div>
+
+          <!-- Main Header with Logo -->
+          <div class="header-main">
+            <img src="${kspLogo}" class="logo-img" alt="KSP Logo" />
+            <div class="title-box">
+              <h1>KARNATAKA STATE POLICE DEPARTMENT</h1>
+              <h2>ANPR AUTOMATIC LICENSE PLATE RECOGNITION FORENSIC MOVEMENT REPORT</h2>
+            </div>
+            <div>
+              <span class="plate-badge">${targetPlate}</span>
+            </div>
+          </div>
+
+          <!-- Metadata Summary Grid -->
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Registration Plate</span>
+              <span class="meta-val" style="color: #1a73e8;">${targetPlate}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Make & Model</span>
+              <span class="meta-val">${vehInfo.makeModel || "Toyota Fortuner Legender 4x4"}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Registered Owner</span>
+              <span class="meta-val">${vehInfo.ownerName || "Athreya (Registered)"}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Vehicle Category</span>
+              <span class="meta-val">${vehInfo.category || "SUV"}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Primary Jurisdiction</span>
+              <span class="meta-val">${vehInfo.district || "Bengaluru Urban"}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">ANPR Checkpoints Traversed</span>
+              <span class="meta-val" style="color: #1a73e8;">${travelLogs.length} Camera Checkpoints</span>
+            </div>
+          </div>
+
+          <!-- Section Heading -->
+          <div class="section-heading">
+            <span>Chronological ANPR Camera Surveillance Trajectory</span>
+            <span style="font-size: 9px; font-weight: normal; color: #64748b;">CONFIDENTIAL LAW ENFORCEMENT EVIDENCE</span>
+          </div>
+
+          <!-- ANPR Data Table -->
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 35px;">Scan</th>
+                <th>Checkpoint Location / Camera Site</th>
+                <th>District</th>
+                <th>Timestamp</th>
+                <th>Speed</th>
+                <th>Occupants Detected</th>
+                <th style="text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <!-- Official Signatures & Digital Seal -->
+          <div class="sig-container">
+            <div class="seal-box">
+              🔒 OFFICIAL DIGITAL TELEMETRY SEAL<br/>
+              STATE CRIME RECORDS BUREAU (SCRB) · KARNATAKA
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <p style="margin: 0; font-size: 11px; font-weight: bold; font-family: 'EB Garamond', serif;">Investigating Officer Signature</p>
+              <p style="margin: 2px 0 0 0; font-size: 9px; font-family: 'Courier Prime', monospace; color: #475569;">State Crime Records Bureau (SCRB)</p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="footer">
+            <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
+            <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+          </div>
         </div>
 
         <script>
@@ -233,24 +434,24 @@ function exportVehiclePdfReport(targetPlate: string, vehInfo: any, travelLogs: T
 }
 
 function exportPhonePdfReport(targetPhone: string, subscriber: string, operator: string, imei: string, districtName: string, callLogs: CallLogEntry[]) {
-  const printWindow = window.open("", "_blank", "width=950,height=1000");
+  const printWindow = window.open("", "_blank", "width=980,height=1000");
   if (!printWindow) {
     toast.error("Pop-up window blocked. Please allow pop-ups to view/export the PDF report.");
     return;
   }
 
   const rowsHtml = callLogs.map((log, idx) => `
-    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8f9fa'}; border-bottom: 1px solid #e0e0e0;">
-      <td style="padding: 10px 12px; font-weight: 600; text-align: center; color: #0284c7;">#${idx + 1}</td>
-      <td style="padding: 10px 12px;">
-        <span style="background: ${log.type === "Incoming" ? "#e6f4ea" : log.type === "Outgoing" ? "#e8f0fe" : "#fce8e6"}; color: ${log.type === "Incoming" ? "#137333" : log.type === "Outgoing" ? "#1a73e8" : "#c5221f"}; font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 10px;">${log.type}</span>
+    <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+      <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: #0284c7;">#${idx + 1}</td>
+      <td style="padding: 7px 8px;">
+        <span style="background: ${log.type === "Incoming" ? "#f0fdf4" : log.type === "Outgoing" ? "#eff6ff" : "#fef2f2"}; color: ${log.type === "Incoming" ? "#166534" : log.type === "Outgoing" ? "#1d4ed8" : "#991b1b"}; font-weight: bold; padding: 2px 7px; border-radius: 4px; font-size: 9px; border: 1px solid ${log.type === "Incoming" ? "#bbf7d0" : log.type === "Outgoing" ? "#bfdbfe" : "#fca5a5"};">${log.type}</span>
       </td>
-      <td style="padding: 10px 12px; font-family: monospace; font-weight: 700; color: #202124; font-size: 12px;">${log.otherPartyNumber}</td>
-      <td style="padding: 10px 12px; font-weight: 600; color: #3c4043;">${log.otherPartyName}</td>
-      <td style="padding: 10px 12px; font-family: monospace; font-weight: 600; color: #0284c7;">${log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Ans)"}</td>
-      <td style="padding: 10px 12px; color: #3c4043;">${log.towerLocation} <span style="color: #5f6368; font-size: 10px;">(${log.towerId})</span></td>
-      <td style="padding: 10px 12px; color: #3c4043;">${log.district}</td>
-      <td style="padding: 10px 12px; font-family: monospace; color: #1a73e8; font-weight: 600;">${log.timestamp}</td>
+      <td style="padding: 7px 8px; font-family: 'Courier Prime', monospace; font-weight: bold; color: #0f172a; font-size: 11px;">${log.otherPartyNumber}</td>
+      <td style="padding: 7px 8px; font-weight: bold; color: #334155;">${log.otherPartyName}</td>
+      <td style="padding: 7px 8px; font-family: 'Courier Prime', monospace; font-weight: bold; color: #0284c7;">${log.durationSeconds > 0 ? `${Math.floor(log.durationSeconds / 60)}m ${log.durationSeconds % 60}s` : "0s (No Ans)"}</td>
+      <td style="padding: 7px 8px; color: #334155;">${log.towerLocation} <span style="color: #64748b; font-size: 9px;">(${log.towerId})</span></td>
+      <td style="padding: 7px 8px; font-weight: 600;">${log.district}</td>
+      <td style="padding: 7px 8px; color: #0284c7; font-weight: bold;">${log.timestamp}</td>
     </tr>
   `).join("");
 
@@ -258,105 +459,306 @@ function exportPhonePdfReport(targetPhone: string, subscriber: string, operator:
     <!DOCTYPE html>
     <html>
       <head>
-        <title>KSP CDR Telecom Forensic Intercept Report - ${targetPhone}</title>
+        <title>KSP CDR Telecom Forensic Report - ${targetPhone}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
           @page { size: A4 portrait; margin: 12mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #202124; margin: 0; padding: 24px; font-size: 12px; background: #ffffff; }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; }
-          .header-title h1 { margin: 0; font-size: 20px; color: #0284c7; font-weight: 700; letter-spacing: 0.3px; }
-          .header-title p { margin: 4px 0 0 0; color: #5f6368; font-size: 11px; font-weight: 500; }
-          .phone-badge { background: #0284c7; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 16px; letter-spacing: 1px; }
-          .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
-          .meta-item { display: flex; flex-direction: column; gap: 2px; }
-          .meta-item label { text-transform: uppercase; font-size: 9px; color: #5f6368; font-weight: 700; letter-spacing: 0.5px; }
-          .meta-item p { margin: 0; font-size: 13px; font-weight: 600; color: #202124; }
-          .section-header { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #0284c7; letter-spacing: 0.5px; margin-top: 24px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; font-size: 11px; }
-          th { background: #f1f3f4; text-align: left; padding: 10px 12px; border-bottom: 2px solid #dadce0; color: #3c4043; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
-          .sig-container { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
-          .seal-box { border: 2px border-dashed #bae6fd; padding: 12px 18px; border-radius: 8px; background: #e0f2fe; color: #0284c7; font-size: 10px; font-weight: 600; text-align: center; }
+          body {
+            font-family: 'EB Garamond', serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 24px;
+            font-size: 11px;
+            line-height: 1.5;
+            background: #ffffff;
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px;
+            height: 420px;
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 0;
+            filter: grayscale(100%);
+          }
+          .content { position: relative; z-index: 1; }
+          .top-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1.5px solid #000;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+          }
+          .gov-ribbon {
+            text-align: center;
+            margin-bottom: 10px;
+          }
+          .gov-badge {
+            display: inline-block;
+            border: 1px solid #000;
+            padding: 3px 14px;
+            font-family: 'EB Garamond', serif;
+            font-weight: bold;
+            letter-spacing: 2px;
+            font-size: 9.5px;
+            text-transform: uppercase;
+            background: #ffffff;
+          }
+          .header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .logo-img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+          }
+          .title-box {
+            text-align: center;
+            flex: 1;
+            padding: 0 12px;
+          }
+          .title-box h1 {
+            margin: 0;
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          }
+          .title-box h2 {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            color: #0284c7;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .phone-badge {
+            background: #0284c7;
+            color: #ffffff;
+            padding: 5px 14px;
+            border-radius: 6px;
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 1px;
+            display: inline-block;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            border: 1.5px solid #000;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: #fafafa;
+          }
+          .meta-item { display: flex; flex-direction: column; gap: 1px; }
+          .meta-label { font-size: 8.5px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+          .meta-val { font-family: 'Courier Prime', monospace; font-weight: bold; font-size: 11px; color: #0f172a; }
+          .section-heading {
+            font-family: 'EB Garamond', serif;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1.5px solid #000;
+            padding-bottom: 4px;
+            margin-top: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1.5px solid #000;
+            font-family: 'Courier Prime', monospace;
+            font-size: 10px;
+          }
+          .data-table th {
+            background: #f1f5f9;
+            border: 1px solid #000;
+            padding: 7px 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 8.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .data-table td {
+            border: 1px solid #cbd5e1;
+          }
+          .sig-container {
+            margin-top: 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .seal-box {
+            border: 2px dashed #0284c7;
+            padding: 10px 16px;
+            border-radius: 6px;
+            background: #f0f9ff;
+            color: #0284c7;
+            font-family: 'Courier Prime', monospace;
+            font-size: 9.5px;
+            font-weight: bold;
+            text-align: center;
+          }
           .sig-box { text-align: right; }
-          .sig-line { width: 220px; border-bottom: 1.5px solid #202124; display: inline-block; margin-bottom: 6px; }
-          .footer { margin-top: 30px; border-top: 1px solid #dadce0; padding-top: 12px; display: flex; justify-content: space-between; color: #5f6368; font-size: 10px; }
+          .sig-line { width: 210px; border-bottom: 1.5px solid #000; display: inline-block; margin-bottom: 4px; }
+          .footer {
+            margin-top: 24px;
+            border-top: 1px solid #000;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Courier Prime', monospace;
+            font-size: 8.5px;
+            color: #64748b;
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="header-title">
-            <h1>Karnataka State Police · SCRB</h1>
-            <p>Call Detail Record (CDR) Telecom Tower Intercept Forensic Report</p>
-          </div>
-          <div style="text-align: right;">
-            <span class="phone-badge">${targetPhone}</span>
-            <p style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #5f6368;">REF: KSP-CDR-${Date.now().toString().slice(-6)}</p>
-          </div>
-        </div>
+        <!-- Background Official Seal Watermark -->
+        <img src="${kspLogo}" class="watermark" alt="" />
 
-        <div class="meta-grid">
-          <div class="meta-item">
-            <label>Target Subscriber Line</label>
-            <p style="color: #0284c7; font-family: monospace;">${targetPhone}</p>
-          </div>
-          <div class="meta-item">
-            <label>Subscriber Name</label>
-            <p>${subscriber}</p>
-          </div>
-          <div class="meta-item">
-            <label>Telecom Operator</label>
-            <p>${operator}</p>
-          </div>
-          <div class="meta-item">
-            <label>Hardware IMEI Number</label>
-            <p style="font-family: monospace;">${imei}</p>
-          </div>
-          <div class="meta-item">
-            <label>Tower District Jurisdiction</label>
-            <p>${districtName}</p>
-          </div>
-          <div class="meta-item">
-            <label>Total Call Detail Events</label>
-            <p style="color: #0284c7;">${callLogs.length} Records</p>
-          </div>
-        </div>
+        <div class="content">
+          <!-- Top Meta Barcode & QR Bar -->
+          <div class="top-meta">
+            <div>
+              <svg style="width: 120px; height: 16px;" viewBox="0 0 160 20">
+                <rect x="0" y="0" width="3" height="20" fill="black" />
+                <rect x="5" y="0" width="1" height="20" fill="black" />
+                <rect x="8" y="0" width="4" height="20" fill="black" />
+                <rect x="14" y="0" width="1" height="20" fill="black" />
+                <rect x="17" y="0" width="3" height="20" fill="black" />
+                <rect x="22" y="0" width="5" height="20" fill="black" />
+                <rect x="29" y="0" width="1" height="20" fill="black" />
+                <rect x="32" y="0" width="3" height="20" fill="black" />
+                <rect x="40" y="0" width="4" height="20" fill="black" />
+                <rect x="49" y="0" width="5" height="20" fill="black" />
+                <rect x="56" y="0" width="3" height="20" fill="black" />
+                <rect x="64" y="0" width="4" height="20" fill="black" />
+                <rect x="75" y="0" width="1" height="20" fill="black" />
+                <rect x="84" y="0" width="5" height="20" fill="black" />
+                <rect x="99" y="0" width="1" height="20" fill="black" />
+                <rect x="108" y="0" width="3" height="20" fill="black" />
+                <rect x="123" y="0" width="4" height="20" fill="black" />
+                <rect x="137" y="0" width="5" height="20" fill="black" />
+              </svg>
+              <div style="font-family: 'Courier Prime', monospace; font-size: 7px; color: #64748b;">CCTNS-CDR-${targetPhone.replace(/[^0-9]/g, "")}</div>
+            </div>
 
-        <div class="section-header">
-          <span>Chronological Call Detail Records (CDR) Feed</span>
-          <span style="font-size: 10px; color: #5f6368; font-weight: normal;">Telecom Intercept Evidence</span>
-        </div>
+            <div style="text-align: center; font-size: 8px; font-family: 'EB Garamond', serif; font-weight: bold;">
+              INTEGRATED CRIME RECORDS HUB (CCTNS CLOUD)<br/>
+              <span style="color: #0284c7;">STATUS: TELECOM TOWER INTERCEPT EVIDENCE RECORD</span>
+            </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: center;">#</th>
-              <th>Call Type</th>
-              <th>Target Contact Number</th>
-              <th>Contact Name / Role</th>
-              <th>Duration</th>
-              <th>Cell Tower Location</th>
-              <th>District</th>
-              <th>Timestamp</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="sig-container">
-          <div class="seal-box">
-            OFFICIAL CYBER TELECOM INTERCEPT SEAL<br/>
-            STATE CRIME RECORDS BUREAU · KARNATAKA
+            <div style="border: 1px solid #000; padding: 4px 8px; font-family: 'Courier Prime', monospace; font-size: 7px; text-align: center;">
+              <strong>KSP VERIFIED</strong><br/>
+              <span>SHA: CDR-${Date.now().toString().slice(-6)}</span>
+            </div>
           </div>
-          <div class="sig-box">
-            <div class="sig-line"></div>
-            <p style="margin: 0; font-size: 11px; font-weight: 700;">Cyber & Telecom Nodal Officer</p>
-            <p style="margin: 2px 0 0 0; font-size: 10px; color: #5f6368;">State Crime Records Bureau (SCRB)</p>
-          </div>
-        </div>
 
-        <div class="footer">
-          <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
-          <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+          <!-- Government Ribbon Header -->
+          <div class="gov-ribbon">
+            <div class="gov-badge">Government of Karnataka · State Crime Records Bureau</div>
+          </div>
+
+          <!-- Main Header with Logo -->
+          <div class="header-main">
+            <img src="${kspLogo}" class="logo-img" alt="KSP Logo" />
+            <div class="title-box">
+              <h1>KARNATAKA STATE POLICE DEPARTMENT</h1>
+              <h2>CALL DETAIL RECORD (CDR) TELECOM TOWER INTERCEPT FORENSIC REPORT</h2>
+            </div>
+            <div>
+              <span class="phone-badge">${targetPhone}</span>
+            </div>
+          </div>
+
+          <!-- Metadata Summary Grid -->
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Target Subscriber Line</span>
+              <span class="meta-val" style="color: #0284c7;">${targetPhone}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Subscriber Name</span>
+              <span class="meta-val">${subscriber}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Telecom Operator</span>
+              <span class="meta-val">${operator}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Hardware IMEI Number</span>
+              <span class="meta-val">${imei}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Tower Jurisdiction</span>
+              <span class="meta-val">${districtName}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Call Events</span>
+              <span class="meta-val" style="color: #0284c7;">${callLogs.length} Records</span>
+            </div>
+          </div>
+
+          <!-- Section Heading -->
+          <div class="section-heading">
+            <span>Chronological Call Detail Records (CDR) Feed</span>
+            <span style="font-size: 9px; font-weight: normal; color: #64748b;">TELECOM INTERCEPT EVIDENCE</span>
+          </div>
+
+          <!-- CDR Data Table -->
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 30px;">#</th>
+                <th>Call Type</th>
+                <th>Target Contact Number</th>
+                <th>Contact Name / Role</th>
+                <th>Duration</th>
+                <th>Cell Tower Location</th>
+                <th>District</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <!-- Official Signatures & Digital Seal -->
+          <div class="sig-container">
+            <div class="seal-box">
+              📡 OFFICIAL CYBER TELECOM INTERCEPT SEAL<br/>
+              STATE CRIME RECORDS BUREAU (SCRB) · KARNATAKA
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <p style="margin: 0; font-size: 11px; font-weight: bold; font-family: 'EB Garamond', serif;">Cyber & Telecom Nodal Officer Signature</p>
+              <p style="margin: 2px 0 0 0; font-size: 9px; font-family: 'Courier Prime', monospace; color: #475569;">State Crime Records Bureau (SCRB)</p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="footer">
+            <span>Official Law Enforcement Evidence Document · Strictly Confidential</span>
+            <span>Generated on: ${new Date().toLocaleString("en-IN")}</span>
+          </div>
         </div>
 
         <script>
